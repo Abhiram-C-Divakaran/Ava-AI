@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ava AI — Privacy Policy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ─── CSS Variables ────────────────────────────────────────── */
+        :root {
+            --bg-deep: #0F0A2A;
+            --bg-mid: #1A1040;
+            --bg-darker: #08051A;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --bg-card-hover: rgba(255, 255, 255, 0.08);
+            --bg-input: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --border-light: rgba(255, 255, 255, 0.12);
+            --text-primary: #F0EEFF;
+            --text-secondary: #B8B0D8;
+            --text-muted: #7A6F9A;
+            --text-dim: rgba(240, 238, 255, 0.60);
+            --text-dimmer: rgba(240, 238, 255, 0.35);
+            --cyan: #54E6F2;
+            --violet: #A78BFA;
+            --violet-dark: #7C5CBF;
+            --pink: #F472B6;
+            --blue: #60A5FA;
+            --green: #4ADE80;
+            --gradient-primary: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --gradient-secondary: linear-gradient(135deg, #F472B6, #A78BFA);
+            --gradient-accent: linear-gradient(135deg, #54E6F2, #F472B6);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-full: 999px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --btn-bg: rgba(255, 255, 255, 0.05);
+            --btn-hover: rgba(255, 255, 255, 0.10);
+            --nav-bg: rgba(15, 10, 42, 0.88);
+            --nav-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            --badge-bg: rgba(255, 255, 255, 0.06);
+            --badge-text: #B8B0D8;
+            --logo-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-text: #0F0A2A;
+            --accent-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --card-text: #F0EEFF;
+            --card-secondary: #B8B0D8;
+            --border-card: rgba(255,255,255,0.06);
+            --glow-color: rgba(84, 230, 242, 0.06);
+        }
+
+        /* ─── Light Mode ────────────────────────────────────────────── */
+        body.light-mode {
+            --bg-deep: #F8F6FF;
+            --bg-mid: #F0ECFA;
+            --bg-darker: #E8E2F5;
+            --bg-card: rgba(255, 255, 255, 0.5);
+            --bg-card-hover: rgba(255, 255, 255, 0.8);
+            --bg-input: rgba(255, 255, 255, 0.5);
+            --border-color: rgba(27, 22, 100, 0.06);
+            --border-light: rgba(27, 22, 100, 0.12);
+            --text-primary: #1D1230;
+            --text-secondary: #3D2E5A;
+            --text-muted: #6B5D82;
+            --text-dim: rgba(29, 18, 48, 0.60);
+            --text-dimmer: rgba(29, 18, 48, 0.35);
+            --shadow-card: 0 8px 32px rgba(27, 22, 100, 0.06);
+            --btn-bg: rgba(27, 22, 100, 0.04);
+            --btn-hover: rgba(27, 22, 100, 0.08);
+            --nav-bg: rgba(248, 246, 255, 0.88);
+            --nav-shadow: 0 4px 20px rgba(27, 22, 100, 0.06);
+            --badge-bg: rgba(27, 22, 100, 0.04);
+            --badge-text: #3D2E5A;
+            --logo-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-text: #0F0A2A;
+            --card-text: #1D1230;
+            --card-secondary: #3D2E5A;
+            --border-card: rgba(27, 22, 100, 0.06);
+            --glow-color: rgba(84, 230, 242, 0.04);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 4px; }
+
+        h1, h2, h3, .logo-text { font-family: 'Sora', sans-serif; }
+        a { text-decoration: none; color: inherit; }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 6%;
+        }
+
+        /* ─── Buttons ────────────────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0 24px;
+            line-height: 42px;
+            border-radius: var(--radius-full);
+            transition: var(--transition);
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: center;
+            background: var(--btn-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .btn:hover {
+            background: var(--btn-hover);
+            border-color: var(--border-light);
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(84, 230, 242, 0.15);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 8px 28px rgba(84, 230, 242, 0.25);
+            transform: translateY(-2px);
+            border-color: transparent;
+        }
+        .btn-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            color: #0F0A2A;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        body.light-mode .btn-circle {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* ─── Theme Toggle ──────────────────────────────────────────── */
+        .theme-toggle {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            padding: 6px 12px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            line-height: 1;
+        }
+        .theme-toggle:hover {
+            background: var(--btn-hover);
+            border-color: var(--border-light);
+            color: var(--text-primary);
+        }
+        .theme-toggle .icon {
+            font-size: 0.9rem;
+        }
+
+        /* ─── Navigation ────────────────────────────────────────────── */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 6%;
+            background: var(--nav-bg);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            transition: var(--transition);
+            box-shadow: var(--nav-shadow);
+        }
+        .nav .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+        }
+        .nav .logo svg { 
+            width: 30px; 
+            height: 30px; 
+        }
+        .nav .logo .logo-text {
+            background: var(--logo-color);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav .logo .logo-text span { 
+            -webkit-text-fill-color: transparent;
+        }
+        .nav .logo .badge {
+            font-size: 0.5rem;
+            font-weight: 600;
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            padding: 2px 10px;
+            border-radius: var(--radius-full);
+            margin-left: 4px;
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-links {
+            display: flex;
+            gap: 28px;
+            align-items: center;
+        }
+        .nav-links a {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            position: relative;
+        }
+        .nav-links a:hover { color: var(--text-primary); }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-primary);
+            transition: var(--transition);
+        }
+        .nav-links a:hover::after { width: 100%; }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .nav-actions .btn-signup {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            border: none;
+            padding: 0 20px;
+            line-height: 36px;
+            font-size: 0.82rem;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+        .nav-actions .btn-signup:hover {
+            box-shadow: 0 4px 20px rgba(84, 230, 242, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* ─── Hero Section ──────────────────────────────────────────── */
+        .hero {
+            padding: 120px 0 40px;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-deep);
+        }
+        .hero-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero-glow.one {
+            width: 400px;
+            height: 400px;
+            background: rgba(84, 230, 242, 0.06);
+            top: -100px;
+            right: -100px;
+            animation: float-glow 8s ease-in-out infinite;
+        }
+        .hero-glow.two {
+            width: 300px;
+            height: 300px;
+            background: rgba(167, 139, 250, 0.06);
+            bottom: -80px;
+            left: -80px;
+            animation: float-glow 10s ease-in-out infinite reverse;
+        }
+        @keyframes float-glow {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(20px, -15px) scale(1.1); }
+        }
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+        .hero-content .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--badge-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            padding: 4px 16px 4px 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--badge-text);
+            margin-bottom: 16px;
+        }
+        .hero-content .badge span {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            padding: 2px 12px;
+            border-radius: var(--radius-full);
+            font-size: 0.65rem;
+        }
+        .hero-content h1 {
+            font-size: clamp(2.5rem, 4vw, 3.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .hero-content h1 .highlight {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-content p {
+            font-size: 1.05rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-width: 600px;
+        }
+
+        /* ─── Content ───────────────────────────────────────────────── */
+        .content-section {
+            padding: 60px 0 80px;
+            position: relative;
+            background: var(--bg-deep);
+        }
+        .content-section .container {
+            max-width: 820px;
+        }
+
+        .content-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 40px 44px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(8px);
+            transition: var(--transition);
+        }
+        .content-card:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+        }
+        .content-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .content-card h2 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--card-text);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .content-card h2 .icon {
+            font-size: 1.4rem;
+        }
+        .content-card p {
+            color: var(--card-secondary);
+            font-size: 0.98rem;
+            line-height: 1.8;
+            margin-bottom: 12px;
+        }
+        .content-card p:last-child {
+            margin-bottom: 0;
+        }
+        .content-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .content-card ul li {
+            color: var(--card-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            padding-left: 24px;
+            position: relative;
+        }
+        .content-card ul li::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 10px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+        }
+        .content-card .last-updated {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-style: italic;
+            margin-top: 4px;
+        }
+
+        /* ─── Footer ────────────────────────────────────────────────── */
+        .footer {
+            background: var(--bg-darker);
+            border-top: 1px solid var(--border-color);
+            padding: 40px 0 30px;
+        }
+        .footer-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .footer-brand h3 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .footer-brand h3 span { 
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .footer-brand p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 2px;
+        }
+        .footer-links {
+            display: flex;
+            gap: 24px;
+        }
+        .footer-links a {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            transition: var(--transition);
+        }
+        .footer-links a:hover { color: var(--text-primary); }
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* ─── Responsive ────────────────────────────────────────────── */
+        @media (max-width: 1024px) {
+            .hero { padding: 110px 0 30px; }
+            .hero-glow.one { width: 300px; height: 300px; top: -60px; right: -60px; }
+            .hero-glow.two { width: 200px; height: 200px; bottom: -40px; left: -40px; }
+        }
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .nav-links.open { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-deep); padding: 20px; gap: 16px; border-bottom: 1px solid var(--border-color); }
+            .hamburger { display: block; }
+            .hero { padding: 100px 0 20px; }
+            .hero-content h1 { font-size: 2rem; }
+            .content-card { padding: 28px 20px; }
+            .content-card h2 { font-size: 1.1rem; }
+            .footer-grid { flex-direction: column; text-align: center; }
+            .footer-links { justify-content: center; }
+        }
+        @media (max-width: 480px) {
+            .hero-content h1 { font-size: 1.7rem; }
+            .content-card { padding: 20px 16px; }
+            .content-card p { font-size: 0.9rem; }
+            .content-card ul li { font-size: 0.88rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── SVG Defs ─────────────────────────────────────────────────────── -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+        <linearGradient id="gradient-primary" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#54E6F2"/>
+            <stop offset="100%" stop-color="#A78BFA"/>
+        </linearGradient>
+        <linearGradient id="gradient-secondary" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#F472B6"/>
+            <stop offset="100%" stop-color="#A78BFA"/>
+        </linearGradient>
+        <symbol id="logo" viewBox="0 0 60 60">
+            <circle cx="30" cy="15" r="14" fill="url(#gradient-primary)"/>
+            <circle cx="45" cy="40" r="14" fill="#54E6F2" opacity="0.85"/>
+            <circle cx="15" cy="40" r="14" fill="#A78BFA" opacity="0.85"/>
+        </symbol>
+    </defs>
+</svg>
+
+<!-- ─── Navigation ───────────────────────────────────────────────────── -->
+<nav class="nav" id="navbar">
+    <a class="logo" href="index.html">
+        <svg viewBox="0 0 60 60"><use href="#logo"/></svg>
+        <span class="logo-text">Ava<span>AI</span></span>
+        <span class="badge">v3.0</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#how-it-works">How It Works</a>
+        <a href="index.html#faq">FAQ</a>
+        <a href="privacy.html">Privacy</a>
+        <div class="nav-actions">
+            <a href="auth.html?mode=signup" class="btn-signup">Sign Up</a>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <span class="icon" id="themeIcon">🌙</span>
+            </button>
+        </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">☰</button>
+</nav>
+
+<!-- ─── Hero Section ────────────────────────────────────────────────── -->
+<section class="hero" id="hero">
+    <div class="hero-glow one"></div>
+    <div class="hero-glow two"></div>
+    <div class="container">
+        <div class="hero-content">
+            <div class="badge"><span>Legal</span> Privacy Policy</div>
+            <h1>Your Privacy <br><span class="highlight">Matters to Us</span></h1>
+            <p>We believe in transparency. Here's how we handle your data when you use Ava AI.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Content Section ────────────────────────────────────────────── -->
+<section class="content-section">
+    <div class="container">
+        <div class="content-card">
+            <h2><span class="icon">📋</span> 1. What We Collect</h2>
+            <p>To provide Ava's memory-aware support experience, we collect the following information:</p>
+            <ul>
+                <li><strong>Account Information</strong> — your name, email address, and encrypted password</li>
+                <li><strong>Conversation Content</strong> — messages you send and responses we generate</li>
+                <li><strong>Metadata</strong> — sentiment scores, detected intent, frustration ratings, and interaction timestamps</li>
+                <li><strong>Usage Data</strong> — how you interact with Ava, including features used and session duration</li>
+            </ul>
+            <p class="last-updated">Last updated: June 28, 2026</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🔧</span> 2. How We Use Your Data</h2>
+            <p>We use your data to provide and improve Ava AI's functionality:</p>
+            <ul>
+                <li><strong>Respond to your messages</strong> and maintain conversation context across sessions</li>
+                <li><strong>Generate sentiment, intent, and frustration scores</strong> that help Ava respond appropriately</li>
+                <li><strong>Improve accuracy and reliability</strong> over time through aggregated analysis</li>
+                <li><strong>Personalize your experience</strong> by remembering preferences and past interactions</li>
+            </ul>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🧠</span> 3. Persistent Memory</h2>
+            <p>Ava stores a summary of past conversations so you don't have to repeat yourself. This includes:</p>
+            <ul>
+                <li><strong>Important facts</strong> you've shared (name, preferences, ongoing projects)</li>
+                <li><strong>Recurring topics</strong> and issues you've discussed</li>
+                <li><strong>Contextual information</strong> that helps Ava provide better responses</li>
+            </ul>
+            <p>You can view, export, or delete this stored memory at any time from your account settings.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🔒</span> 4. Data Sharing</h2>
+            <p>We take your privacy seriously. We do not sell or rent your personal data to third parties.</p>
+            <p>Information may be shared with service providers who help operate Ava (such as hosting providers, LLM API providers, and analytics services), under strict confidentiality obligations.</p>
+            <p>We only share data that is necessary for the operation of the service, and we ensure all third-party providers comply with industry-standard security practices.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🗑️</span> 5. Data Retention &amp; Deletion</h2>
+            <p>You have control over your data:</p>
+            <ul>
+                <li><strong>Retention</strong> — your data is stored as long as your account is active</li>
+                <li><strong>Deletion</strong> — you can request deletion of your account and all associated conversation history at any time</li>
+                <li><strong>Export</strong> — you can export all your data in a machine-readable format</li>
+            </ul>
+            <p>We'll remove your data within a reasonable period after a deletion request, except where retention is required by law or for legitimate business purposes.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🛡️</span> 6. Security</h2>
+            <p>We implement industry-standard security measures to protect your data:</p>
+            <ul>
+                <li><strong>Encryption</strong> — all data is encrypted in transit (TLS) and at rest</li>
+                <li><strong>Authentication</strong> — password hashing with PBKDF2 and secure session management</li>
+                <li><strong>Access Controls</strong> — strict internal access policies and monitoring</li>
+                <li><strong>Regular Audits</strong> — periodic security reviews and vulnerability assessments</li>
+            </ul>
+            <p>While we strive to protect your data, no system is 100% secure. We encourage you to use strong, unique passwords and enable two-factor authentication where available.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">📧</span> 7. Contact Us</h2>
+            <p>If you have any questions about this Privacy Policy or how we handle your data, please reach out:</p>
+            <p style="margin-top:8px;">
+                <strong>Email:</strong> <a href="mailto:privacy@ava.ai" style="color:var(--violet);text-decoration:underline;">privacy@ava.ai</a><br>
+                <strong>Response time:</strong> We aim to respond within 48 hours
+            </p>
+            <p class="last-updated">Last updated: June 28, 2026</p>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Footer ──────────────────────────────────────────────────────── -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h3>Ava<span>AI</span></h3>
+                <p>Your intelligent support assistant</p>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#features">Features</a>
+                <a href="terms.html">Terms of Service</a>
+                <a href="privacy.html">Privacy</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            Copyright © Ava AI 2026. All rights reserved.
+        </div>
+    </div>
+</footer>
+
+<script>
+    // ─── Theme Toggle — SYNCED WITH INDEX ────────────────────────────
+    (function() {
+        const body = document.body;
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+
+        // Get the saved theme from localStorage (shared with index.html)
+        // Default to 'dark' if not set, matching index.html
+        const savedTheme = localStorage.getItem('ava-theme') || 'dark';
+
+        function setTheme(theme) {
+            const isDark = theme === 'dark';
+            
+            // Toggle the light-mode class on the body
+            if (isDark) {
+                body.classList.remove('light-mode');
+                if (themeIcon) themeIcon.textContent = '🌙';
+            } else {
+                body.classList.add('light-mode');
+                if (themeIcon) themeIcon.textContent = '☀️';
+            }
+            
+            // Save to localStorage so index.html sees the change
+            localStorage.setItem('ava-theme', theme);
+        }
+
+        // Apply the saved theme immediately
+        setTheme(savedTheme);
+
+        // Listen for changes from other tabs/windows (cross-tab sync)
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'ava-theme') {
+                const newTheme = e.newValue || 'dark';
+                setTheme(newTheme);
+            }
+        });
+
+        // Add click event listener to toggle
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Determine current mode (check if light-mode class is present)
+                const isDark = !body.classList.contains('light-mode');
+                // Toggle to opposite
+                setTheme(isDark ? 'light' : 'dark');
+            });
+        }
+
+        console.log('🔆 Privacy page theme loaded:', savedTheme);
+    })();
+
+    // ─── Hamburger Menu ──────────────────────────────────────────────
+    document.getElementById('hamburger').addEventListener('click', function() {
+        document.getElementById('navLinks').classList.toggle('open');
+    });
+
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', () => {
+            document.getElementById('navLinks').classList.remove('open');
+        });
+    });
+</script>
+</body>
+</html>

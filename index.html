@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ava AI — Your Personal Intelligence Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ─── CSS Variables ────────────────────────────────────────── */
+        :root {
+            --bg-deep: #0F0A2A;
+            --bg-mid: #1A1040;
+            --bg-darker: #08051A;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --bg-card-hover: rgba(255, 255, 255, 0.10);
+            --bg-input: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --border-light: rgba(255, 255, 255, 0.12);
+            --text-primary: #F0EEFF;
+            --text-secondary: #B8B0D8;
+            --text-muted: #7A6F9A;
+            --text-dim: rgba(240, 238, 255, 0.60);
+            --text-dimmer: rgba(240, 238, 255, 0.35);
+            --cyan: #54E6F2;
+            --violet: #A78BFA;
+            --violet-dark: #7C5CBF;
+            --pink: #F472B6;
+            --blue: #60A5FA;
+            --green: #4ADE80;
+            --gradient-primary: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --gradient-secondary: linear-gradient(135deg, #F472B6, #A78BFA);
+            --gradient-accent: linear-gradient(135deg, #54E6F2, #F472B6);
+            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-full: 999px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --btn-bg: rgba(255, 255, 255, 0.05);
+            --btn-hover: rgba(255, 255, 255, 0.10);
+            --nav-bg: rgba(15, 10, 42, 0.88);
+            --nav-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            --image-filter: grayscale(0.2) brightness(1.0) contrast(1.1);
+            --badge-bg: rgba(255, 255, 255, 0.06);
+            --badge-text: #B8B0D8;
+            --logo-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-text: #0F0A2A;
+            --accent-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --step-number-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --step-number-text: #0F0A2A;
+            --avatar-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --avatar-text: #0F0A2A;
+            --star-color: #FBBF24;
+            --footer-brand-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --hero-text: #F0EEFF;
+            --section-bg: rgba(255,255,255,0.02);
+            --section-alt-bg: rgba(255,255,255,0.04);
+            --card-text: #F0EEFF;
+            --card-secondary: #B8B0D8;
+            --border-card: rgba(255,255,255,0.06);
+            --glow-color: rgba(84, 230, 242, 0.06);
+            --theme-icon: '☀️';
+        }
+
+        /* ─── Light Mode ────────────────────────────────────────────── */
+        body.light-mode {
+            --bg-deep: #F8F6FF;
+            --bg-mid: #F0ECFA;
+            --bg-darker: #E8E2F5;
+            --bg-card: rgba(255, 255, 255, 0.5);
+            --bg-card-hover: rgba(255, 255, 255, 0.8);
+            --bg-input: rgba(255, 255, 255, 0.5);
+            --border-color: rgba(27, 22, 100, 0.06);
+            --border-light: rgba(27, 22, 100, 0.12);
+            --text-primary: #1D1230;
+            --text-secondary: #3D2E5A;
+            --text-muted: #6B5D82;
+            --text-dim: rgba(29, 18, 48, 0.60);
+            --text-dimmer: rgba(29, 18, 48, 0.35);
+            --shadow-card: 0 8px 32px rgba(27, 22, 100, 0.06);
+            --btn-bg: rgba(27, 22, 100, 0.04);
+            --btn-hover: rgba(27, 22, 100, 0.08);
+            --nav-bg: rgba(248, 246, 255, 0.88);
+            --nav-shadow: 0 4px 20px rgba(27, 22, 100, 0.06);
+            --image-filter: grayscale(0.2) brightness(1.0);
+            --badge-bg: rgba(27, 22, 100, 0.04);
+            --badge-text: #3D2E5A;
+            --logo-color: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-bg: linear-gradient(135deg, #54E6F2, #A78BFA);
+            --btn-primary-text: #0F0A2A;
+            --card-text: #1D1230;
+            --card-secondary: #3D2E5A;
+            --border-card: rgba(27, 22, 100, 0.06);
+            --glow-color: rgba(84, 230, 242, 0.04);
+            --theme-icon: '🌙';
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 4px; }
+
+        h1, h2, h3, .logo-text { font-family: 'Sora', sans-serif; }
+        a { text-decoration: none; color: inherit; }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 6%;
+        }
+
+        /* ─── Buttons ────────────────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0 24px;
+            line-height: 42px;
+            border-radius: var(--radius-full);
+            transition: var(--transition);
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: center;
+            background: var(--btn-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .btn:hover {
+            background: var(--btn-hover);
+            border-color: var(--border-light);
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(84, 230, 242, 0.15);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 8px 28px rgba(84, 230, 242, 0.25);
+            transform: translateY(-2px);
+            border-color: transparent;
+        }
+        .btn-secondary {
+            background: var(--gradient-secondary);
+            color: var(--btn-primary-text);
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(167, 139, 250, 0.15);
+        }
+        .btn-secondary:hover {
+            box-shadow: 0 8px 28px rgba(167, 139, 250, 0.25);
+            transform: translateY(-2px);
+            border-color: transparent;
+        }
+        .btn-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            color: #0F0A2A;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        body.light-mode .btn-circle {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* ─── Theme Toggle ──────────────────────────────────────────── */
+        .theme-toggle {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            padding: 6px 12px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            line-height: 1;
+        }
+        .theme-toggle:hover {
+            background: var(--btn-hover);
+            border-color: var(--border-light);
+            color: var(--text-primary);
+        }
+        .theme-toggle .icon {
+            font-size: 0.9rem;
+        }
+
+        /* ─── Navigation ────────────────────────────────────────────── */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 6%;
+            background: var(--nav-bg);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            transition: var(--transition);
+            box-shadow: var(--nav-shadow);
+        }
+        .nav .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+        }
+        .nav .logo svg { 
+            width: 30px; 
+            height: 30px; 
+        }
+        .nav .logo .logo-text {
+            background: var(--logo-color);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav .logo .logo-text span { 
+            -webkit-text-fill-color: transparent;
+        }
+        .nav .logo .badge {
+            font-size: 0.5rem;
+            font-weight: 600;
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            padding: 2px 10px;
+            border-radius: var(--radius-full);
+            margin-left: 4px;
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-links {
+            display: flex;
+            gap: 28px;
+            align-items: center;
+        }
+        .nav-links a {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            position: relative;
+        }
+        .nav-links a:hover { color: var(--text-primary); }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-primary);
+            transition: var(--transition);
+        }
+        .nav-links a:hover::after { width: 100%; }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .nav-actions .btn-signup {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            border: none;
+            padding: 0 20px;
+            line-height: 36px;
+            font-size: 0.82rem;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+        .nav-actions .btn-signup:hover {
+            box-shadow: 0 4px 20px rgba(84, 230, 242, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* ─── Hero Section ──────────────────────────────────────────── */
+        .hero {
+            padding: 120px 0 60px;
+            position: relative;
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: var(--bg-deep);
+        }
+        .hero-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero-glow.one {
+            width: 500px;
+            height: 500px;
+            background: rgba(84, 230, 242, 0.08);
+            top: -150px;
+            right: -150px;
+            animation: float-glow 8s ease-in-out infinite;
+        }
+        .hero-glow.two {
+            width: 400px;
+            height: 400px;
+            background: rgba(167, 139, 250, 0.08);
+            bottom: -100px;
+            left: -100px;
+            animation: float-glow 10s ease-in-out infinite reverse;
+        }
+        @keyframes float-glow {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -20px) scale(1.1); }
+        }
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.1fr;
+            gap: 50px;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+        .hero-content .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--badge-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            padding: 4px 16px 4px 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--badge-text);
+            margin-bottom: 20px;
+        }
+        .hero-content .badge span {
+            background: var(--gradient-primary);
+            color: var(--btn-primary-text);
+            padding: 2px 12px;
+            border-radius: var(--radius-full);
+            font-size: 0.65rem;
+        }
+        .hero-content h1 {
+            font-size: clamp(2.8rem, 5.5vw, 4.2rem);
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+        .hero-content h1 .highlight {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-content p {
+            font-size: 1.05rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-width: 480px;
+            margin-bottom: 24px;
+        }
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .hero-trust {
+            display: flex;
+            gap: 20px;
+            margin-top: 24px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+        .hero-trust span { display: flex; align-items: center; gap: 5px; }
+
+        .hero-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .hero-visual .image-placeholder {
+            max-width: 380px;
+            width: 100%;
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: var(--transition);
+            background: transparent;
+        }
+        .hero-visual .image-placeholder:hover {
+            transform: translateY(-4px);
+        }
+        .hero-visual .image-placeholder img {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: var(--image-filter);
+            transition: filter 0.3s ease;
+        }
+
+        /* ─── Stats Banner ──────────────────────────────────────────── */
+        .stats-banner {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 40px 0;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 60px;
+            background: var(--bg-deep);
+        }
+        .stat-item { text-align: center; }
+        .stat-number {
+            font-family: 'Sora', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+        .stat-empty {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 2px;
+        }
+
+        /* ─── Section Styles ────────────────────────────────────────── */
+        .section { padding: 80px 0; }
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        .section-header h2 {
+            font-size: clamp(1.8rem, 3vw, 2.4rem);
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .section-header p {
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 8px auto 0;
+            font-size: 1.05rem;
+        }
+
+        /* Section backgrounds - blended */
+        .section-alt { background: var(--section-alt-bg); }
+        .section-light { background: var(--section-bg); }
+
+        /* ─── How It Works ──────────────────────────────────────────── */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+        .step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 32px 28px;
+            text-align: center;
+            transition: var(--transition);
+            color: var(--card-text);
+            backdrop-filter: blur(8px);
+        }
+        .step:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-card);
+        }
+        .step-number {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--step-number-bg);
+            color: var(--step-number-text);
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+        .step h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; color: var(--card-text); }
+        .step p { color: var(--card-secondary); font-size: 0.95rem; line-height: 1.6; }
+
+        /* ─── Features ──────────────────────────────────────────────── */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            transition: var(--transition);
+            color: var(--card-text);
+            backdrop-filter: blur(8px);
+        }
+        .feature-card:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-card);
+        }
+        .feature-card .icon { font-size: 2rem; margin-bottom: 12px; }
+        .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; color: var(--card-text); }
+        .feature-card p { color: var(--card-secondary); font-size: 0.92rem; line-height: 1.6; }
+
+        /* ─── Use Cases ─────────────────────────────────────────────── */
+        .use-cases-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+        .use-case {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            text-align: center;
+            transition: var(--transition);
+            color: var(--card-text);
+            backdrop-filter: blur(8px);
+        }
+        .use-case:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-card);
+        }
+        .use-case .icon { font-size: 2.4rem; margin-bottom: 12px; }
+        .use-case h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; color: var(--card-text); }
+        .use-case p { color: var(--card-secondary); font-size: 0.88rem; line-height: 1.6; }
+
+        /* ─── FAQ ────────────────────────────────────────────────────── */
+        .faq-section {
+            position: relative;
+            overflow: hidden;
+            padding: 80px 0;
+            background: var(--section-alt-bg);
+        }
+        .faq-section .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: flex-start;
+        }
+        .faq-section .faq-image {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: sticky;
+            top: 140px;
+        }
+        .faq-section .faq-image img {
+            max-width: 280px;
+            width: 100%;
+            height: auto;
+            filter: var(--image-filter);
+            transition: filter 0.3s ease;
+            border-radius: var(--radius);
+        }
+        .faq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .faq-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            transition: var(--transition);
+            color: var(--card-text);
+            backdrop-filter: blur(8px);
+        }
+        .faq-item:hover {
+            border-color: var(--border-light);
+        }
+        .faq-question {
+            padding: 16px 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--transition);
+            background: var(--bg-card);
+            border: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+            color: var(--card-text);
+        }
+        .faq-question:hover {
+            color: var(--violet);
+        }
+        .faq-question .arrow {
+            transition: var(--transition);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .faq-item.open .faq-question .arrow {
+            transform: rotate(180deg);
+        }
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            padding: 0 20px;
+            color: var(--card-secondary);
+            font-size: 0.92rem;
+            line-height: 1.7;
+        }
+        .faq-item.open .faq-answer {
+            max-height: 200px;
+            padding: 0 20px 16px;
+        }
+
+        /* ─── Footer ────────────────────────────────────────────────── */
+        .footer {
+            background: var(--bg-darker);
+            border-top: 1px solid var(--border-color);
+            padding: 60px 0 30px;
+            margin-top: 0;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 40px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .footer-brand h3 {
+            font-family: 'Sora', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .footer-brand h3 span { 
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .footer-brand .footer-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .footer-brand .footer-logo svg {
+            width: 28px;
+            height: 28px;
+        }
+        .footer-brand p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 8px;
+            max-width: 300px;
+            line-height: 1.6;
+        }
+        .footer-links h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+        .footer-links a {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 4px 0;
+            transition: var(--transition);
+        }
+        .footer-links a:hover { color: var(--text-primary); }
+        .footer-bottom {
+            text-align: center;
+            padding-top: 24px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ─── Animations ────────────────────────────────────────────── */
+        @keyframes fadeSlideDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ─── Responsive ────────────────────────────────────────────── */
+        @media (max-width: 1024px) {
+            .hero-grid { grid-template-columns: 1fr; text-align: center; gap: 40px; }
+            .hero-content p { margin-left: auto; margin-right: auto; }
+            .hero-actions { justify-content: center; }
+            .hero-trust { justify-content: center; }
+            .hero-visual .image-placeholder { max-width: 300px; margin: 0 auto; }
+            .stats-banner { grid-template-columns: repeat(2, 1fr); }
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .use-cases-grid { grid-template-columns: repeat(2, 1fr); }
+            .steps-grid { grid-template-columns: repeat(2, 1fr); }
+            .faq-section .container { grid-template-columns: 1fr; gap: 40px; }
+            .faq-section .faq-image { position: relative; top: 0; }
+            .faq-section .faq-image img { max-width: 200px; }
+            .footer-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .nav-links.open { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-deep); padding: 20px; gap: 16px; border-bottom: 1px solid var(--border-color); }
+            .hamburger { display: block; }
+            .nav-actions .btn-signup { display: none; }
+            .hero { padding: 100px 0 40px; min-height: auto; }
+            .hero-glow.one { width: 250px; height: 250px; top: -60px; right: -60px; }
+            .hero-glow.two { width: 200px; height: 200px; bottom: -40px; left: -40px; }
+            .hero-visual .image-placeholder { max-width: 250px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .use-cases-grid { grid-template-columns: 1fr; }
+            .steps-grid { grid-template-columns: 1fr; }
+            .stats-banner { grid-template-columns: 1fr 1fr; gap: 16px; }
+            .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+            .section { padding: 40px 0; }
+            .faq-section { padding: 40px 0; }
+            .faq-section .faq-image img { max-width: 150px; }
+            .hero-trust { gap: 12px; font-size: 0.75rem; }
+            .hero-trust span { white-space: nowrap; }
+        }
+        @media (max-width: 480px) {
+            .stats-banner { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .stat-number { font-size: 1.4rem; }
+            .hero-content h1 { font-size: 2rem; }
+            .hero-visual .image-placeholder { max-width: 200px; }
+            .hero-trust { gap: 8px; flex-direction: column; align-items: center; }
+            .faq-question { font-size: 0.88rem; padding: 14px 16px; }
+            .faq-answer { font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── SVG Defs ─────────────────────────────────────────────────────── -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+        <linearGradient id="gradient-primary" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#54E6F2"/>
+            <stop offset="100%" stop-color="#A78BFA"/>
+        </linearGradient>
+        <linearGradient id="gradient-secondary" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#F472B6"/>
+            <stop offset="100%" stop-color="#A78BFA"/>
+        </linearGradient>
+        <symbol id="logo" viewBox="0 0 60 60">
+            <circle cx="30" cy="15" r="14" fill="url(#gradient-primary)"/>
+            <circle cx="45" cy="40" r="14" fill="#54E6F2" opacity="0.85"/>
+            <circle cx="15" cy="40" r="14" fill="#A78BFA" opacity="0.85"/>
+        </symbol>
+    </defs>
+</svg>
+
+<!-- ─── Navigation ───────────────────────────────────────────────────── -->
+<nav class="nav" id="navbar">
+    <a class="logo" href="index.html">
+        <svg viewBox="0 0 60 60"><use href="#logo"/></svg>
+        <span class="logo-text">Ava<span>AI</span></span>
+        <span class="badge">v3.0</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#faq">FAQ</a>
+        <div class="nav-actions">
+            <a href="auth.html?mode=signup" class="btn-signup">Sign Up</a>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <span class="icon" id="themeIcon">☀️</span>
+            </button>
+        </div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">☰</button>
+</nav>
+
+<!-- ─── Hero Section ────────────────────────────────────────────────── -->
+<section class="hero" id="hero">
+    <div class="hero-glow one"></div>
+    <div class="hero-glow two"></div>
+    <div class="container">
+        <div class="hero-grid">
+            <div class="hero-content">
+                <div class="badge"><span>New</span> v3.0 — Smarter than ever</div>
+                <h1>Your Personal <br><span class="highlight">Intelligence Platform</span></h1>
+                <p>Ava reads tone, classifies intent, and tracks frustration in real time — then responds with a memory‑aware AI agent so you never have to repeat yourself.</p>
+                <div class="hero-actions">
+                    <a href="auth.html?mode=signup" class="btn btn-primary">Get Started</a>
+                    <a href="#features" class="btn">Learn More</a>
+                </div>
+                <div class="hero-trust">
+                    <span>✨ Used by teams worldwide</span>
+                    <span>🔒 100% free to start</span>
+                    <span>⚡ Instant responses</span>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="image-placeholder">
+                    <img src="cute-ai-robot-chatbot-reading-a-book-on-transparent-background-free-png.webp" alt="Ava robot reading a book">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Stats Banner ────────────────────────────────────────────────── -->
+<div class="container">
+    <div class="stats-banner">
+        <div class="stat-item">
+            <div class="stat-number" id="stat-conversations">0</div>
+            <div class="stat-label">Conversations</div>
+            <div class="stat-empty" id="stat-empty-conversations">No data yet</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number" id="stat-rating">0.0</div>
+            <div class="stat-label">Average Rating</div>
+            <div class="stat-empty" id="stat-empty-rating">No reviews yet</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number" id="stat-satisfaction">0%</div>
+            <div class="stat-label">Satisfaction Rate</div>
+            <div class="stat-empty" id="stat-empty-satisfaction">No data yet</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number" id="stat-users">0</div>
+            <div class="stat-label">Active Users</div>
+            <div class="stat-empty" id="stat-empty-users">No users yet</div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── How It Works ────────────────────────────────────────────────── -->
+<section class="section section-alt" id="how-it-works">
+    <div class="container">
+        <div class="section-header animate-on-scroll">
+            <h2>How It Works</h2>
+            <p>Get started with Ava in three simple steps</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step animate-on-scroll">
+                <div class="step-number">1</div>
+                <h3>Sign Up</h3>
+                <p>Create your free account in seconds — no credit card required.</p>
+            </div>
+            <div class="step animate-on-scroll">
+                <div class="step-number">2</div>
+                <h3>Start Chatting</h3>
+                <p>Ask Ava anything. It remembers context, so you never repeat yourself.</p>
+            </div>
+            <div class="step animate-on-scroll">
+                <div class="step-number">3</div>
+                <h3>Get Results</h3>
+                <p>Real-time answers with sentiment analysis, intent detection, and frustration tracking.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Features ────────────────────────────────────────────────────── -->
+<section class="section section-light" id="features">
+    <div class="container">
+        <div class="section-header animate-on-scroll">
+            <h2>Built for the conversations that matter</h2>
+            <p>Ava combines real-time emotional intelligence with persistent memory to deliver support that feels human.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">❤️</div>
+                <h3>Sentiment Analysis</h3>
+                <p>Every message is analyzed for tone, helping Ava respond with the right level of empathy and urgency.</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">🎯</div>
+                <h3>Intent Detection</h3>
+                <p>From billing to login issues, Ava automatically routes inquiries to the correct resolution path.</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">📊</div>
+                <h3>Frustration Scoring</h3>
+                <p>A real-time 0–1 score helps Ava de-escalate tense situations before they spiral.</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">🧠</div>
+                <h3>Persistent Memory</h3>
+                <p>Ava remembers your preferences, past conversations, and context across sessions.</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">⚡</div>
+                <h3>Code Execution</h3>
+                <p>Write, debug, and run code in Python, JavaScript, Java, C++, and more — right in the chat.</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <div class="icon">🌐</div>
+                <h3>Live Web Search</h3>
+                <p>Get real-time information from the web with automatic search integration.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Use Cases ───────────────────────────────────────────────────── -->
+<section class="section section-alt" id="use-cases">
+    <div class="container">
+        <div class="section-header animate-on-scroll">
+            <h2>Built for Teams Like Yours</h2>
+            <p>Whether you're in support, development, or content — Ava has you covered</p>
+        </div>
+        <div class="use-cases-grid">
+            <div class="use-case animate-on-scroll">
+                <div class="icon">🛠️</div>
+                <h3>Support Teams</h3>
+                <p>Handle tickets faster with sentiment-aware responses and automatic escalation detection.</p>
+            </div>
+            <div class="use-case animate-on-scroll">
+                <div class="icon">💻</div>
+                <h3>Developers</h3>
+                <p>Write, debug, and review code in any language with real-time execution and feedback.</p>
+            </div>
+            <div class="use-case animate-on-scroll">
+                <div class="icon">📝</div>
+                <h3>Content Creators</h3>
+                <p>Draft, edit, and polish content with AI assistance — from blog posts to technical documentation.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── FAQ Section ────────────────────────────────────────────────── -->
+<section class="faq-section" id="faq">
+    <div class="container">
+        <div class="faq-image">
+            <img src="pngegg.png" alt="Ava robot peeking">
+        </div>
+        <div>
+            <div class="section-header" style="text-align:left;margin-bottom:24px;">
+                <h2 style="font-size:clamp(1.5rem,2.5vw,2rem);">Frequently Asked Questions</h2>
+                <p style="font-size:1rem;">Quick answers to common questions</p>
+            </div>
+            <div class="faq-list">
+                <div class="faq-item open">
+                    <button class="faq-question" onclick="toggleFaq(this)">
+                        Is Ava really free?
+                        <span class="arrow">▾</span>
+                    </button>
+                    <div class="faq-answer">Yes! Ava is completely free to use. No credit card required, no hidden fees. We believe in making AI accessible to everyone.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" onclick="toggleFaq(this)">
+                        Does Ava remember my conversations?
+                        <span class="arrow">▾</span>
+                    </button>
+                    <div class="faq-answer">Yes, Ava remembers context across sessions. It uses a memory system that keeps track of important facts, preferences, and ongoing projects so you never have to repeat yourself.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" onclick="toggleFaq(this)">
+                        Can Ava write and run code?
+                        <span class="arrow">▾</span>
+                    </button>
+                    <div class="faq-answer">Absolutely! Ava can write, debug, explain, and execute code in Python, JavaScript, Java, C++, Go, Rust, Ruby, and many more languages.</div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" onclick="toggleFaq(this)">
+                        What languages does Ava support?
+                        <span class="arrow">▾</span>
+                    </button>
+                    <div class="faq-answer">Ava supports conversation in virtually any language and can translate between 29+ languages using DeepL integration.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── Footer ──────────────────────────────────────────────────────── -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <div class="footer-logo">
+                    <svg viewBox="0 0 60 60"><use href="#logo"/></svg>
+                    <h3>Ava<span>AI</span></h3>
+                </div>
+                <p>Your intelligent support assistant that reads sentiment, tracks frustration, and remembers context — so you never have to repeat yourself.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Product</h4>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="auth.html?mode=signup">Get Started</a>
+            </div>
+            <div class="footer-links">
+                <h4>Company</h4>
+                <a href="#">About</a>
+                <a href="#">Blog</a>
+                <a href="#">Contact</a>
+            </div>
+            <div class="footer-links">
+                <h4>Legal</h4>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms of Service</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            Copyright © Ava AI 2026. All rights reserved.
+        </div>
+    </div>
+</footer>
+
+<script>
+    // ─── Theme Toggle ────────────────────────────────────────────────
+    // This script runs immediately when the page loads
+    (function() {
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        
+        // Get saved theme from localStorage, default to 'dark'
+        const savedTheme = localStorage.getItem('ava-theme') || 'dark';
+        
+        function setTheme(theme) {
+            const isDark = theme === 'dark';
+            
+            // Toggle the light-mode class on the body
+            document.body.classList.toggle('light-mode', !isDark);
+            
+            // Update the icon
+            themeIcon.textContent = isDark ? '🌙' : '☀️';
+            
+            // Save preference
+            localStorage.setItem('ava-theme', theme);
+        }
+        
+        // Set initial theme
+        setTheme(savedTheme);
+        
+        // Add click event listener
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Determine current mode
+                const isDark = !document.body.classList.contains('light-mode');
+                // Toggle to opposite
+                setTheme(isDark ? 'light' : 'dark');
+            });
+        }
+    })();
+
+    // ─── Hamburger Menu ──────────────────────────────────────────────
+    document.getElementById('hamburger').addEventListener('click', function() {
+        document.getElementById('navLinks').classList.toggle('open');
+    });
+
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', () => {
+            document.getElementById('navLinks').classList.remove('open');
+        });
+    });
+
+    // ─── FAQ Toggle ──────────────────────────────────────────────────
+    function toggleFaq(element) {
+        const item = element.closest('.faq-item');
+        const isOpen = item.classList.contains('open');
+        document.querySelectorAll('.faq-item').forEach(el => {
+            if (el !== item) {
+                el.classList.remove('open');
+            }
+        });
+        item.classList.toggle('open');
+    }
+
+    // ─── Scroll Animations ───────────────────────────────────────────
+    function handleScrollAnimations() {
+        const elements = document.querySelectorAll('.animate-on-scroll');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        elements.forEach(el => observer.observe(el));
+    }
+
+    // ─── Smooth Navbar on Scroll ─────────────────────────────────────
+    function handleNavbarScroll() {
+        const nav = document.getElementById('navbar');
+        if (window.scrollY > 50) {
+            nav.style.boxShadow = 'var(--nav-shadow)';
+        } else {
+            nav.style.boxShadow = 'none';
+        }
+    }
+
+    window.addEventListener('scroll', handleNavbarScroll);
+
+    // ─── Update Stats with Real Data ──────────────────────────────────
+    async function updateStats() {
+        try {
+            const res = await fetch('/api/analytics');
+            if (res.ok) {
+                const data = await res.json();
+                
+                const conversationsEl = document.getElementById('stat-conversations');
+                const emptyConv = document.getElementById('stat-empty-conversations');
+                if (data.total_interactions && data.total_interactions > 0) {
+                    conversationsEl.textContent = data.total_interactions;
+                    emptyConv.textContent = `${data.total_interactions} total conversations`;
+                } else {
+                    conversationsEl.textContent = '0';
+                    emptyConv.textContent = 'No conversations yet';
+                }
+
+                const ratingEl = document.getElementById('stat-rating');
+                const emptyRating = document.getElementById('stat-empty-rating');
+                if (data.avg_frustration !== undefined && data.total_interactions > 0) {
+                    const rating = Math.max(0, Math.min(5, 5 - (data.avg_frustration || 0) * 4));
+                    ratingEl.textContent = rating.toFixed(1) + '⭐';
+                    emptyRating.textContent = `Based on ${data.total_interactions} interactions`;
+                } else {
+                    ratingEl.textContent = '0.0⭐';
+                    emptyRating.textContent = 'No reviews yet';
+                }
+
+                const satEl = document.getElementById('stat-satisfaction');
+                const emptySat = document.getElementById('stat-empty-satisfaction');
+                if (data.total_interactions > 0) {
+                    const sat = Math.round(Math.max(0, Math.min(100, (1 - (data.avg_frustration || 0)) * 100)));
+                    satEl.textContent = sat + '%';
+                    emptySat.textContent = `${sat}% satisfaction rate`;
+                } else {
+                    satEl.textContent = '0%';
+                    emptySat.textContent = 'No data yet';
+                }
+
+                const usersEl = document.getElementById('stat-users');
+                const emptyUsers = document.getElementById('stat-empty-users');
+                if (data.total_users && data.total_users > 0) {
+                    usersEl.textContent = data.total_users;
+                    emptyUsers.textContent = `${data.total_users} registered users`;
+                } else {
+                    usersEl.textContent = '0';
+                    emptyUsers.textContent = 'No users yet';
+                }
+            } else {
+                document.getElementById('stat-conversations').textContent = '0';
+                document.getElementById('stat-rating').textContent = '0.0⭐';
+                document.getElementById('stat-satisfaction').textContent = '0%';
+                document.getElementById('stat-users').textContent = '0';
+            }
+        } catch (e) {
+            console.log('Could not fetch analytics data, showing zeros');
+            document.getElementById('stat-conversations').textContent = '0';
+            document.getElementById('stat-rating').textContent = '0.0⭐';
+            document.getElementById('stat-satisfaction').textContent = '0%';
+            document.getElementById('stat-users').textContent = '0';
+            
+            document.getElementById('stat-empty-conversations').textContent = 'No conversations yet';
+            document.getElementById('stat-empty-rating').textContent = 'No reviews yet';
+            document.getElementById('stat-empty-satisfaction').textContent = 'No data yet';
+            document.getElementById('stat-empty-users').textContent = 'No users yet';
+        }
+    }
+
+    // ─── Init ─────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        handleScrollAnimations();
+        updateStats();
+    });
+</script>
+</body>
+</html>

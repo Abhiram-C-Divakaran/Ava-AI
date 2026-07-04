@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Chat - Ava AI</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f4ff;
+            padding: 20px;
+            max-width: 760px;
+            margin: 40px auto;
+            color: #1d1230;
+        }
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 18px;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .user {
+            background: #e3cdfb;
+            border-radius: 18px 18px 4px 18px;
+        }
+        .ava {
+            background: #ffffff;
+            border: 1px solid #ece2fb;
+            border-radius: 18px 18px 18px 4px;
+        }
+        .meta {
+            font-size: 0.8rem;
+            color: #9a8db8;
+            margin-top: 6px;
+        }
+        h1 {
+            font-family: 'Sora', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <h1>Shared Conversation</h1>
+    <div id="messages"></div>
+    <script>
+        const token = window.location.pathname.split('/').pop();
+        fetch(`/api/share-data?token=${token}`)
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('messages');
+                data.forEach(msg => {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'bubble user';
+                    userDiv.innerHTML = `<strong>User:</strong> ${escapeHtml(msg.user_message)}`;
+                    container.appendChild(userDiv);
+                    const avaDiv = document.createElement('div');
+                    avaDiv.className = 'bubble ava';
+                    avaDiv.innerHTML = `<strong>Ava:</strong> ${escapeHtml(msg.agent_response)}`;
+                    container.appendChild(avaDiv);
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'meta';
+                    metaDiv.textContent = `Sentiment: ${msg.sentiment_label || 'N/A'} • Intent: ${msg.intent || 'N/A'}`;
+                    container.appendChild(metaDiv);
+                });
+            })
+            .catch(err => {
+                document.getElementById('messages').innerHTML = '<p>Error loading shared conversation.</p>';
+                console.error(err);
+            });
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+    </script>
+</body>
+</html>

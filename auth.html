@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ava AI — Sign in</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy-deep: #11142b;
+            --navy: #161a36;
+            --field: #20264e;
+            --blue: #4a8df0;
+            --blue-light: #6fb1ff;
+            --text: #eef0fb;
+            --muted: #8a90b8;
+            --border: #2b3160;
+        }
+
+        /* ─── Light Mode ────────────────────────────────────────────── */
+        body.light-mode {
+            --navy-deep: #F8F6FF;
+            --navy: #F0ECFA;
+            --field: #ffffff;
+            --blue: #4a8df0;
+            --blue-light: #6fb1ff;
+            --text: #1D1230;
+            --muted: #6B5D82;
+            --border: rgba(27, 22, 100, 0.12);
+            --nav-bg: rgba(248, 246, 255, 0.88);
+            --nav-shadow: 0 4px 20px rgba(27, 22, 100, 0.06);
+            --shell-shadow: 0 40px 80px -40px rgba(27, 22, 100, 0.08);
+            --illustration-bg: radial-gradient(circle at 50% 40%, #F0ECFA 0%, #F8F6FF 70%);
+            --logo-mark-bg: #ffffff;
+            --logo-mark-border: rgba(27, 22, 100, 0.06);
+            --logo-mark-shadow: 0 0 80px rgba(74, 141, 240, 0.08);
+            --error-bg: rgba(248, 113, 113, 0.12);
+            --error-border: rgba(248, 113, 113, 0.25);
+            --error-text: #dc2626;
+            --success-bg: rgba(74, 222, 128, 0.12);
+            --success-border: rgba(74, 222, 128, 0.25);
+            --success-text: #16a34a;
+            --social-btn-bg: #ffffff;
+            --social-btn-border: rgba(27, 22, 100, 0.06);
+            --social-btn-text: #3D2E5A;
+            --social-btn-hover-bg: #F8F6FF;
+            --social-btn-hover-border: var(--blue);
+            --divider-color: rgba(27, 22, 100, 0.06);
+            --switch-link-color: var(--blue);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--navy-deep);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+        .shell {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            background: var(--navy);
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: var(--shell-shadow, 0 40px 80px -40px rgba(0,0,0,0.6));
+            transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+        }
+        .illustration {
+            position: relative;
+            background: var(--illustration-bg, radial-gradient(circle at 50% 40%, #1c2358 0%, var(--navy-deep) 70%));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            overflow: hidden;
+            transition: background 0.4s ease;
+        }
+        .logo-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 28px;
+        }
+        .logo-mark {
+            width: 180px;
+            height: 180px;
+            border-radius: 36px;
+            background: var(--logo-mark-bg, #1c2358);
+            border: 1px solid var(--logo-mark-border, var(--border));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--logo-mark-shadow, 0 0 80px rgba(74,141,240,0.25));
+            transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+        }
+        .logo-mark svg { width: 100px; height: 100px; }
+        .logo-wordmark {
+            font-family: 'Sora', sans-serif;
+            font-weight: 800;
+            font-size: 2rem;
+            color: var(--text);
+            letter-spacing: -0.01em;
+            transition: color 0.4s ease;
+        }
+        .logo-wordmark span { color: var(--blue-light); }
+        .logo-tagline {
+            color: var(--muted);
+            font-size: 0.95rem;
+            text-align: center;
+            max-width: 260px;
+            line-height: 1.6;
+            transition: color 0.4s ease;
+        }
+        .panel { padding: 48px 44px; }
+        .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+        .logo-icon { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .logo-icon svg { width: 38px; height: 38px; }
+        .logo-text { font-weight: 700; font-size: 1.1rem; font-family: 'Sora', sans-serif; color: var(--text); transition: color 0.4s ease; }
+        h1 { font-size: 1.6rem; margin-bottom: 6px; font-family: 'Sora', sans-serif; color: var(--text); transition: color 0.4s ease; }
+        h1 .accent { color: var(--blue-light); }
+        .subtitle { color: var(--muted); margin-bottom: 28px; transition: color 0.4s ease; }
+        form { display: flex; flex-direction: column; gap: 14px; }
+        .field input {
+            width: 100%;
+            background: var(--field);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 13px 16px;
+            font-size: 0.92rem;
+            color: var(--text);
+            font-family: inherit;
+            transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+        }
+        .field input::placeholder { color: var(--muted); }
+        .field input:focus { outline: none; border-color: var(--blue); }
+        .toggle-pw { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; }
+        .field { position: relative; }
+        .terms { 
+            display: flex; 
+            align-items: flex-start; 
+            gap: 10px; 
+            font-size: 0.82rem; 
+            margin: 4px 0; 
+            color: var(--muted);
+            padding: 8px 4px;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        .terms:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        body.light-mode .terms:hover {
+            background: rgba(27, 22, 100, 0.03);
+        }
+        .terms a { 
+            color: var(--blue-light); 
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        .terms a:hover {
+            text-decoration: underline;
+        }
+        .terms input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            background: var(--field);
+            cursor: pointer;
+            position: relative;
+            margin-top: 2px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        .terms input[type="checkbox"]:checked {
+            background: var(--blue);
+            border-color: var(--blue);
+        }
+        .terms input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .terms input[type="checkbox"]:focus {
+            outline: 2px solid var(--blue);
+            outline-offset: 2px;
+        }
+        .terms .error-highlight {
+            outline: 2px solid #ff6b6b;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        .submit {
+            background: linear-gradient(135deg, var(--blue), #3a6fd6);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 13px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: filter 0.15s, transform 0.15s;
+        }
+        .submit:hover { filter: brightness(1.08); transform: translateY(-2px); }
+        .submit:disabled { opacity: 0.6; cursor: wait; transform: none; filter: none; }
+        .switch-mode { text-align: center; margin-top: 12px; color: var(--muted); }
+        .switch-mode a { color: var(--switch-link-color, var(--blue-light)); text-decoration: none; }
+        .divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--muted); font-size: 0.8rem; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--divider-color, var(--border)); }
+        .social-row { display: flex; justify-content: center; }
+        .social-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--social-btn-bg, var(--field));
+            border: 1px solid var(--social-btn-border, var(--border));
+            border-radius: 12px;
+            padding: 11px 28px;
+            color: var(--social-btn-text, var(--text));
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
+        }
+        .social-btn:hover {
+            border-color: var(--social-btn-hover-border, var(--blue));
+            background: var(--social-btn-hover-bg, rgba(74,141,240,0.1));
+            transform: translateY(-2px);
+        }
+        .error-msg, .success-msg { font-size: 0.85rem; padding: 10px 14px; border-radius: 10px; display: none; }
+        .error-msg { 
+            background: var(--error-bg, rgba(240,90,90,0.12)); 
+            color: var(--error-text, #ff9c9c); 
+            border: 1px solid var(--error-border, rgba(240,90,90,0.25));
+        }
+        .success-msg { 
+            background: var(--success-bg, rgba(90,220,160,0.1)); 
+            color: var(--success-text, #8af0c4); 
+            border: 1px solid var(--success-border, rgba(90,220,160,0.25));
+        }
+
+        /* ─── Theme Toggle ──────────────────────────────────────────── */
+        .theme-toggle-auth {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 6px 12px;
+            color: var(--muted);
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            line-height: 1;
+        }
+        .theme-toggle-auth:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: var(--blue);
+            color: var(--text);
+        }
+        .theme-toggle-auth .icon { font-size: 0.9rem; }
+
+        /* ─── Light mode overrides for auth page ────────────────────── */
+        body.light-mode .theme-toggle-auth {
+            background: rgba(27, 22, 100, 0.04);
+            border-color: rgba(27, 22, 100, 0.06);
+            color: #6B5D82;
+        }
+        body.light-mode .theme-toggle-auth:hover {
+            background: rgba(27, 22, 100, 0.08);
+            border-color: var(--blue);
+            color: #1D1230;
+        }
+        body.light-mode .submit {
+            background: linear-gradient(135deg, #4a8df0, #3a6fd6);
+            color: #fff;
+        }
+        body.light-mode .submit:hover {
+            filter: brightness(1.08);
+        }
+        body.light-mode .field input {
+            background: #ffffff;
+            border-color: rgba(27, 22, 100, 0.12);
+            color: #1D1230;
+        }
+        body.light-mode .field input::placeholder {
+            color: #6B5D82;
+        }
+        body.light-mode .field input:focus {
+            border-color: #4a8df0;
+        }
+
+        @media (max-width: 760px) {
+            .illustration { display: none; }
+            .shell { grid-template-columns: 1fr; }
+            .panel { padding: 40px 28px; }
+            .theme-toggle-auth { top: 12px; right: 12px; padding: 4px 10px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── SVG Defs ─────────────────────────────────────────────────────── -->
+<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+        <linearGradient id="cyanGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#54E6F2"/>
+            <stop offset="100%" stop-color="#7C6CF6"/>
+        </linearGradient>
+    </defs>
+</svg>
+
+<!-- ─── Theme Toggle ─────────────────────────────────────────────────── -->
+<button class="theme-toggle-auth" id="themeToggle" aria-label="Toggle theme">
+    <span class="icon" id="themeIcon">🌙</span>
+</button>
+
+<!-- ─── Auth Shell ───────────────────────────────────────────────────── -->
+<div class="shell">
+    <div class="illustration">
+        <div class="logo-display">
+            <div class="logo-mark">
+                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ava AI chat bot logo">
+                    <circle cx="14" cy="58" r="9" fill="#fff"/>
+                    <circle cx="106" cy="58" r="9" fill="#fff"/>
+                    <line x1="60" y1="8" x2="60" y2="22" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+                    <circle cx="60" cy="8" r="6" fill="#fff"/>
+                    <path d="M32 24 h56 a18 18 0 0 1 18 18 v34 a18 18 0 0 1 -18 18 h-24 l-18 16 v-16 h-14 a18 18 0 0 1 -18 -18 v-34 a18 18 0 0 1 18 -18 z" fill="#fff"/>
+                    <circle cx="54" cy="58" r="5" fill="#10173f"/>
+                    <circle cx="68" cy="58" r="5" fill="#10173f"/>
+                </svg>
+            </div>
+            <div class="logo-wordmark">Ava<span>AI</span></div>
+            <p class="logo-tagline">Your AI assistant with sentiment analysis, frustration detection, and persistent memory.</p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="30" cy="15" r="14" fill="url(#cyanGrad)"/>
+                    <circle cx="45" cy="40" r="14" fill="#54E6F2" opacity="0.85"/>
+                    <circle cx="15" cy="40" r="14" fill="#7C6CF6" opacity="0.85"/>
+                </svg>
+            </div>
+            <span class="logo-text">Ava AI</span>
+        </div>
+        <h1 id="form-title">Welcome back to <span class="accent">Ava!</span></h1>
+        <p class="subtitle" id="form-subtitle">Sign in to pick up your conversation where you left off.</p>
+
+        <div class="error-msg" id="error-msg"></div>
+        <div class="success-msg" id="success-msg"></div>
+
+        <form id="auth-form">
+            <div class="field" id="name-field" style="display: none;">
+                <input type="text" id="name" placeholder="Enter your name" autocomplete="name">
+            </div>
+            <div class="field">
+                <input type="email" id="email" placeholder="Enter your email" autocomplete="email" required>
+            </div>
+            <div class="field">
+                <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required minlength="6">
+                <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">👁️</button>
+            </div>
+
+            <label class="terms" id="terms-row" style="display: none;">
+                <input type="checkbox" id="agree" required>
+                <span>I agree to the <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></span>
+            </label>
+
+            <button type="submit" class="submit" id="submit-btn">Sign In</button>
+        </form>
+
+        <p class="switch-mode" id="switch-mode">
+            New here? <a href="#" id="switch-link">Create an account</a>
+        </p>
+
+        <div class="divider">Or continue with</div>
+        <div class="social-row">
+            <a href="/api/auth/google" class="social-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 10.8v3.6h5.04c-.2 1.2-1.5 3.6-5.04 3.6-3.04 0-5.52-2.52-5.52-5.6s2.48-5.6 5.52-5.6c1.73 0 2.9.74 3.56 1.37l2.43-2.34C16.3 4.32 14.36 3.4 12 3.4 6.93 3.4 2.8 7.53 2.8 12.6s4.13 9.2 9.2 9.2c5.3 0 8.83-3.73 8.83-8.98 0-.6-.07-1.07-.15-1.52H12z"/></svg>
+                Sign in with Google
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ─── Theme Toggle ────────────────────────────────────────────
+    (function() {
+        const body = document.body;
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+
+        const savedTheme = localStorage.getItem('ava-theme') || 'dark';
+
+        function setTheme(theme) {
+            const isDark = theme === 'dark';
+            
+            if (isDark) {
+                body.classList.remove('light-mode');
+                if (themeIcon) themeIcon.textContent = '🌙';
+            } else {
+                body.classList.add('light-mode');
+                if (themeIcon) themeIcon.textContent = '☀️';
+            }
+            
+            localStorage.setItem('ava-theme', theme);
+        }
+
+        setTheme(savedTheme);
+
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'ava-theme') {
+                setTheme(e.newValue || 'dark');
+            }
+        });
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                const isDark = !body.classList.contains('light-mode');
+                setTheme(isDark ? 'light' : 'dark');
+            });
+        }
+    })();
+
+    // ─── Auth Logic ────────────────────────────────────────────────────
+    const form = document.getElementById('auth-form');
+    const title = document.getElementById('form-title');
+    const subtitle = document.getElementById('form-subtitle');
+    const nameField = document.getElementById('name-field');
+    const termsRow = document.getElementById('terms-row');
+    const agreeCheckbox = document.getElementById('agree');
+    const submitBtn = document.getElementById('submit-btn');
+    const switchMode = document.getElementById('switch-mode');
+    const switchLink = document.getElementById('switch-link');
+    const errorMsg = document.getElementById('error-msg');
+    const successMsg = document.getElementById('success-msg');
+    const togglePw = document.getElementById('toggle-pw');
+    const pwInput = document.getElementById('password');
+
+    let mode = new URLSearchParams(window.location.search).get('mode') === 'login' ? 'login' : 'signup';
+
+    function render() {
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+
+        if (mode === 'signup') {
+            title.innerHTML = 'Welcome to Sign Up <span class="accent">Ava!</span>';
+            subtitle.textContent = 'Create an account to start chatting with your AI assistant.';
+            nameField.style.display = '';
+            document.getElementById('name').required = true;
+            termsRow.style.display = 'flex';
+            agreeCheckbox.required = true;
+            submitBtn.textContent = 'Sign Up';
+            pwInput.setAttribute('autocomplete', 'new-password');
+            switchMode.innerHTML = 'Already have an account? <a href="#" id="switch-link">Sign in</a>';
+        } else {
+            title.innerHTML = 'Welcome back to <span class="accent">Ava!</span>';
+            subtitle.textContent = 'Sign in to pick up your conversation where you left off.';
+            nameField.style.display = 'none';
+            document.getElementById('name').required = false;
+            termsRow.style.display = 'none';
+            agreeCheckbox.required = false;
+            submitBtn.textContent = 'Sign In';
+            pwInput.setAttribute('autocomplete', 'current-password');
+            switchMode.innerHTML = 'New here? <a href="#" id="switch-link">Create an account</a>';
+        }
+
+        const newLink = document.getElementById('switch-link');
+        if (newLink) {
+            newLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                mode = mode === 'signup' ? 'login' : 'signup';
+                const url = new URL(window.location);
+                url.searchParams.set('mode', mode);
+                window.history.replaceState({}, '', url);
+                render();
+            });
+        }
+    }
+
+    render();
+
+    togglePw.addEventListener('click', () => {
+        const showing = pwInput.type === 'text';
+        pwInput.type = showing ? 'password' : 'text';
+        togglePw.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    });
+
+    // ─── Handle Signup with Terms Acceptance ──────────────────────────
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorMsg.style.display = 'none';
+        successMsg.style.display = 'none';
+
+        const email = document.getElementById('email').value.trim();
+        const password = pwInput.value;
+        const name = document.getElementById('name').value.trim();
+
+        // ─── For Signup: Validate Terms Acceptance ────────────────────
+        if (mode === 'signup') {
+            if (!agreeCheckbox.checked) {
+                errorMsg.textContent = '⚠️ You must agree to the Terms of Service and Privacy Policy to create an account.';
+                errorMsg.style.display = 'block';
+                // Highlight the checkbox
+                agreeCheckbox.classList.add('error-highlight');
+                setTimeout(() => {
+                    agreeCheckbox.classList.remove('error-highlight');
+                }, 3000);
+                return;
+            }
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = mode === 'signup' ? 'Creating account…' : 'Signing in…';
+
+        try {
+            const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+            
+            // ─── For Signup: Include terms acceptance in the request ──
+            const body = mode === 'signup' 
+                ? { 
+                    name, 
+                    email, 
+                    password,
+                    terms_accepted: true,
+                    terms_accepted_date: new Date().toISOString()
+                  } 
+                : { email, password };
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const textResponse = await res.text();
+                console.error('Non-JSON response:', textResponse);
+                throw new Error(`Server returned ${res.status} with non-JSON. ${textResponse.substring(0, 200)}`);
+            }
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.detail || 'Invalid email or password');
+            }
+
+            // ─── Store user data ──────────────────────────────────────
+            const userData = {
+                user_id: data.user_id,
+                name: data.name,
+                email: data.email,
+                is_admin: data.is_admin || false
+            };
+
+            // ─── If signup, store that terms were accepted ────────────
+            if (mode === 'signup') {
+                userData.terms_accepted = true;
+                userData.terms_accepted_date = new Date().toISOString();
+                // Also store in localStorage so we can track across sessions
+                localStorage.setItem('ava-terms-accepted', 'true');
+                localStorage.setItem('ava-terms-accepted-date', new Date().toISOString());
+            }
+
+            localStorage.setItem('neurosupport_user', JSON.stringify(userData));
+
+            successMsg.textContent = mode === 'signup' 
+                ? '✅ Account created! You have accepted the Terms & Privacy Policy. Redirecting…' 
+                : '✅ Signed in — redirecting…';
+            successMsg.style.display = 'block';
+
+            // ─── Redirect based on admin flag ─────────────────────────
+            setTimeout(() => {
+                if (data.is_admin) {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'chat.html';
+                }
+            }, 800);
+        } catch (err) {
+            console.error('Auth error:', err);
+            errorMsg.textContent = err.message || 'Network error. Please check if the backend server is running.';
+            errorMsg.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+        }
+    });
+</script>
+</body>
+</html>
