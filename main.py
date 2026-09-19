@@ -32,12 +32,12 @@ import search
 import memory
 import adaptation
 import powers
+import config
+from version import __version__
+from metrics import metrics
 
-from dotenv import load_dotenv
-load_dotenv()
-
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-SECRET_KEY = os.getenv("SECRET_KEY")
+ENVIRONMENT = config.ENVIRONMENT
+SECRET_KEY = config.SECRET_KEY
 if not SECRET_KEY:
     if ENVIRONMENT == "production":
         raise RuntimeError("SECRET_KEY must be configured in production environment")
@@ -96,18 +96,25 @@ except ImportError:
 # ─── Lifespan ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    val = config.validate_config()
+    if not val["valid"]:
+        logger.error(f"Configuration validation: {val['errors']}")
+        if config.ENVIRONMENT == "production":
+            raise RuntimeError(f"Invalid production configuration: {val['errors']}")
+    config.ensure_directories()
     db.init_db()
     yield
 
-app = FastAPI(title="Ava AI", version="2.3.0", lifespan=lifespan)
+app = FastAPI(title="Ava AI", version=__version__, lifespan=lifespan)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
-    if origin.strip()
-]
+def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    metrics.inc("rate_limit_events")
+    return _rate_limit_exceeded_handler(request, exc)
+
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
+
+ALLOWED_ORIGINS = config.ALLOWED_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,
@@ -138,15 +145,54 @@ def health_check():
 
 @app.get("/ready")
 def ready_check():
+    errors = []
+    val = config.validate_config()
+    if not val["valid"]:
+        errors.extend(val["errors"])
+
     try:
         with db.get_conn() as conn:
-            conn.execute("SELECT 1").fetchone()
-        return {"status": "ready", "database": "connected"}
+            conn.execute("CREATE TABLE IF NOT EXISTS _readiness_check (id INTEGER PRIMARY KEY, ts REAL)")
+            conn.execute("INSERT OR REPLACE INTO _readiness_check (id, ts) VALUES (1, ?)", (time.time(),))
+            conn.commit()
+            conn.execute("SELECT ts FROM _readiness_check WHERE id = 1").fetchone()
     except Exception as e:
-        logger.exception("Readiness check failed")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        metrics.inc("database_errors")
+        logger.exception("Readiness check: DB failed")
+        errors.append(f"database: {str(e)}")
 
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+    for dir_path, label in [(config.UPLOAD_DIR, "uploads"), (config.REVIEW_IMAGE_DIR, "review_images")]:
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+            test_file = os.path.join(dir_path, ".write_test")
+            with open(test_file, "w") as f:
+                f.write("ok")
+            if os.path.exists(test_file):
+                os.remove(test_file)
+        except Exception as e:
+            logger.exception(f"Readiness check: Storage {label} not writable")
+            errors.append(f"storage_{label}: not writable ({str(e)})")
+
+    if errors:
+        return Response(
+            content=json.dumps({"status": "unhealthy", "errors": errors, "version": __version__}),
+            status_code=503,
+            media_type="application/json"
+        )
+
+    return {
+        "status": "ready",
+        "version": __version__,
+        "database": "connected",
+        "storage": "writable"
+    }
+
+@app.get("/api/metrics")
+def get_operational_metrics(request: Request):
+    require_admin(request)
+    return metrics.get_snapshot()
+
+ADMIN_PASSWORD = config.ADMIN_PASSWORD
 
 def require_admin(request: Request):
     if not request.session.get("is_admin"):
@@ -644,6 +690,7 @@ def assemble_chat_prompt_context(
 @app.post("/api/chat")
 @limiter.limit("30/minute")
 def chat(req: ChatRequest, request: Request):
+    metrics.inc("chat_requests")
     current_user = require_user(request)
     if req.user_id and req.user_id != current_user:
         raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
@@ -750,10 +797,15 @@ def chat(req: ChatRequest, request: Request):
                 mode=req.mode or "flash",
             )
     except Exception as e:
+        metrics.inc("llm_failures")
+        metrics.inc("chat_errors")
         logger.exception("Chat LLM execution failed")
         response = "I'm sorry, I encountered an error processing your request."
 
     latency_ms = int((time.time() - start_time) * 1000)
+    metrics.record_latency(latency_ms)
+    if aug_meta.get("adaptation_used", False):
+        metrics.inc("adaptation_used_count")
     message_id = str(uuid.uuid4())
     session_id = req.session_id or str(uuid.uuid4())
     if not req.session_id:
@@ -792,6 +844,7 @@ def chat(req: ChatRequest, request: Request):
 @app.post("/api/chat/stream")
 @limiter.limit("30/minute")
 def chat_stream(req: ChatRequest, request: Request):
+    metrics.inc("stream_requests")
     current_user = require_user(request)
     if req.user_id and req.user_id != current_user:
         raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
@@ -955,6 +1008,9 @@ def chat_stream(req: ChatRequest, request: Request):
                     yield f"data: {json.dumps({'chunk': full_response})}\n\n"
 
         latency_ms = int((time.time() - start_time) * 1000)
+        metrics.record_latency(latency_ms)
+        if aug_meta.get("adaptation_used", False):
+            metrics.inc("adaptation_used_count")
         message_id = str(uuid.uuid4())
         session_id = req.session_id or str(uuid.uuid4())
         if not req.session_id:
@@ -1127,7 +1183,10 @@ def feedback(req: FeedbackRequest, request: Request):
             raise HTTPException(status_code=403, detail="Forbidden: message does not belong to you")
 
     db.save_feedback(user_id, req.session_id, req.message_id, req.helpful)
-    if not req.helpful:
+    if req.helpful:
+        metrics.inc("feedback_positive")
+    else:
+        metrics.inc("feedback_negative")
         sol = db.get_last_agent_response(user_id, req.session_id)
         if sol:
             db.save_failed_solution(user_id, req.session_id, sol)
@@ -1300,7 +1359,7 @@ def update_terms_acceptance(user_id: str, req: TermsAcceptRequest, request: Requ
     }
 
 # ─── Document Upload ──────────────────────────────────────────────────
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = config.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".xls", ".pptx", ".csv", ".tsv", ".txt", ".md", ".log"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -1513,7 +1572,7 @@ def clear_user_memory(user_id: str, request: Request):
     return {"status": "cleared"}
 
 # ─── Reviews ──────────────────────────────────────────────────────────
-REVIEW_IMAGE_DIR = "review_images"
+REVIEW_IMAGE_DIR = config.REVIEW_IMAGE_DIR
 os.makedirs(REVIEW_IMAGE_DIR, exist_ok=True)
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024

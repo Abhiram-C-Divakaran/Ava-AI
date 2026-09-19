@@ -2,13 +2,13 @@ name: CI Tests
 
 on:
   push:
-    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening ]
+    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening, phase-5-release-readiness ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: Run Unit Tests & Static Compilation
+    name: Run Unit Tests, Reliability Suite & Static Compilation
     runs-on: ubuntu-latest
 
     env:
@@ -35,7 +35,7 @@ jobs:
 
       - name: Static compilation check
         run: |
-          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py test_adaptation.py test_security.py
+          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py scripts/smoke_test.py scripts/load_test.py scripts/backup_db.py scripts/restore_db.py
 
       - name: Run adaptation test suite
         run: |
@@ -44,3 +44,11 @@ jobs:
       - name: Run security test suite
         run: |
           python -m unittest test_security.py -v
+
+      - name: Run reliability test suite
+        run: |
+          python -m unittest test_reliability.py -v
+
+      - name: Run offline adaptation quality evaluation
+        run: |
+          python evaluation/evaluate_adaptation.py

@@ -197,50 +197,91 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 
 ---
 
-## 6. Testing
+## 6. Testing & Evaluation
 
-The repository contains 65 automated tests across two suites, executing in under 6 seconds with 100% offline mocks and isolated temporary databases.
+The repository contains 82 automated unit tests across three suites (executing in ~7 seconds offline) plus an 8-scenario behavioral adaptation evaluation suite and deployment smoke/load benchmarks:
 
-### Run All Test Suites
+### Run All 82 Unit Tests
 ```bash
-python -m unittest test_adaptation.py test_security.py -v
+python -m unittest test_adaptation.py test_security.py test_reliability.py -v
 ```
 
-### Adaptation Test Suite (45 Tests)
+### 1. Adaptation Test Suite (45 Tests)
 Validates behavioral learning, strategy statistics, Bayesian updates, exponential decay, token-boundary matching, and multi-user profile isolation:
 ```bash
 python -m unittest test_adaptation.py -v
 ```
 
-### Security Test Suite (20 Tests)
+### 2. Security Test Suite (20 Tests)
 Validates authentication, authorization, IDOR checks, rate limiting, CORS preflight, production secrets validation, path traversal prevention, and admin role enforcement:
 ```bash
 python -m unittest test_security.py -v
 ```
 
+### 3. Operational Reliability Test Suite (17 Tests)
+Validates persistent storage, online SQLite backup/restore, schema migrations tracking, concurrent multi-threaded writes without lock contention, LLM retry and timeout policies, and external tool graceful degradation:
+```bash
+python -m unittest test_reliability.py -v
+```
+
+### 4. Behavioral Adaptation Quality Evaluation
+Offline evaluation against 8 canonical multi-turn behavioral scenarios (programmers, students, analysts, reversals, and overrides):
+```bash
+python evaluation/evaluate_adaptation.py
+```
+
+### 5. Deployment Smoke Test & Load Benchmark
+Validate active deployment health, auth, session, chat, feedback, and concurrency under write load:
+```bash
+# Smoke test active server
+python scripts/smoke_test.py --base-url http://127.0.0.1:8000
+
+# Concurrency load benchmark (e.g. 25 users)
+python scripts/load_test.py --base-url http://127.0.0.1:8000 --users 25 --requests-per-user 3
+```
+
 ---
 
-## 7. Docker Deployment
+## 7. Database Management & Operations
 
-A hardened production Dockerfile is included:
+### Online Backup & Safe Restore
+Safely backup the active SQLite database without taking Ava offline, and restore with automatic pre-restore safety snapshots and integrity verification:
+```bash
+# Online hot backup
+python scripts/backup_db.py --dest /backups/ava_backup_$(date +%Y%m%d_%H%M%S).db
+
+# Safe restore with integrity check and migrations
+python scripts/restore_db.py --source /backups/ava_backup.db
+```
+
+### Health, Readiness & Metrics Endpoints
+- **Liveness**: `GET /health` -> `{"status": "ok"}`
+- **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.0-rc1", "database": "connected", "storage": "writable"}`
+- **Operational Metrics**: `GET /api/metrics` (Admin authenticated, returns counters, latencies, and uptime)
+
+---
+
+## 8. Docker Deployment
+
+A hardened multi-stage production Dockerfile is included:
 ```bash
 # Build the Docker image
-docker build -t ava-ai:latest .
+docker build -t ava-ai:1.0.0-rc1 .
 
-# Run the container with environment variables
+# Run container with persistent host volume
 docker run -d \
   -p 8000:8000 \
   -e ENVIRONMENT=production \
   -e SECRET_KEY="your_secure_random_production_secret" \
   -e GROQ_API_KEY="your_groq_api_key" \
   -e ADMIN_PASSWORD="your_secure_admin_password" \
-  -v ava_data:/app/data \
+  -v /var/lib/ava/data:/app/data \
   --name ava-app \
-  ava-ai:latest
+  ava-ai:1.0.0-rc1
 ```
 
 ---
 
-## 8. License
+## 9. License
 
 Ava AI is open-source software licensed under the MIT License.
