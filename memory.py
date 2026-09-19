@@ -113,7 +113,27 @@ def maybe_refresh_user_memory(user_id: str, session_id: str, latest_user_message
     """
     total = db.count_all_user_messages(user_id)
     mem = db.get_user_memory(user_id)
-    if total - mem["message_count_at_update"] < USER_MEMORY_REFRESH_INTERVAL:
+
+    # Explicit memory requests should take effect immediately. Ordinary chats
+    # still use the refresh interval so memory extraction stays inexpensive.
+    latest_lower = latest_user_message.lower()
+    explicit_memory_request = any(
+        phrase in latest_lower
+        for phrase in (
+            "remember this",
+            "remember that",
+            "remember me",
+            "remember for",
+            "future conversations",
+            "keep this in mind",
+            "don't forget",
+            "do not forget",
+        )
+    )
+    if (
+        not explicit_memory_request
+        and total - mem["message_count_at_update"] < USER_MEMORY_REFRESH_INTERVAL
+    ):
         return
 
     recent = db.get_recent_messages(user_id, session_id=session_id, limit=SESSION_WINDOW)
