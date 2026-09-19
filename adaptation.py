@@ -3,7 +3,7 @@ adaptation.py — Phase 2: Behavioral Adaptation Engine for Ava AI.
 
 Conceptually distinct from conversation memory:
 - Memory answers: "What does Ava know about this user?" (Facts, projects, history)
-- Adaptation answers: "How should Ava respond to this user?" (Verbosity, technical depth, code examples, tone)
+- Adaptation answers: "How should Ava respond to this user?" (Verbosity, technical depth, code examples, tone, examples)
 
 Architecture:
 - LLM + persistent memory + behavioral adaptation + feedback-driven learning
@@ -27,6 +27,15 @@ CONFIDENCE_THRESHOLD = 0.60  # Minimum confidence to inject into prompt context
 LEARNING_RATE = 0.06         # Conservative step per interaction
 EXPLICIT_SIGNAL_WEIGHT = 2.0 # Explicit instructions carry higher weight
 IMPLICIT_SIGNAL_WEIGHT = 1.0 # Implicit observation weight
+
+ALLOWED_VALUES: dict[str, set] = {
+    "verbosity": {"concise", "balanced", "detailed"},
+    "technical_depth": {"beginner", "intermediate", "advanced"},
+    "code_examples": {True, False},
+    "step_by_step": {True, False},
+    "examples": {True, False},
+    "tone": {"friendly", "direct", "formal"},
+}
 
 DEFAULT_PROFILE: dict[str, dict[str, Any]] = {
     "verbosity": {"value": "balanced", "confidence": DEFAULT_CONFIDENCE},
@@ -68,6 +77,15 @@ PATTERNS_EXPLICIT = {
             r"\b(all at once|no need for steps|skip the steps|just give me the final answer)\b",
         ],
     },
+    "examples": {
+        True: [
+            r"\b(give me an example|show me an example|examples help me understand|include examples|use examples|give practical examples)\b",
+            r"\b(give (me )?(an )?example|show (me )?(an )?example|with examples?|practical examples?)\b",
+        ],
+        False: [
+            r"\b(no examples|skip examples|don't give examples|do not give examples|just explain the concept|without examples)\b",
+        ],
+    },
     "technical_depth": {
         "advanced": [
             r"\b(skip the basic(s)?|you can skip basic explanation|advanced technical|expert level|low level implementation)\b",
@@ -85,7 +103,7 @@ PATTERNS_EXPLICIT = {
             r"\b(be friendly|warm tone|conversational tone|casual tone)\b",
         ],
         "formal": [
-            r"\b(formal tone|professional tone|business professional)\b",
+            r"\b(formal tone|professional tone|business professional|be formal)\b",
         ],
     },
 }
@@ -111,22 +129,42 @@ def _clone_default_profile() -> dict[str, dict[str, Any]]:
     return {k: dict(v) for k, v in DEFAULT_PROFILE.items()}
 
 
+def is_valid_preference_value(preference: str, value: Any) -> bool:
+    """Validate that value matches the strict type and allowed values for the preference."""
+    if preference not in ALLOWED_VALUES:
+        return False
+    allowed = ALLOWED_VALUES[preference]
+    if preference in ("code_examples", "step_by_step", "examples"):
+        return isinstance(value, bool) and value in allowed
+    return isinstance(value, str) and value in allowed
+
+
 def get_adaptation_profile(user_id: str) -> dict:
     """
     Retrieve the user's persistent adaptation profile.
-    If the user has no profile yet, initializes and stores the default profile.
+    Safely handles invalid JSON, missing dimensions, unknown dimensions, and invalid types,
+    falling back gracefully to defaults. Bad adaptation data will never break chat.
     """
     try:
         record = db.get_adaptation_profile(user_id)
-        if record and record.get("profile"):
-            profile = _clone_default_profile()
+        if record and isinstance(record.get("profile"), dict):
             stored = record["profile"]
-            for key, default_item in profile.items():
-                if key in stored and isinstance(stored[key], dict):
-                    profile[key] = {
-                        "value": stored[key].get("value", default_item["value"]),
-                        "confidence": round(float(stored[key].get("confidence", default_item["confidence"])), 3),
-                    }
+            profile = _clone_default_profile()
+            for dim, default_item in DEFAULT_PROFILE.items():
+                if dim in stored and isinstance(stored[dim], dict):
+                    dim_data = stored[dim]
+                    val = dim_data.get("value")
+                    clean_val = val if is_valid_preference_value(dim, val) else default_item["value"]
+
+                    conf = dim_data.get("confidence")
+                    if isinstance(conf, (int, float)) and not isinstance(conf, bool) and 0.0 <= float(conf) <= 1.0:
+                        clean_conf = round(float(conf), 3)
+                    else:
+                        clean_conf = default_item["confidence"]
+
+                    profile[dim] = {"value": clean_val, "confidence": clean_conf}
+                else:
+                    profile[dim] = dict(default_item)
             return profile
         else:
             default_prof = _clone_default_profile()
@@ -158,8 +196,9 @@ def update_signal(
     """
     Apply a conservative confidence-bounded update toward target_value.
     0.0 <= confidence <= 1.0
+    When conflicting evidence arrives, it weakens the old preference before switching.
     """
-    if preference not in DEFAULT_PROFILE:
+    if preference not in ALLOWED_VALUES or not is_valid_preference_value(preference, target_value):
         return
 
     try:
@@ -175,14 +214,14 @@ def update_signal(
             new_conf = min(1.0, curr_conf + delta)
             profile[preference] = {"value": curr_val, "confidence": round(new_conf, 3)}
         else:
-            # Contradicting evidence
+            # Contradicting evidence: weaken existing confidence first
             if curr_conf - delta < DEFAULT_CONFIDENCE:
-                # Value shifts over to target_value with conservative confidence
+                # Old preference weakened below baseline: crossover to target_value
                 surplus = delta - (curr_conf - DEFAULT_CONFIDENCE)
                 new_conf = min(1.0, DEFAULT_CONFIDENCE + surplus)
                 profile[preference] = {"value": target_value, "confidence": round(new_conf, 3)}
             else:
-                # Confidence in current value weakens
+                # Confidence in current value weakens gradually without immediately switching
                 new_conf = max(0.0, curr_conf - delta)
                 profile[preference] = {"value": curr_val, "confidence": round(new_conf, 3)}
 
@@ -260,48 +299,128 @@ def _classify_strategy(response_text: str) -> str:
         return "detailed_explanation"
 
 
+def message_explicitly_requested(msg: str, preference: str, target_val: Any) -> bool:
+    """Check if the user message contains an explicit behavioral pattern for this preference & value."""
+    if not msg:
+        return False
+    patterns = PATTERNS_EXPLICIT.get(preference, {}).get(target_val, [])
+    for pat in patterns:
+        if re.search(pat, msg, re.IGNORECASE):
+            return True
+    return False
+
+
 def process_feedback(user_id: str, message_id: str, helpful: bool) -> None:
     """
     Process thumbs-up / thumbs-down feedback conservatively.
-    Updates behavioral strategy statistics and adjusts profile signals if mismatched.
+    A positive feedback signal reinforces a preference ONLY when at least one of these is true:
+      1. Preference was already learned with meaningful confidence (confidence >= CONFIDENCE_THRESHOLD),
+      2. The user message explicitly requested that behavior,
+      3. Repeated strategy feedback provides sufficient evidence (successes >= 3).
+    A single thumbs-up on an answer containing code must NOT immediately establish a code preference.
+    Negative feedback never inverts unrelated preferences.
     """
     if not user_id:
         return
 
     try:
-        # Find the message if possible to determine response strategy
+        user_msg = ""
+        agent_resp = ""
         with db.get_conn() as conn:
             row = conn.execute(
                 "SELECT user_message, agent_response FROM messages WHERE message_id = ?",
                 (message_id,)
             ).fetchone()
+            if row:
+                user_msg = row["user_message"] or ""
+                agent_resp = row["agent_response"] or ""
 
-        if row:
-            agent_resp = row["agent_response"] or ""
+        if agent_resp:
             strategy = _classify_strategy(agent_resp)
             db.record_strategy_feedback(user_id, strategy, helpful)
 
             profile = get_adaptation_profile(user_id)
-            verbosity_pref = profile.get("verbosity", {}).get("value", "balanced")
-            code_pref = profile.get("code_examples", {}).get("value", False)
+            stats = db.get_strategy_stats(user_id)
+            strat_succ = stats.get(strategy, {}).get("successes", 0)
 
-            if not helpful:
-                # Conservative negative feedback adjustments
-                # e.g., if response was excessively long (>900 chars) while user prefers concise, reinforce concise
-                if len(agent_resp) > 900 and verbosity_pref == "concise":
-                    update_signal(user_id, "verbosity", "concise", weight=0.5, evidence="negative_feedback_on_long_response")
-                # e.g., if response had code but user preferred no code
-                if "```" in agent_resp and code_pref is False:
-                    update_signal(user_id, "code_examples", False, weight=0.5, evidence="negative_feedback_on_code")
-            else:
-                # Positive reinforcement
+            if helpful:
+                # 1. Code examples reinforcement
                 if "```" in agent_resp:
-                    update_signal(user_id, "code_examples", True, weight=0.3, evidence="positive_feedback_on_code")
-                if len(agent_resp) < 450 and verbosity_pref == "concise":
-                    update_signal(user_id, "verbosity", "concise", weight=0.3, evidence="positive_feedback_on_concise")
+                    code_conf = profile.get("code_examples", {}).get("confidence", 0)
+                    code_val = profile.get("code_examples", {}).get("value", False)
+                    already_learned = (code_conf >= CONFIDENCE_THRESHOLD and code_val is True)
+                    explicitly_requested = message_explicitly_requested(user_msg, "code_examples", True)
+                    sufficient_evidence = (strat_succ >= 3)
+
+                    if already_learned or explicitly_requested or sufficient_evidence:
+                        update_signal(user_id, "code_examples", True, weight=0.3, evidence="verified_positive_code_feedback")
+
+                # 2. Verbosity reinforcement
+                verb_conf = profile.get("verbosity", {}).get("confidence", 0)
+                verb_val = profile.get("verbosity", {}).get("value", "balanced")
+                if len(agent_resp) < 450:
+                    already_learned = (verb_conf >= CONFIDENCE_THRESHOLD and verb_val == "concise")
+                    explicitly_requested = message_explicitly_requested(user_msg, "verbosity", "concise")
+                    sufficient_evidence = (strat_succ >= 3)
+
+                    if already_learned or explicitly_requested or sufficient_evidence:
+                        update_signal(user_id, "verbosity", "concise", weight=0.3, evidence="verified_positive_concise_feedback")
+                elif len(agent_resp) > 900:
+                    already_learned = (verb_conf >= CONFIDENCE_THRESHOLD and verb_val == "detailed")
+                    explicitly_requested = message_explicitly_requested(user_msg, "verbosity", "detailed")
+                    sufficient_evidence = (strat_succ >= 3)
+
+                    if already_learned or explicitly_requested or sufficient_evidence:
+                        update_signal(user_id, "verbosity", "detailed", weight=0.3, evidence="verified_positive_detailed_feedback")
+
+            else:
+                # Conservative negative feedback
+                # Only weaken if response explicitly exhibited that behavior and user preferred otherwise
+                verb_val = profile.get("verbosity", {}).get("value", "balanced")
+                verb_conf = profile.get("verbosity", {}).get("confidence", 0)
+                if len(agent_resp) > 900 and verb_val == "concise" and verb_conf >= CONFIDENCE_THRESHOLD:
+                    update_signal(user_id, "verbosity", "concise", weight=0.4, evidence="negative_feedback_on_overly_long_response")
+
+                code_val = profile.get("code_examples", {}).get("value", False)
+                code_conf = profile.get("code_examples", {}).get("confidence", 0)
+                if "```" in agent_resp and code_val is False and code_conf >= CONFIDENCE_THRESHOLD:
+                    update_signal(user_id, "code_examples", False, weight=0.4, evidence="negative_feedback_on_unwanted_code")
 
     except Exception as e:
         logger.warning(f"Adaptation feedback processing failed for {user_id}: {e}")
+
+
+def get_strategy_score(user_id: str, strategy: str, prior_success: float = 1.0, prior_total: float = 2.0) -> float:
+    """
+    Computes a confidence-safe smoothed Bayesian score for a strategy:
+    (successes + prior_success) / (successes + failures + prior_total)
+    Default prior gives 1/2 = 0.50 when no evidence exists.
+    """
+    stats = db.get_strategy_stats(user_id)
+    strat_data = stats.get(strategy, {"successes": 0, "failures": 0})
+    succ = strat_data.get("successes", 0)
+    fail = strat_data.get("failures", 0)
+    return round((succ + prior_success) / (succ + fail + prior_total), 3)
+
+
+def get_preferred_strategies(user_id: str, min_evidence: int = 3, threshold: float = 0.60) -> list[str]:
+    """
+    Returns list of strategies that meet the minimum evidence requirement (successes + failures >= min_evidence)
+    and whose smoothed score meets or exceeds the threshold, sorted by score descending.
+    A strategy with only 1 success / 0 failures is NOT considered preferred.
+    """
+    stats = db.get_strategy_stats(user_id)
+    candidates = []
+    for strat, data in stats.items():
+        succ = data.get("successes", 0)
+        fail = data.get("failures", 0)
+        total = succ + fail
+        if total >= min_evidence:
+            score = get_strategy_score(user_id, strat)
+            if score >= threshold:
+                candidates.append((strat, score, total))
+    candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    return [c[0] for c in candidates]
 
 
 # ─── Context Generation for Prompt Injection ──────────────────────────────────
@@ -347,7 +466,15 @@ def get_adaptation_context(user_id: str) -> str:
         if step.get("confidence", 0) >= CONFIDENCE_THRESHOLD and step.get("value"):
             lines.append("- Structure: Prefer structured, step-by-step breakdowns.")
 
-        # 5. Tone
+        # 5. Examples
+        ex = profile.get("examples", {})
+        if ex.get("confidence", 0) >= CONFIDENCE_THRESHOLD:
+            if ex.get("value") is True:
+                lines.append("- Examples: Include practical examples when useful.")
+            elif ex.get("value") is False:
+                lines.append("- Examples: Avoid unnecessary examples unless explicitly requested.")
+
+        # 6. Tone
         tone = profile.get("tone", {})
         if tone.get("confidence", 0) >= CONFIDENCE_THRESHOLD:
             t_val = tone.get("value")
@@ -361,7 +488,7 @@ def get_adaptation_context(user_id: str) -> str:
         if not lines:
             return ""
 
-        header = "--- User response preferences (Learned Adaptation Profile) ---\n"
+        header = "--- User response preferences ---\n"
         header += "Ava has learned the following response preferences for this user:\n"
         body = "\n".join(lines)
         footer = (
@@ -373,7 +500,7 @@ def get_adaptation_context(user_id: str) -> str:
             "3. Explicit custom instructions in user profile\n"
             "4. Learned adaptation preferences above\n"
             "5. Default Ava behavior\n"
-            "If the user's current message explicitly asks for a different style (e.g., asking for detail when concise is learned), "
+            "If the user's current message explicitly asks for a different style (e.g., asking for detail when concise is learned, or asking for code when no code is learned), "
             "ALWAYS follow the current explicit request."
         )
 
@@ -385,14 +512,25 @@ def get_adaptation_context(user_id: str) -> str:
 
 
 def set_manual_preference(user_id: str, preference: str, value: Any, confidence: float = 0.85) -> dict:
-    """Allows manual configuration or inspection of an adaptation dimension (e.g. via PATCH)."""
-    if preference not in DEFAULT_PROFILE:
-        raise ValueError(f"Unknown preference dimension: {preference}")
+    """
+    Allows manual configuration of an adaptation dimension (e.g. via PATCH).
+    Validates preference name, value against ALLOWED_VALUES, and confidence (0.0 <= confidence <= 1.0).
+    Raises ValueError on invalid input (no silent clamping for API requests).
+    """
+    if preference not in ALLOWED_VALUES:
+        raise ValueError(f"Unknown preference dimension: '{preference}'. Allowed: {sorted(list(ALLOWED_VALUES.keys()))}")
+
+    if not is_valid_preference_value(preference, value):
+        allowed_repr = sorted(list(ALLOWED_VALUES[preference])) if isinstance(list(ALLOWED_VALUES[preference])[0], str) else [True, False]
+        raise ValueError(f"Invalid value '{value}' for preference '{preference}'. Allowed: {allowed_repr}")
+
+    if confidence is None or isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not (0.0 <= float(confidence) <= 1.0):
+        raise ValueError(f"Invalid confidence: {confidence}. Confidence must be a float between 0.0 and 1.0.")
 
     profile = get_adaptation_profile(user_id)
     profile[preference] = {
         "value": value,
-        "confidence": round(min(1.0, max(0.0, float(confidence))), 3),
+        "confidence": round(float(confidence), 3),
     }
     db.set_adaptation_profile(user_id, profile)
     return profile

@@ -335,33 +335,33 @@ def build_augmented_system_prompt(
     user_memory_context: str = "",
 ) -> tuple[str, dict]:
     """
-    Builds the final system prompt with all augmentations injected.
-    Returns (system_prompt, augmentation_metadata).
-    
-    Priority order:
-    1. Base instructions & Time context (always)
-    2. User factual memory & Behavioral adaptation profile
-    3. Web search results (if needed)
-    4. File/CSV context
-    5. Conversation context
-    6. Translation routing
-    7. Support/sentiment routing
+    Builds the final system prompt with all augmentations injected in strict conceptual order:
+    1. Base system prompt
+    2. Current time context
+    3. Factual persistent user memory (--- What Ava remembers about this user ---)
+    4. Behavioral adaptation context (--- User response preferences ---)
+    5. Conversation context so far (current session only: --- Conversation so far ---)
+    6. Search context, attached documents/files, failure notes, routing instructions
     """
     metadata = {"searched": False, "search_results": [], "deepl_used": False}
     parts = [base_prompt]
 
-    # Always inject current time
+    # 1. Always inject current time
     parts.append(f"\n\n{get_time_context()}")
 
-    # Persistent cross-session user memory (factual memory)
-    if user_memory_context:
+    # 2. Persistent cross-session user memory (factual memory)
+    if user_memory_context and user_memory_context.strip():
         parts.append(f"\n\n--- What Ava remembers about this user ---\n{user_memory_context.strip()}")
 
-    # Behavioral adaptation context (learned response preferences)
-    if adaptation_context:
+    # 3. Behavioral adaptation context (learned response preferences)
+    if adaptation_context and adaptation_context.strip():
         parts.append(f"\n\n{adaptation_context.strip()}")
 
-    # Auto web search — check if query needs live data
+    # 4. Conversation history (current-session context only)
+    if conversation_context and conversation_context.strip():
+        parts.append(f"\n\n--- Conversation so far ---\n{conversation_context.strip()}")
+
+    # 5. Auto web search — check if query needs live data
     search_ctx = ""
     should_search = web_search_enabled or needs_web_search(user_message)
     if should_search and BRAVE_API_KEY:
@@ -372,7 +372,7 @@ def build_augmented_system_prompt(
             metadata["searched"] = True
             metadata["search_results"] = results
 
-    # File context
+    # 6. File context
     if file_context:
         is_csv = "[CSV DATA" in file_context or "[TSV DATA" in file_context
         label = "CSV/spreadsheet data" if is_csv else "attached document"
@@ -380,14 +380,10 @@ def build_augmented_system_prompt(
         if is_csv:
             parts.append("\nAnalyse this data following your DATA ANALYSIS rules.")
 
-    # Conversation history
-    if conversation_context:
-        parts.append(f"\n\n--- Conversation so far ---\n{conversation_context}")
-
     if failed_note:
         parts.append(f"\n{failed_note}")
 
-    # Routing instructions
+    # 7. Routing instructions
     if translation_langs:
         src = translation_langs.get("src", "auto-detect")
         tgt = translation_langs.get("tgt", "English")
@@ -397,4 +393,4 @@ def build_augmented_system_prompt(
     else:
         parts.append("\n\nRespond naturally and helpfully.")
 
-    return "".join(parts), metadata
+    return "".join(parts), metadata

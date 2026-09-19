@@ -473,6 +473,84 @@ def call_llm_with_vision(user_message: str, image_base64: str, image_mime: str =
     except Exception as e:
         return f"[Vision error: {str(e)}]"
 
+def assemble_chat_prompt_context(
+    user_id: str,
+    message: str,
+    session_id: Optional[str] = None,
+    doc_id: Optional[str] = None,
+    file_context: Optional[str] = None,
+    mode: Optional[str] = "flash",
+    web_search: Optional[bool] = False,
+    custom_instructions: str = "",
+    personality: str = "friendly",
+) -> tuple[str, dict]:
+    """
+    Constructs the augmented system prompt with correct conceptual separation:
+    - user_memory_context = persistent cross-session factual memory
+    - adaptation_context = learned behavioral response preferences
+    - conversation_context = current-session context only (strictly session_context)
+    Returns (system_prompt, aug_meta).
+    """
+    # 1. Session history is strictly scoped to the active chat
+    session_context = memory.get_session_context(user_id, session_id) if session_id else ""
+    # 2. Durable user facts stored separately
+    user_memory_context = memory.get_user_memory_context(user_id)
+    # Conceptual separation: conversation_context is strictly session_context
+    conversation_context = session_context
+
+    sentiment = sentiment_analyzer.analyze(message)
+    intent = intent_classifier.classify(message)
+    frustration = frustration_detector.score(user_id, message)
+
+    failed = db.get_failed_solutions(user_id)
+    failed_note = "Previously attempted solutions that didn't work: " + "; ".join(failed) if failed else ""
+
+    translation_langs = _detect_translation(message)
+    support_flag = is_support_issue(message, intent)
+
+    fc = file_context or ""
+    if doc_id and not fc:
+        try:
+            doc = db.get_document(doc_id)
+            if doc:
+                fc = doc.get("extracted_text", "")[:8000]
+        except Exception:
+            pass
+
+    adaptation_context = ""
+    try:
+        adaptation_context = adaptation.get_adaptation_context(user_id)
+    except Exception as e:
+        print(f"⚠️ Adaptation context build failed: {e}")
+
+    from llm import build_system_prompt as _bsp
+    _base = _bsp(custom_instructions, personality, mode or "flash")
+
+    system_override, aug_meta = powers.build_augmented_system_prompt(
+        base_prompt=_base,
+        user_message=message,
+        conversation_context=conversation_context,
+        file_context=fc,
+        failed_note=failed_note,
+        sentiment_label=sentiment["label"],
+        frustration=frustration,
+        translation_langs=translation_langs,
+        support_flag=support_flag,
+        web_search_enabled=bool(web_search),
+        adaptation_context=adaptation_context,
+        user_memory_context=user_memory_context,
+    )
+    aug_meta["sentiment"] = sentiment
+    aug_meta["intent"] = intent
+    aug_meta["frustration"] = frustration
+    aug_meta["translation_langs"] = translation_langs
+    aug_meta["support_flag"] = support_flag
+    aug_meta["file_context"] = fc
+    aug_meta["adaptation_context"] = adaptation_context
+    aug_meta["user_memory_context"] = user_memory_context
+    aug_meta["conversation_context"] = conversation_context
+    return system_override, aug_meta
+
 # ─── Chat (non‑streaming) ──────────────────────────────────────────────
 @app.post("/api/chat")
 def chat(req: ChatRequest):
@@ -511,58 +589,23 @@ def chat(req: ChatRequest):
     custom_instructions = prefs.get("custom_instructions", "")
     personality = prefs.get("personality", "friendly")
 
-    # Build memory context without cross-session conversation bleed.
-    # Session history is scoped to the active chat and summarized by memory.py;
-    # durable user facts are stored separately and intentionally carried across chats.
-    session_context = memory.get_session_context(req.user_id, req.session_id) if req.session_id else ""
-    user_memory_context = memory.get_user_memory_context(req.user_id)
-    context = "\n".join(
-        part.strip()
-        for part in (user_memory_context, session_context)
-        if part and part.strip()
+    system_override, aug_meta = assemble_chat_prompt_context(
+        user_id=req.user_id,
+        message=req.message,
+        session_id=req.session_id,
+        doc_id=req.doc_id,
+        file_context=req.file_context,
+        mode=req.mode or "flash",
+        web_search=getattr(req, "web_search", False),
+        custom_instructions=custom_instructions,
+        personality=personality,
     )
-
-    sentiment = sentiment_analyzer.analyze(req.message)
-    intent = intent_classifier.classify(req.message)
-    frustration = frustration_detector.score(req.user_id, req.message)
-
-    failed = db.get_failed_solutions(req.user_id)
-    failed_note = "Previously attempted solutions that didn't work: " + "; ".join(failed) if failed else ""
-
-    translation_langs = _detect_translation(req.message)
-    support_flag = is_support_issue(req.message, intent)
-
-    file_context = req.file_context or ""
-    if req.doc_id and not file_context:
-        try:
-            doc = db.get_document(req.doc_id)
-            if doc: file_context = doc.get("extracted_text", "")[:8000]
-        except Exception: pass
-
-    adaptation_context = ""
-    try:
-        adaptation_context = adaptation.get_adaptation_context(req.user_id)
-    except Exception as e:
-        print(f"⚠️ Adaptation context build failed: {e}")
-
-    from llm import build_system_prompt as _bsp
-    _base = _bsp(custom_instructions, personality, req.mode or "flash")
-    print(f"🔍 [Non-streaming] Using mode for system prompt: {req.mode or 'flash'}")
-
-    system_override, aug_meta = powers.build_augmented_system_prompt(
-        base_prompt=_base,
-        user_message=req.message,
-        conversation_context=context,
-        file_context=file_context,
-        failed_note=failed_note,
-        sentiment_label=sentiment["label"],
-        frustration=frustration,
-        translation_langs=translation_langs,
-        support_flag=support_flag,
-        web_search_enabled=getattr(req, "web_search", False),
-        adaptation_context=adaptation_context,
-        user_memory_context=user_memory_context,
-    )
+    sentiment = aug_meta["sentiment"]
+    intent = aug_meta["intent"]
+    frustration = aug_meta["frustration"]
+    translation_langs = aug_meta["translation_langs"]
+    support_flag = aug_meta["support_flag"]
+    file_context = aug_meta["file_context"]
 
     # DeepL translation path
     if translation_langs and translation_langs.get("tgt"):
@@ -667,58 +710,23 @@ def chat_stream(req: ChatRequest):
         custom_instructions = prefs.get("custom_instructions", "")
         personality = prefs.get("personality", "friendly")
 
-        # Build memory context without cross-session conversation bleed.
-        # Session history is scoped to the active chat and summarized by memory.py;
-        # durable user facts are stored separately and intentionally carried across chats.
-        session_context = memory.get_session_context(req.user_id, req.session_id) if req.session_id else ""
-        user_memory_context = memory.get_user_memory_context(req.user_id)
-        context = "\n".join(
-            part.strip()
-            for part in (user_memory_context, session_context)
-            if part and part.strip()
+        system_override, aug_meta = assemble_chat_prompt_context(
+            user_id=req.user_id,
+            message=req.message,
+            session_id=req.session_id,
+            doc_id=req.doc_id,
+            file_context=req.file_context,
+            mode=req.mode or "flash",
+            web_search=getattr(req, "web_search", False),
+            custom_instructions=custom_instructions,
+            personality=personality,
         )
-
-        sentiment = sentiment_analyzer.analyze(req.message)
-        intent = intent_classifier.classify(req.message)
-        frustration = frustration_detector.score(req.user_id, req.message)
-
-        failed = db.get_failed_solutions(req.user_id)
-        failed_note = "Previously attempted solutions that didn't work: " + "; ".join(failed) if failed else ""
-
-        translation_langs = _detect_translation(req.message)
-        support_flag = is_support_issue(req.message, intent)
-
-        file_context = req.file_context or ""
-        if req.doc_id and not file_context:
-            try:
-                doc = db.get_document(req.doc_id)
-                if doc: file_context = doc.get("extracted_text", "")[:8000]
-            except Exception: pass
-
-        adaptation_context = ""
-        try:
-            adaptation_context = adaptation.get_adaptation_context(req.user_id)
-        except Exception as e:
-            print(f"⚠️ Adaptation context build failed: {e}")
-
-        from llm import build_system_prompt as _bsp
-        _base = _bsp(custom_instructions, personality, req.mode or "flash")
-        print(f"🔍 [Streaming] Using mode for system prompt: {req.mode or 'flash'}")
-
-        system_override, aug_meta = powers.build_augmented_system_prompt(
-            base_prompt=_base,
-            user_message=req.message,
-            conversation_context=context,
-            file_context=file_context,
-            failed_note=failed_note,
-            sentiment_label=sentiment["label"],
-            frustration=frustration,
-            translation_langs=translation_langs,
-            support_flag=support_flag,
-            web_search_enabled=getattr(req, "web_search", False),
-            adaptation_context=adaptation_context,
-            user_memory_context=user_memory_context,
-        )
+        sentiment = aug_meta["sentiment"]
+        intent = aug_meta["intent"]
+        frustration = aug_meta["frustration"]
+        translation_langs = aug_meta["translation_langs"]
+        support_flag = aug_meta["support_flag"]
+        file_context = aug_meta["file_context"]
 
         if aug_meta.get("searched"):
             yield f"data: {json.dumps({'status': '🔍 Searching the web…', 'searching': True})}\n\n"
@@ -960,15 +968,18 @@ def reset_user_adaptation(user_id: str):
 class AdaptationPatchRequest(BaseModel):
     preference: str
     value: Any
-    confidence: Optional[float] = 0.85
+    confidence: Optional[Any] = 0.85
 
 @app.patch("/api/adaptation/{user_id}")
 def patch_user_adaptation(user_id: str, req: AdaptationPatchRequest):
     try:
-        updated = adaptation.set_manual_preference(user_id, req.preference, req.value, req.confidence or 0.85)
+        conf = req.confidence if req.confidence is not None else 0.85
+        updated = adaptation.set_manual_preference(user_id, req.preference, req.value, conf)
         return {"status": "updated", "user_id": user_id, "profile": updated}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid request parameters.")
 
 # ─── Sessions ─────────────────────────────────────────────────────────
 @app.get("/api/sessions/{user_id}")
