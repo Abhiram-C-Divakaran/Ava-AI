@@ -313,6 +313,7 @@ async def google_auth(request: Request):
             print(f"Existing user: {email}")
         
         # Return HTML with user data
+        safe_name = name.replace("'", "\\'")
         html = f"""
         <!DOCTYPE html>
         <html>
@@ -385,7 +386,7 @@ async def google_auth(request: Request):
                 // Store user data in localStorage
                 const userData = {{
                     user_id: '{user_id}',
-                    name: '{name.replace("'", "\\'")}',
+                    name: '{safe_name}',
                     email: '{email}',
                     terms_accepted: true,
                     is_oauth: true
