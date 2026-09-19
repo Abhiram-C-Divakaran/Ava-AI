@@ -132,10 +132,13 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
-                user_id    TEXT NOT NULL,
-                strategy   TEXT NOT NULL,
-                successes  INTEGER NOT NULL DEFAULT 0,
-                failures   INTEGER NOT NULL DEFAULT 0,
+                user_id         TEXT NOT NULL,
+                strategy        TEXT NOT NULL,
+                successes       INTEGER NOT NULL DEFAULT 0,
+                failures        INTEGER NOT NULL DEFAULT 0,
+                last_updated    TEXT,
+                last_success_at TEXT,
+                last_failure_at TEXT,
                 PRIMARY KEY (user_id, strategy)
             );
 
@@ -177,6 +180,20 @@ def init_db():
             pass
         try:
             conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # Add missing columns to adaptation_strategy_stats (if they don't exist)
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_updated TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_success_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_failure_at TEXT")
         except sqlite3.OperationalError:
             pass
 
@@ -846,39 +863,66 @@ def increment_adaptation_interaction_count(user_id: str) -> int:
         return row["interaction_count"] if row else 1
 
 
-def record_strategy_feedback(user_id: str, strategy: str, helpful: bool) -> None:
-    """Track successes and failures for behavioral response strategies."""
+def record_strategy_feedback(user_id: str, strategy: str, helpful: bool, timestamp: str | None = None) -> None:
+    """Track successes, failures, and timestamps for behavioral response strategies."""
+    now = timestamp or _now()
     with get_conn() as conn:
         if helpful:
             conn.execute(
                 """
-                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
-                VALUES (?, ?, 1, 0)
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures, last_updated, last_success_at)
+                VALUES (?, ?, 1, 0, ?, ?)
                 ON CONFLICT(user_id, strategy) DO UPDATE SET
-                    successes = adaptation_strategy_stats.successes + 1
+                    successes = adaptation_strategy_stats.successes + 1,
+                    last_updated = excluded.last_updated,
+                    last_success_at = excluded.last_success_at
                 """,
-                (user_id, strategy)
+                (user_id, strategy, now, now)
             )
         else:
             conn.execute(
                 """
-                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
-                VALUES (?, ?, 0, 1)
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures, last_updated, last_failure_at)
+                VALUES (?, ?, 0, 1, ?, ?)
                 ON CONFLICT(user_id, strategy) DO UPDATE SET
-                    failures = adaptation_strategy_stats.failures + 1
+                    failures = adaptation_strategy_stats.failures + 1,
+                    last_updated = excluded.last_updated,
+                    last_failure_at = excluded.last_failure_at
                 """,
-                (user_id, strategy)
+                (user_id, strategy, now, now)
             )
 
 
 def get_strategy_stats(user_id: str) -> dict[str, dict]:
-    """Return all strategy success/failure statistics for user_id."""
+    """Return all strategy statistics with timestamps for user_id."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT strategy, successes, failures FROM adaptation_strategy_stats WHERE user_id = ?",
+            """
+            SELECT strategy, successes, failures, last_updated, last_success_at, last_failure_at
+            FROM adaptation_strategy_stats WHERE user_id = ?
+            """,
             (user_id,)
         ).fetchall()
         return {
-            row["strategy"]: {"successes": row["successes"], "failures": row["failures"]}
+            row["strategy"]: {
+                "successes": row["successes"],
+                "failures": row["failures"],
+                "last_updated": row["last_updated"],
+                "last_success_at": row["last_success_at"],
+                "last_failure_at": row["last_failure_at"],
+            }
             for row in rows
+        }
+
+
+def get_user_feedback_stats(user_id: str) -> dict:
+    """Return total feedback count and positive feedback count for user_id."""
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) AS c FROM feedback WHERE user_id = ?", (user_id,)).fetchone()["c"]
+        positive = conn.execute("SELECT COUNT(*) AS c FROM feedback WHERE user_id = ? AND helpful = 1", (user_id,)).fetchone()["c"]
+        return {
+            "total_feedback": total,
+            "positive_feedback": positive,
+            "negative_feedback": total - positive,
+            "positive_rate": round(positive / total, 3) if total > 0 else 0.0,
         }

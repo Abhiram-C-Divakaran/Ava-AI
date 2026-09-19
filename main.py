@@ -518,8 +518,10 @@ def assemble_chat_prompt_context(
             pass
 
     adaptation_context = ""
+    policy = {}
     try:
-        adaptation_context = adaptation.get_adaptation_context(user_id)
+        adaptation_context = adaptation.get_adaptation_context(user_id, message)
+        policy = adaptation.get_behavior_policy(user_id, message)
     except Exception as e:
         print(f"⚠️ Adaptation context build failed: {e}")
 
@@ -549,6 +551,9 @@ def assemble_chat_prompt_context(
     aug_meta["adaptation_context"] = adaptation_context
     aug_meta["user_memory_context"] = user_memory_context
     aug_meta["conversation_context"] = conversation_context
+    aug_meta["strategy"] = policy.get("preferred_strategy")
+    aug_meta["adaptation_used"] = bool(policy.get("preferred_strategy") or adaptation_context)
+    aug_meta["policy"] = policy
     return system_override, aug_meta
 
 # ─── Chat (non‑streaming) ──────────────────────────────────────────────
@@ -671,7 +676,9 @@ def chat(req: ChatRequest):
 
     return {"response": response, "message_id": message_id, "session_id": session_id,
         "metadata": {"intent": intent, "sentiment": sentiment, "frustration_score": frustration,
-                     "searched": aug_meta.get("searched", False)}}
+                     "searched": aug_meta.get("searched", False),
+                     "strategy": aug_meta.get("strategy"),
+                     "adaptation_used": aug_meta.get("adaptation_used", False)}}
 
 # ─── Chat streaming ─────────────────────────────────────────────────────
 @app.post("/api/chat/stream")
@@ -837,7 +844,7 @@ def chat_stream(req: ChatRequest):
         except Exception as e:
             print(f"⚠️ Adaptation observation failed: {e}")
 
-        yield f"data: {json.dumps({'done': True, 'message_id': message_id, 'session_id': session_id, 'metadata': {'intent': intent, 'sentiment': sentiment, 'frustration_score': frustration, 'searched': aug_meta.get('searched', False), 'deepl_used': aug_meta.get('deepl_used', False)}})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'message_id': message_id, 'session_id': session_id, 'metadata': {'intent': intent, 'sentiment': sentiment, 'frustration_score': frustration, 'searched': aug_meta.get('searched', False), 'deepl_used': aug_meta.get('deepl_used', False), 'strategy': aug_meta.get('strategy'), 'adaptation_used': aug_meta.get('adaptation_used', False)}})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -953,11 +960,17 @@ def get_user_adaptation(user_id: str):
     profile = adaptation.get_adaptation_profile(user_id)
     context = adaptation.get_adaptation_context(user_id)
     strategy_stats = db.get_strategy_stats(user_id)
+    preferred_strategies = adaptation.get_preferred_strategies(user_id)
+    policy = adaptation.get_behavior_policy(user_id)
+    metrics = adaptation.get_adaptation_metrics(user_id)
     return {
         "user_id": user_id,
         "profile": profile,
         "context": context,
+        "preferred_strategies": preferred_strategies,
         "strategy_stats": strategy_stats,
+        "policy": policy,
+        "metrics": metrics,
     }
 
 @app.delete("/api/adaptation/{user_id}")

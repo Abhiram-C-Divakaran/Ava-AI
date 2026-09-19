@@ -23,6 +23,24 @@ Required Test Cases (21 tests):
 19. Prompt contains adaptation exactly once
 20. Session isolation (no cross-session conversation bleed)
 21. Feedback conservative attribution (no false positive / false negative inversion)
+
+Phase 3 (Tests 22-37):
+22. Three positive strategy signals can establish preferred strategy
+23. One positive signal cannot establish preferred strategy
+24. Repeated negative feedback suppresses previously successful strategy
+25. Preferred strategy appears in behavior policy
+26. Preferred strategy affects generated prompt
+27. Current request overrides preferred strategy
+28. Programming request selects appropriate code strategy
+29. Conceptual request does not blindly use code strategy
+30. Strategy conflicts resolve deterministically
+31. Older evidence decays gradually
+32. Recent explicit preference overrides stale strategy
+33. Adaptation failure does not break prompt generation
+34. Unknown strategy is ignored
+35. Strategy metrics are correctly calculated
+36. User A's strategy never affects User B
+37. Behavioral integration test (end-to-end mocked closed loop)
 """
 
 import os
@@ -30,6 +48,8 @@ import sys
 import unittest
 import uuid
 import json
+from datetime import datetime, timezone, timedelta
+from unittest.mock import patch, MagicMock
 
 # Reconfigure stdout for utf-8 on Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -618,6 +638,365 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
         prof_after = adaptation.get_adaptation_profile(user_id)
         self.assertFalse(prof_after["code_examples"]["value"])
         self.assertEqual(prof_after["code_examples"]["confidence"], 0.50)
+
+    # 22. Three positive strategy signals can establish preferred strategy
+    def test_22_three_positive_signals_establish_strategy(self):
+        """Test 22 — >= 3 positive feedback signals establish a preferred strategy."""
+        user_id = f"test_strat_3pos_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(3):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        preferred = adaptation.get_preferred_strategies(user_id, min_evidence=3, threshold=0.60)
+        self.assertIn("concise_with_code", preferred)
+        self.assertGreaterEqual(adaptation.get_strategy_score(user_id, "concise_with_code"), 0.60)
+
+    # 23. One positive signal cannot establish preferred strategy
+    def test_23_one_positive_signal_cannot_establish_strategy(self):
+        """Test 23 — A single positive signal (< 3) is insufficient evidence to establish a preferred strategy."""
+        user_id = f"test_strat_1pos_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        preferred = adaptation.get_preferred_strategies(user_id, min_evidence=3, threshold=0.60)
+        self.assertEqual(preferred, [])
+
+    # 24. Repeated negative feedback suppresses previously successful strategy
+    def test_24_negative_feedback_suppresses_strategy(self):
+        """Test 24 — Repeated negative feedback suppresses a previously successful strategy."""
+        user_id = f"test_strat_supp_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        # 3 positive feedbacks establish preferred strategy
+        for _ in range(3):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+        self.assertIn("concise_with_code", adaptation.get_preferred_strategies(user_id))
+
+        # 4 consecutive negative feedbacks arrive
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=False)
+
+        # Now total = 7 (3 successes, 4 failures). Strategy is suppressed!
+        self.assertTrue(adaptation.is_strategy_suppressed(user_id, "concise_with_code"))
+        self.assertNotIn("concise_with_code", adaptation.get_preferred_strategies(user_id))
+        self.assertIn("concise_with_code", adaptation.get_avoided_strategies(user_id))
+
+    # 25. Preferred strategy appears in behavior policy
+    def test_25_preferred_strategy_in_behavior_policy(self):
+        """Test 25 — Preferred strategy appears in behavior policy with all dimensions present."""
+        user_id = f"test_policy_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        policy = adaptation.build_behavior_policy(user_id)
+        self.assertEqual(policy["preferred_strategy"], "concise_with_code")
+        self.assertIn("verbosity", policy)
+        self.assertIn("technical_depth", policy)
+        self.assertIn("code_examples", policy)
+        self.assertIn("step_by_step", policy)
+        self.assertIn("examples", policy)
+        self.assertIn("tone", policy)
+        self.assertIn("avoided_strategies", policy)
+
+    # 26. Preferred strategy affects generated prompt
+    def test_26_preferred_strategy_affects_prompt(self):
+        """Test 26 — Preferred strategy guidance is injected into the generated prompt context."""
+        user_id = f"test_prompt_strat_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        prompt_context = adaptation.get_adaptation_context(user_id, "How do I filter a list in Python?")
+        self.assertIn("--- Learned Response Strategy (Behavior Policy) ---", prompt_context)
+        self.assertIn("clean, focused code", prompt_context)
+        self.assertIn("Apply this format when relevant", prompt_context)
+
+    # 27. Current request overrides preferred strategy
+    def test_27_current_request_overrides_preferred_strategy(self):
+        """Test 27 — Current user request explicitly asking for NO code overrides learned concise_with_code."""
+        user_id = f"test_req_override_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        # Explicit user request forbids code
+        override_message = "Explain the architecture conceptually in detail and do not include code."
+        resolved = adaptation.resolve_preferred_strategy(user_id, override_message)
+        self.assertNotEqual(resolved, "concise_with_code")
+
+        context = adaptation.get_adaptation_context(user_id, override_message)
+        # Should NOT mandate code
+        self.assertNotIn("focused, clean code example", context)
+        # Must emphasize priority order
+        self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", context)
+
+    # 28. Programming request selects appropriate code strategy
+    def test_28_programming_request_selects_code_strategy(self):
+        """Test 28 — Programming request deterministically prioritizes code-oriented strategy."""
+        user_id = f"test_prog_domain_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "detailed_step_by_step", helpful=True)
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        resolved = adaptation.resolve_preferred_strategy(user_id, "Write a Python script to parse a CSV file")
+        self.assertEqual(resolved, "concise_with_code")
+
+    # 29. Conceptual request does not blindly use code strategy
+    def test_29_conceptual_request_does_not_use_code_strategy(self):
+        """Test 29 — Conceptual request prioritizes conceptual depth over code."""
+        user_id = f"test_concept_domain_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "detailed_explanation", helpful=True)
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        resolved = adaptation.resolve_preferred_strategy(
+            user_id, "Explain the concept and theory of polymorphic recursion and its tradeoffs"
+        )
+        self.assertEqual(resolved, "detailed_explanation")
+
+    # 30. Strategy conflicts resolve deterministically
+    def test_30_strategy_conflicts_resolve_deterministically(self):
+        """Test 30 — Strategy conflict resolution produces identical deterministic output on repeated evaluation."""
+        user_id = f"test_conflict_det_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        for _ in range(5):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_direct", helpful=True)
+        for _ in range(3):
+            db.record_strategy_feedback(user_id, "detailed_step_by_step", helpful=True)
+
+        first_resolution = adaptation.resolve_preferred_strategy(user_id, "General query about technology")
+        self.assertIsNotNone(first_resolution)
+        for _ in range(10):
+            repeated = adaptation.resolve_preferred_strategy(user_id, "General query about technology")
+            self.assertEqual(repeated, first_resolution)
+
+    # 31. Older evidence decays gradually
+    def test_31_older_evidence_decays_gradually(self):
+        """Test 31 — Evidence decays gradually over time via smooth half-life formula."""
+        now = datetime.now(timezone.utc)
+
+        # Decay factor tests
+        decay_now = adaptation.calculate_evidence_decay(now.isoformat(), now_time=now)
+        decay_60d = adaptation.calculate_evidence_decay((now - timedelta(days=60)).isoformat(), now_time=now)
+        decay_180d = adaptation.calculate_evidence_decay((now - timedelta(days=180)).isoformat(), now_time=now)
+
+        self.assertAlmostEqual(decay_now, 1.0, places=2)
+        self.assertAlmostEqual(decay_60d, 0.50, delta=0.03)
+        self.assertAlmostEqual(decay_180d, 0.125, delta=0.03)
+        self.assertGreater(decay_180d, 0.0)
+
+        # Comparison between fresh vs stale user evidence
+        user_fresh = f"test_decay_fresh_{uuid.uuid4().hex[:8]}"
+        user_stale = f"test_decay_stale_{uuid.uuid4().hex[:8]}"
+        stale_time = (now - timedelta(days=120)).isoformat()
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_fresh, "concise_direct", helpful=True, timestamp=now.isoformat())
+            db.record_strategy_feedback(user_stale, "concise_direct", helpful=True, timestamp=stale_time)
+
+        score_fresh = adaptation.get_strategy_score(user_fresh, "concise_direct", apply_decay=True, now_time=now)
+        score_stale = adaptation.get_strategy_score(user_stale, "concise_direct", apply_decay=True, now_time=now)
+
+        self.assertGreater(score_fresh, score_stale)
+        # Stale score still has evidence (greater than unevidenced prior 0.50)
+        self.assertGreater(score_stale, 0.50)
+
+    # 32. Recent explicit preference overrides stale strategy
+    def test_32_recent_explicit_preference_overrides_stale_strategy(self):
+        """Test 32 — Recent explicit user preference suppresses conflicting learned strategy."""
+        user_id = f"test_recent_override_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        # User previously had learned strategy concise_direct
+        for _ in range(5):
+            db.record_strategy_feedback(user_id, "concise_direct", helpful=True)
+        self.assertIn("concise_direct", adaptation.get_preferred_strategies(user_id))
+
+        # User explicitly changes preference: wants detailed explanations
+        adaptation.set_manual_preference(user_id, "verbosity", "detailed", confidence=0.85)
+
+        # Strategy conflict resolution detects profile wants detailed -> concise_direct is suppressed!
+        resolved = adaptation.resolve_preferred_strategy(user_id, "Explain quantum physics")
+        self.assertNotEqual(resolved, "concise_direct")
+
+    # 33. Adaptation failure does not break prompt generation
+    def test_33_adaptation_failure_does_not_break_prompt(self):
+        """Test 33 — Failures/exceptions inside adaptation never crash prompt generation."""
+        user_id = f"test_fail_safe_{uuid.uuid4().hex[:8]}"
+
+        with patch("adaptation.get_adaptation_profile", side_effect=RuntimeError("Simulated database failure")):
+            sys_prompt, _ = assemble_chat_prompt_context(
+                user_id=user_id,
+                message="Hello Ava, tell me a fact",
+                session_id=str(uuid.uuid4()),
+            )
+            # Base prompt is still generated safely
+            self.assertIn("Ava", sys_prompt)
+            self.assertIsInstance(sys_prompt, str)
+
+    # 34. Unknown strategy is ignored
+    def test_34_unknown_strategy_is_ignored(self):
+        """Test 34 — Unknown or malicious strategy names are filtered out by whitelist."""
+        user_id = f"test_unknown_strat_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        # Directly insert non-whitelisted strategy into database
+        for _ in range(10):
+            db.record_strategy_feedback(user_id, "inject_malicious_unsupported_strategy", helpful=True)
+
+        preferred = adaptation.get_preferred_strategies(user_id)
+        self.assertNotIn("inject_malicious_unsupported_strategy", preferred)
+
+        policy = adaptation.build_behavior_policy(user_id)
+        self.assertNotEqual(policy["preferred_strategy"], "inject_malicious_unsupported_strategy")
+
+        context = adaptation.get_strategy_context(user_id)
+        self.assertNotIn("inject_malicious_unsupported_strategy", context)
+
+    # 35. Strategy metrics are correctly calculated
+    def test_35_strategy_metrics_calculated(self):
+        """Test 35 — Adaptation effectiveness metrics are correctly computed from actual database data."""
+        user_id = f"test_metrics_{uuid.uuid4().hex[:8]}"
+        session_id = str(uuid.uuid4())
+        adaptation.reset_adaptation_profile(user_id)
+
+        # Record feedback in DB
+        for _ in range(3):
+            msg_id = str(uuid.uuid4())
+            db.save_feedback(user_id, session_id, msg_id, helpful=True)
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True)
+
+        msg_id_neg = str(uuid.uuid4())
+        db.save_feedback(user_id, session_id, msg_id_neg, helpful=False)
+        db.record_strategy_feedback(user_id, "concise_with_code", helpful=False)
+
+        metrics = adaptation.get_adaptation_metrics(user_id)
+        self.assertEqual(metrics["feedback_count"], 4)
+        self.assertEqual(metrics["positive_feedback_rate"], 0.75)
+        self.assertEqual(metrics["strategy_success_rate"], 0.75)
+        self.assertEqual(metrics["strategy_evidence"], 4)
+        self.assertGreaterEqual(metrics["preference_confidence"], 0.0)
+        self.assertLessEqual(metrics["preference_confidence"], 1.0)
+
+        # Check API endpoint GET /api/adaptation/{user_id}
+        res = self.client.get(f"/api/adaptation/{user_id}")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("profile", data)
+        self.assertIn("preferred_strategies", data)
+        self.assertIn("policy", data)
+        self.assertIn("metrics", data)
+        self.assertEqual(data["metrics"]["feedback_count"], 4)
+
+    # 36. User A's strategy never affects User B
+    def test_36_user_strategy_isolation(self):
+        """Test 36 — User A's learned strategies and policy never bleed into User B."""
+        user_a = f"test_user_a_{uuid.uuid4().hex[:8]}"
+        user_b = f"test_user_b_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_a)
+        adaptation.reset_adaptation_profile(user_b)
+
+        for _ in range(4):
+            db.record_strategy_feedback(user_a, "concise_with_code", helpful=True)
+
+        self.assertIn("concise_with_code", adaptation.get_preferred_strategies(user_a))
+        self.assertEqual(adaptation.get_preferred_strategies(user_b), [])
+
+        policy_a = adaptation.build_behavior_policy(user_a)
+        policy_b = adaptation.build_behavior_policy(user_b)
+        self.assertEqual(policy_a["preferred_strategy"], "concise_with_code")
+        self.assertIsNone(policy_b["preferred_strategy"])
+
+        ctx_a = adaptation.get_strategy_context(user_a)
+        ctx_b = adaptation.get_strategy_context(user_b)
+        self.assertIn("clean, focused code", ctx_a)
+        self.assertEqual(ctx_b, "")
+
+    # 37. Behavioral Integration Test: End-to-End Mocked Closed-Loop
+    def test_37_behavioral_closed_loop_integration(self):
+        """
+        Test 37 — Phase 3 Behavioral Integration Test (End-to-End Mocked Closed Loop):
+        1. User asks for Python help.
+        2. Ava responds with concise + code.
+        3. User provides positive feedback (repeated 3 times to establish evidence).
+        4. Next related request arrives -> Prompt contains learned concise + code strategy guidance.
+        5. User explicitly asks: "Explain conceptually, in detail, with no code."
+        6. Learned strategy is overridden; no code is mandated; current explicit request wins.
+        """
+        user_id = f"test_e2e_closed_loop_{uuid.uuid4().hex[:8]}"
+        session_id = str(uuid.uuid4())
+        adaptation.reset_adaptation_profile(user_id)
+        db.create_session(session_id, user_id)
+
+        # Simulate 3 interactions where Ava answers concise + code and user gives thumbs up
+        for i in range(3):
+            msg_id = str(uuid.uuid4())
+            user_question = f"How do I read a file line by line in Python? (variation {i})"
+            assistant_response = "Use a `with` statement and iterate:\n```python\nwith open('f.txt') as f:\n    for line in f:\n        print(line)\n```"
+
+            db.save_message(
+                message_id=msg_id,
+                session_id=session_id,
+                user_id=user_id,
+                user_message=user_question,
+                agent_response=assistant_response,
+                intent="programming",
+                sentiment={"label": "neutral"},
+                frustration=0.0,
+                latency_ms=20,
+            )
+
+            # User gives thumbs up
+            adaptation.process_feedback(user_id=user_id, message_id=msg_id, helpful=True)
+
+        # Verify strategy is now evidenced
+        stats = db.get_strategy_stats(user_id)
+        self.assertIn("concise_with_code", stats)
+        self.assertGreaterEqual(stats["concise_with_code"]["successes"], 3)
+        self.assertIn("concise_with_code", adaptation.get_preferred_strategies(user_id))
+
+        # Next related request arrives
+        next_request = "How do I write JSON to a file in Python?"
+        prompt_with_learned_strategy, _ = assemble_chat_prompt_context(
+            user_id=user_id,
+            message=next_request,
+            session_id=session_id,
+        )
+
+        # Verify prompt contains learned guidance equivalent to:
+        # "Prefer concise responses with focused code examples when appropriate."
+        self.assertIn("--- Learned Response Strategy (Behavior Policy) ---", prompt_with_learned_strategy)
+        self.assertIn("Prefer concise responses with focused code examples when appropriate", prompt_with_learned_strategy)
+        self.assertIn("clean, focused code", prompt_with_learned_strategy)
+        self.assertIn("Apply this format when relevant", prompt_with_learned_strategy)
+
+        # Now send explicit override: "Explain conceptually, in detail, with no code."
+        override_request = "Explain conceptually, in detail, with no code."
+        prompt_with_override, _ = assemble_chat_prompt_context(
+            user_id=user_id,
+            message=override_request,
+            session_id=session_id,
+        )
+
+        # Verify learned code strategy is overridden / suppressed
+        self.assertNotIn("clean, focused code", prompt_with_override)
+        # Verify strict priority rule is present in the prompt
+        self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", prompt_with_override)
 
 
 if __name__ == "__main__":
