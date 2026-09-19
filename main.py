@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Any, Union
 from io import BytesIO
 
 from llm import call_llm, call_llm_streaming, call_llm_with_constraints
@@ -25,6 +25,7 @@ from MLpipeline import SentimentAnalyzer, IntentClassifier, FrustrationDetector
 import database as db
 import search
 import memory
+import adaptation
 import powers
 
 from dotenv import load_dotenv
@@ -538,6 +539,12 @@ def chat(req: ChatRequest):
             if doc: file_context = doc.get("extracted_text", "")[:8000]
         except Exception: pass
 
+    adaptation_context = ""
+    try:
+        adaptation_context = adaptation.get_adaptation_context(req.user_id)
+    except Exception as e:
+        print(f"⚠️ Adaptation context build failed: {e}")
+
     from llm import build_system_prompt as _bsp
     _base = _bsp(custom_instructions, personality, req.mode or "flash")
     print(f"🔍 [Non-streaming] Using mode for system prompt: {req.mode or 'flash'}")
@@ -553,6 +560,8 @@ def chat(req: ChatRequest):
         translation_langs=translation_langs,
         support_flag=support_flag,
         web_search_enabled=getattr(req, "web_search", False),
+        adaptation_context=adaptation_context,
+        user_memory_context=user_memory_context,
     )
 
     # DeepL translation path
@@ -606,6 +615,16 @@ def chat(req: ChatRequest):
         user_message=req.message, agent_response=response, intent=intent,
         sentiment=sentiment, frustration=frustration, latency_ms=latency_ms)
     memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, response)
+    try:
+        adaptation.observe_interaction(
+            user_id=req.user_id,
+            user_message=req.message,
+            agent_response=response,
+            intent=intent,
+            sentiment=sentiment.get("label") if isinstance(sentiment, dict) else str(sentiment),
+        )
+    except Exception as e:
+        print(f"⚠️ Adaptation observation failed: {e}")
 
     return {"response": response, "message_id": message_id, "session_id": session_id,
         "metadata": {"intent": intent, "sentiment": sentiment, "frustration_score": frustration,
@@ -676,6 +695,12 @@ def chat_stream(req: ChatRequest):
                 if doc: file_context = doc.get("extracted_text", "")[:8000]
             except Exception: pass
 
+        adaptation_context = ""
+        try:
+            adaptation_context = adaptation.get_adaptation_context(req.user_id)
+        except Exception as e:
+            print(f"⚠️ Adaptation context build failed: {e}")
+
         from llm import build_system_prompt as _bsp
         _base = _bsp(custom_instructions, personality, req.mode or "flash")
         print(f"🔍 [Streaming] Using mode for system prompt: {req.mode or 'flash'}")
@@ -691,6 +716,8 @@ def chat_stream(req: ChatRequest):
             translation_langs=translation_langs,
             support_flag=support_flag,
             web_search_enabled=getattr(req, "web_search", False),
+            adaptation_context=adaptation_context,
+            user_memory_context=user_memory_context,
         )
 
         if aug_meta.get("searched"):
@@ -791,6 +818,16 @@ def chat_stream(req: ChatRequest):
             latency_ms=latency_ms
         )
         memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, full_response)
+        try:
+            adaptation.observe_interaction(
+                user_id=req.user_id,
+                user_message=req.message,
+                agent_response=full_response,
+                intent=intent,
+                sentiment=sentiment.get("label") if isinstance(sentiment, dict) else str(sentiment),
+            )
+        except Exception as e:
+            print(f"⚠️ Adaptation observation failed: {e}")
 
         yield f"data: {json.dumps({'done': True, 'message_id': message_id, 'session_id': session_id, 'metadata': {'intent': intent, 'sentiment': sentiment, 'frustration_score': frustration, 'searched': aug_meta.get('searched', False), 'deepl_used': aug_meta.get('deepl_used', False)}})}\n\n"
 
@@ -896,7 +933,42 @@ def feedback(req: FeedbackRequest):
         sol = db.get_last_agent_response(req.user_id, req.session_id)
         if sol:
             db.save_failed_solution(req.user_id, req.session_id, sol)
+    try:
+        adaptation.process_feedback(req.user_id, req.message_id, req.helpful)
+    except Exception as e:
+        print(f"⚠️ Adaptation feedback processing failed: {e}")
     return {"status": "recorded"}
+
+# ─── Adaptation Endpoints ─────────────────────────────────────────────
+@app.get("/api/adaptation/{user_id}")
+def get_user_adaptation(user_id: str):
+    profile = adaptation.get_adaptation_profile(user_id)
+    context = adaptation.get_adaptation_context(user_id)
+    strategy_stats = db.get_strategy_stats(user_id)
+    return {
+        "user_id": user_id,
+        "profile": profile,
+        "context": context,
+        "strategy_stats": strategy_stats,
+    }
+
+@app.delete("/api/adaptation/{user_id}")
+def reset_user_adaptation(user_id: str):
+    adaptation.reset_adaptation_profile(user_id)
+    return {"status": "reset", "user_id": user_id, "message": "Adaptation profile reset to defaults"}
+
+class AdaptationPatchRequest(BaseModel):
+    preference: str
+    value: Any
+    confidence: Optional[float] = 0.85
+
+@app.patch("/api/adaptation/{user_id}")
+def patch_user_adaptation(user_id: str, req: AdaptationPatchRequest):
+    try:
+        updated = adaptation.set_manual_preference(user_id, req.preference, req.value, req.confidence or 0.85)
+        return {"status": "updated", "user_id": user_id, "profile": updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ─── Sessions ─────────────────────────────────────────────────────────
 @app.get("/api/sessions/{user_id}")
@@ -1286,7 +1358,11 @@ def user_analytics(user_id: str):
     return db.get_user_stats(user_id)
 
 # ─── Static ───────────────────────────────────────────────────────────
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+STATIC_DIR = (
+    os.path.join(os.path.dirname(__file__), "static")
+    if os.path.isdir(os.path.join(os.path.dirname(__file__), "static"))
+    else os.path.dirname(__file__)
+)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 # ─── Cache-busting route for admin.html ──────────────────────────────

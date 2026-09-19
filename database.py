@@ -123,6 +123,23 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_failed_user ON failed_solutions(user_id);
             CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+
+            CREATE TABLE IF NOT EXISTS adaptation_profiles (
+                user_id           TEXT PRIMARY KEY,
+                profile_json      TEXT NOT NULL,
+                updated_at        TEXT NOT NULL,
+                interaction_count INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
+                user_id    TEXT NOT NULL,
+                strategy   TEXT NOT NULL,
+                successes  INTEGER NOT NULL DEFAULT 0,
+                failures   INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, strategy)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_adaptation_stats_user ON adaptation_strategy_stats(user_id);
             """
         )
 
@@ -748,3 +765,120 @@ def delete_review(review_id: str) -> dict | None:
     with get_conn() as conn:
         conn.execute("DELETE FROM reviews WHERE review_id = ?", (review_id,))
     return review
+
+
+# ─── Adaptation Engine Persistence ──────────────────────────────────────────
+
+def get_adaptation_profile(user_id: str) -> dict | None:
+    """Retrieve adaptation profile for user_id. Returns dict with parsed profile_json, or None."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT user_id, profile_json, updated_at, interaction_count FROM adaptation_profiles WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            profile_data = json.loads(row["profile_json"])
+        except Exception:
+            profile_data = {}
+        return {
+            "user_id": row["user_id"],
+            "profile": profile_data,
+            "updated_at": row["updated_at"],
+            "interaction_count": row["interaction_count"],
+        }
+
+
+def set_adaptation_profile(user_id: str, profile: dict, interaction_count: int | None = None) -> None:
+    """Persist or update adaptation profile JSON for user_id."""
+    now = _now()
+    profile_json = json.dumps(profile)
+    with get_conn() as conn:
+        if interaction_count is not None:
+            conn.execute(
+                """
+                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    profile_json = excluded.profile_json,
+                    updated_at = excluded.updated_at,
+                    interaction_count = excluded.interaction_count
+                """,
+                (user_id, profile_json, now, interaction_count)
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
+                VALUES (?, ?, ?, 0)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    profile_json = excluded.profile_json,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, profile_json, now)
+            )
+
+
+def clear_adaptation_profile(user_id: str) -> bool:
+    """Clear learned adaptation profile and strategy stats for user_id without touching messages or factual memory."""
+    with get_conn() as conn:
+        c1 = conn.execute("DELETE FROM adaptation_profiles WHERE user_id = ?", (user_id,)).rowcount
+        conn.execute("DELETE FROM adaptation_strategy_stats WHERE user_id = ?", (user_id,))
+        return c1 > 0
+
+
+def increment_adaptation_interaction_count(user_id: str) -> int:
+    """Increment interaction count for user's adaptation profile."""
+    now = _now()
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
+            VALUES (?, '{}', ?, 1)
+            ON CONFLICT(user_id) DO UPDATE SET
+                interaction_count = adaptation_profiles.interaction_count + 1,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, now)
+        )
+        row = conn.execute("SELECT interaction_count FROM adaptation_profiles WHERE user_id = ?", (user_id,)).fetchone()
+        return row["interaction_count"] if row else 1
+
+
+def record_strategy_feedback(user_id: str, strategy: str, helpful: bool) -> None:
+    """Track successes and failures for behavioral response strategies."""
+    with get_conn() as conn:
+        if helpful:
+            conn.execute(
+                """
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
+                VALUES (?, ?, 1, 0)
+                ON CONFLICT(user_id, strategy) DO UPDATE SET
+                    successes = adaptation_strategy_stats.successes + 1
+                """,
+                (user_id, strategy)
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
+                VALUES (?, ?, 0, 1)
+                ON CONFLICT(user_id, strategy) DO UPDATE SET
+                    failures = adaptation_strategy_stats.failures + 1
+                """,
+                (user_id, strategy)
+            )
+
+
+def get_strategy_stats(user_id: str) -> dict[str, dict]:
+    """Return all strategy success/failure statistics for user_id."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT strategy, successes, failures FROM adaptation_strategy_stats WHERE user_id = ?",
+            (user_id,)
+        ).fetchall()
+        return {
+            row["strategy"]: {"successes": row["successes"], "failures": row["failures"]}
+            for row in rows
+        }

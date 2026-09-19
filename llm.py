@@ -10,7 +10,7 @@ load_dotenv()
 
 API_KEY = os.getenv("GROQ_API_KEY", "")
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama-3.3-70b-versatile"
+MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 BASE_SYSTEM_PROMPT = """You are Ava — a capable, honest, and friendly AI assistant.
 

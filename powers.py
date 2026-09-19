@@ -331,24 +331,35 @@ def build_augmented_system_prompt(
     translation_langs: dict | None = None,
     support_flag: bool = False,
     web_search_enabled: bool = False,
+    adaptation_context: str = "",
+    user_memory_context: str = "",
 ) -> tuple[str, dict]:
     """
     Builds the final system prompt with all augmentations injected.
     Returns (system_prompt, augmentation_metadata).
     
     Priority order:
-    1. Time context (always)
-    2. Web search results (if needed)
-    3. File/CSV context
-    4. Conversation context
-    5. Translation routing
-    6. Support/sentiment routing
+    1. Base instructions & Time context (always)
+    2. User factual memory & Behavioral adaptation profile
+    3. Web search results (if needed)
+    4. File/CSV context
+    5. Conversation context
+    6. Translation routing
+    7. Support/sentiment routing
     """
     metadata = {"searched": False, "search_results": [], "deepl_used": False}
     parts = [base_prompt]
 
     # Always inject current time
     parts.append(f"\n\n{get_time_context()}")
+
+    # Persistent cross-session user memory (factual memory)
+    if user_memory_context:
+        parts.append(f"\n\n--- What Ava remembers about this user ---\n{user_memory_context.strip()}")
+
+    # Behavioral adaptation context (learned response preferences)
+    if adaptation_context:
+        parts.append(f"\n\n{adaptation_context.strip()}")
 
     # Auto web search — check if query needs live data
     search_ctx = ""
