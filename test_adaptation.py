@@ -41,6 +41,16 @@ Phase 3 (Tests 22-37):
 35. Strategy metrics are correctly calculated
 36. User A's strategy never affects User B
 37. Behavioral integration test (end-to-end mocked closed loop)
+
+Phase 3.5 Hardening (Tests 38-45):
+38. Timezone decay regression test (now_time not supplied)
+39. Hardened evidence decay (separate positive and negative decay)
+40. Strategy recovery after old failures (recency-aware suppression)
+41. Truthful adapted_responses metric and is_adaptation_used verification
+42. Task domain token-boundary regex matching
+43. Comprehensive current-request override end-to-end
+44. Database migration from Phase 2 preserving data
+45. Deep multi-user isolation verification
 """
 
 import os
@@ -48,6 +58,8 @@ import sys
 import unittest
 import uuid
 import json
+import tempfile
+import sqlite3
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 
@@ -69,8 +81,20 @@ from main import app, assemble_chat_prompt_context
 class TestBehavioralAdaptationHardened(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._orig_db_path = db.DB_PATH
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.test_db_path = os.path.join(cls.temp_dir.name, "test_adaptation.db")
+        db.DB_PATH = cls.test_db_path
         db.init_db()
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        db.DB_PATH = cls._orig_db_path
+        try:
+            cls.temp_dir.cleanup()
+        except Exception:
+            pass
 
     # 1. Concise preference learning
     def test_01_concise_preference(self):
@@ -997,6 +1021,293 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
         self.assertNotIn("clean, focused code", prompt_with_override)
         # Verify strict priority rule is present in the prompt
         self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", prompt_with_override)
+
+    # 38. Timezone decay regression test (now_time not supplied)
+    def test_38_timezone_decay_regression(self):
+        """
+        Test 38 — Regression: calculate_evidence_decay must produce a decayed factor (< 1.0)
+        when now_time is NOT manually supplied, proving timezone is properly defined and no silent exception occurs.
+        """
+        old_timestamp = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        decay = adaptation.calculate_evidence_decay(old_timestamp)
+        # 60 days is one half-life; decay must be ~ 0.50 and strictly less than 1.0
+        self.assertLess(decay, 1.0)
+        self.assertAlmostEqual(decay, 0.50, delta=0.05)
+
+    # 39. Hardened evidence decay (separate positive and negative decay)
+    def test_39_hardened_evidence_decay_separate_positive_negative(self):
+        """
+        Test 39 — Successes age by last_success_at and failures age by last_failure_at independently.
+        """
+        user_id = f"test_sep_decay_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+        now = datetime.now(timezone.utc)
+        stale_time = (now - timedelta(days=180)).isoformat()
+
+        # Record 4 old failures 180 days ago, and 4 fresh successes today
+        db.record_strategy_feedback(user_id, "concise_with_code", helpful=False, timestamp=stale_time)
+        with db.get_conn() as conn:
+            conn.execute(
+                "UPDATE adaptation_strategy_stats SET failures = 4 WHERE user_id = ? AND strategy = ?",
+                (user_id, "concise_with_code")
+            )
+        for _ in range(4):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True, timestamp=now.isoformat())
+
+        # Effective successes = 4 * 1.0 = 4.0; Effective failures = 4 * 2^(-180/60) = 4 * 0.125 = 0.5
+        # Decayed score = (4.0 + 1) / (4.0 + 0.5 + 2) = 5.0 / 6.5 ≈ 0.769
+        score = adaptation.get_strategy_score(user_id, "concise_with_code", apply_decay=True, now_time=now)
+        self.assertGreater(score, 0.70)
+
+    # 40. Strategy recovery after old failures (recency-aware suppression)
+    def test_40_strategy_recovery_after_old_failures(self):
+        """
+        Test 40 — Old failures decay so strategies can recover with subsequent positive evidence.
+        Also verifies a single recent success does not prematurely unsuppress recent repeated failures.
+        """
+        user_id = f"test_recov_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+        now = datetime.now(timezone.utc)
+        stale_time = (now - timedelta(days=180)).isoformat()
+
+        # Phase A: 5 failures 180 days ago
+        db.record_strategy_feedback(user_id, "concise_with_code", helpful=False, timestamp=stale_time)
+        with db.get_conn() as conn:
+            conn.execute(
+                "UPDATE adaptation_strategy_stats SET failures = 5 WHERE user_id = ? AND strategy = ?",
+                (user_id, "concise_with_code")
+            )
+
+        # Initially at stale time, it would have been suppressed
+        self.assertTrue(adaptation.is_strategy_suppressed(user_id, "concise_with_code", now_time=datetime.fromisoformat(stale_time)))
+
+        # Phase B: 3 fresh positive feedbacks arrive today
+        for _ in range(3):
+            db.record_strategy_feedback(user_id, "concise_with_code", helpful=True, timestamp=now.isoformat())
+
+        # At current time 'now', effective failures decayed to 5 * 0.125 = 0.625, effective successes = 3.0
+        # Strategy must no longer be suppressed and should qualify as preferred
+        self.assertFalse(adaptation.is_strategy_suppressed(user_id, "concise_with_code", now_time=now))
+        preferred = adaptation.get_preferred_strategies(user_id, now_time=now)
+        self.assertIn("concise_with_code", preferred)
+
+        # Counter-check: A user with 4 RECENT failures and only 1 RECENT success remains suppressed
+        user_recent_fail = f"test_rec_fail_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_recent_fail)
+        for _ in range(4):
+            db.record_strategy_feedback(user_recent_fail, "concise_with_code", helpful=False, timestamp=now.isoformat())
+        db.record_strategy_feedback(user_recent_fail, "concise_with_code", helpful=True, timestamp=now.isoformat())
+        self.assertTrue(adaptation.is_strategy_suppressed(user_recent_fail, "concise_with_code", now_time=now))
+
+    # 41. Truthful adapted_responses metric and is_adaptation_used verification
+    def test_41_adapted_responses_truthful_metric(self):
+        """
+        Test 41 — adapted_responses only increments when adaptation actually influenced the prompt.
+        Default profiles with confidence 0.50 do not count as adapted responses.
+        """
+        user_id = f"test_truth_metric_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(user_id)
+
+        # New user: no learned preferences, confidence 0.50
+        self.assertFalse(adaptation.is_adaptation_used(user_id, "Hello Ava"))
+
+        # Simulate unadapted interaction
+        adaptation.observe_interaction(
+            user_id=user_id,
+            user_message="Hello Ava",
+            agent_response="Hello! How can I help you?",
+            adaptation_used=False,
+        )
+
+        metrics = adaptation.get_adaptation_metrics(user_id)
+        self.assertEqual(metrics["observed_interactions"], 1)
+        self.assertEqual(metrics["adapted_responses"], 0)
+
+        # Now establish a learned preference (confidence >= 0.60)
+        adaptation.set_manual_preference(user_id, "verbosity", "concise", confidence=0.75)
+        self.assertTrue(adaptation.is_adaptation_used(user_id, "What is a neural network?"))
+
+        # Simulate adapted interaction
+        adaptation.observe_interaction(
+            user_id=user_id,
+            user_message="What is a neural network?",
+            agent_response="A neural network is a machine learning model inspired by biological neurons.",
+            adaptation_used=True,
+        )
+
+        metrics_after = adaptation.get_adaptation_metrics(user_id)
+        self.assertEqual(metrics_after["observed_interactions"], 2)
+        self.assertEqual(metrics_after["adapted_responses"], 1)
+
+    # 42. Task domain token-boundary regex matching
+    def test_42_task_domain_token_boundaries(self):
+        """
+        Test 42 — Regex word boundaries prevent false domain classification on substrings.
+        """
+        # "digital" contains "git", "classic" contains "class", "ladybug" contains "bug"
+        # None of these should trigger the programming domain
+        domain_general = adaptation._detect_task_domain("A digital picture of a butterfly in classic museum lighting")
+        self.assertEqual(domain_general, "general")
+
+        # Explicit programming query
+        domain_prog = adaptation._detect_task_domain("Please write a Python script to parse a JSON array")
+        self.assertEqual(domain_prog, "programming")
+
+        # Explicit conceptual query
+        domain_concept = adaptation._detect_task_domain("Explain the architectural tradeoffs and philosophy of event sourcing")
+        self.assertEqual(domain_concept, "conceptual")
+
+    # 43. Comprehensive current-request override end-to-end
+    def test_43_current_request_override_comprehensive(self):
+        """
+        Test 43 — Current explicit user request overrides stored preferences and strategies:
+        - verbosity=concise + 'Explain this in detail without code' -> detailed, no code
+        - code_examples=False + 'Show me the Python implementation' -> code allowed
+        - step_by_step=True + 'Just give me the final result, no steps' -> no forced step-by-step
+        """
+        # Case 1: concise + concise_with_code vs 'Explain this in detail without code'
+        u1 = f"test_ovr1_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(u1)
+        adaptation.set_manual_preference(u1, "verbosity", "concise", confidence=0.90)
+        for _ in range(4):
+            db.record_strategy_feedback(u1, "concise_with_code", helpful=True)
+
+        ctx1 = adaptation.get_adaptation_context(u1, "Explain this in detail without code.")
+        self.assertNotIn("clean, focused code", ctx1)
+        self.assertNotIn("Prefer concise, direct", ctx1)
+        self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", ctx1)
+
+        # Case 2: code_examples=False vs 'Show me the Python implementation'
+        u2 = f"test_ovr2_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(u2)
+        adaptation.set_manual_preference(u2, "code_examples", False, confidence=0.85)
+
+        ctx2 = adaptation.get_adaptation_context(u2, "Show me the Python implementation.")
+        self.assertNotIn("Avoid unprompted code snippets", ctx2)
+        self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", ctx2)
+
+        # Case 3: step_by_step=True vs 'Just give me the final result, no steps'
+        u3 = f"test_ovr3_{uuid.uuid4().hex[:8]}"
+        adaptation.reset_adaptation_profile(u3)
+        adaptation.set_manual_preference(u3, "step_by_step", True, confidence=0.85)
+
+        ctx3 = adaptation.get_adaptation_context(u3, "Just give me the final result, no steps.")
+        self.assertNotIn("Prefer structured, step-by-step", ctx3)
+        self.assertIn("2. The user's CURRENT explicit request in this prompt (overrides any learned preference)", ctx3)
+
+    # 44. Database migration from Phase 2 preserving data
+    def test_44_database_migration_from_phase_2(self):
+        """
+        Test 44 — Migrating from a Phase 2 SQLite database schema cleanly adds
+        last_updated, last_success_at, last_failure_at, and adapted_response_count
+        while preserving all existing rows.
+        """
+        mig_dir = tempfile.TemporaryDirectory()
+        mig_db_path = os.path.join(mig_dir.name, "phase2_legacy.db")
+
+        # Create Phase 2 legacy database schema
+        conn = sqlite3.connect(mig_db_path)
+        conn.execute("""
+            CREATE TABLE adaptation_profiles (
+                user_id TEXT PRIMARY KEY,
+                profile_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                interaction_count INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        conn.execute("""
+            CREATE TABLE adaptation_strategy_stats (
+                user_id TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                successes INTEGER NOT NULL DEFAULT 0,
+                failures INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, strategy)
+            );
+        """)
+        # Insert legacy records
+        conn.execute("INSERT INTO adaptation_profiles VALUES ('user_legacy', '{\"verbosity\":{\"value\":\"concise\",\"confidence\":0.8}}', '2026-01-01', 12)")
+        conn.execute("INSERT INTO adaptation_strategy_stats VALUES ('user_legacy', 'concise_direct', 7, 2)")
+        conn.commit()
+        conn.close()
+
+        # Run Phase 3 migration
+        orig_db = db.DB_PATH
+        try:
+            db.DB_PATH = mig_db_path
+            db.init_db()
+
+            # Verify columns exist via PRAGMA
+            with db.get_conn() as check_conn:
+                prof_cols = [row["name"] for row in check_conn.execute("PRAGMA table_info(adaptation_profiles)").fetchall()]
+                self.assertIn("adapted_response_count", prof_cols)
+
+                strat_cols = [row["name"] for row in check_conn.execute("PRAGMA table_info(adaptation_strategy_stats)").fetchall()]
+                self.assertIn("last_updated", strat_cols)
+                self.assertIn("last_success_at", strat_cols)
+                self.assertIn("last_failure_at", strat_cols)
+
+            # Verify data preservation
+            prof = db.get_adaptation_profile("user_legacy")
+            self.assertIsNotNone(prof)
+            self.assertEqual(prof["interaction_count"], 12)
+            self.assertEqual(prof["adapted_response_count"], 0)
+            self.assertEqual(prof["profile"]["verbosity"]["value"], "concise")
+
+            stats = db.get_strategy_stats("user_legacy")
+            self.assertIn("concise_direct", stats)
+            self.assertEqual(stats["concise_direct"]["successes"], 7)
+            self.assertEqual(stats["concise_direct"]["failures"], 2)
+        finally:
+            db.DB_PATH = orig_db
+            try:
+                mig_dir.cleanup()
+            except Exception:
+                pass
+
+    # 45. Deep multi-user isolation verification
+    def test_45_user_isolation_deep(self):
+        """
+        Test 45 — User A (concise_with_code) and User B (detailed_explanation) remain strictly isolated
+        across profiles, prompt generation, feedback, metrics, and factual memory.
+        """
+        user_a = f"test_iso_deep_a_{uuid.uuid4().hex[:8]}"
+        user_b = f"test_iso_deep_b_{uuid.uuid4().hex[:8]}"
+        session_a = str(uuid.uuid4())
+        session_b = str(uuid.uuid4())
+        adaptation.reset_adaptation_profile(user_a)
+        adaptation.reset_adaptation_profile(user_b)
+        db.create_session(session_a, user_a)
+        db.create_session(session_b, user_b)
+
+        # Train User A on concise_with_code
+        for _ in range(4):
+            db.record_strategy_feedback(user_a, "concise_with_code", helpful=True)
+
+        # Train User B on detailed_explanation
+        for _ in range(4):
+            db.record_strategy_feedback(user_b, "detailed_explanation", helpful=True)
+
+        policy_a = adaptation.build_behavior_policy(user_a)
+        policy_b = adaptation.build_behavior_policy(user_b)
+        self.assertEqual(policy_a["preferred_strategy"], "concise_with_code")
+        self.assertEqual(policy_b["preferred_strategy"], "detailed_explanation")
+
+        prompt_a, _ = assemble_chat_prompt_context(user_id=user_a, message="General query", session_id=session_a)
+        prompt_b, _ = assemble_chat_prompt_context(user_id=user_b, message="General query", session_id=session_b)
+
+        self.assertIn("clean, focused code", prompt_a)
+        self.assertNotIn("deep conceptual and architectural explanations", prompt_a)
+
+        self.assertIn("deep conceptual and architectural explanations", prompt_b)
+        self.assertNotIn("clean, focused code", prompt_b)
+
+        # User A's feedback metrics must not affect User B
+        metrics_a = adaptation.get_adaptation_metrics(user_a)
+        metrics_b = adaptation.get_adaptation_metrics(user_b)
+        self.assertEqual(metrics_a["strategy_evidence"], 4)
+        self.assertEqual(metrics_b["strategy_evidence"], 4)
+        self.assertEqual(metrics_a["preferred_strategy"], "concise_with_code")
+        self.assertEqual(metrics_b["preferred_strategy"], "detailed_explanation")
 
 
 if __name__ == "__main__":

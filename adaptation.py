@@ -17,7 +17,7 @@ Architecture:
 import re
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 import database as db
 
@@ -259,10 +259,12 @@ def observe_interaction(
     agent_response: str,
     intent: Optional[str] = None,
     sentiment: Optional[str] = None,
+    adaptation_used: bool = False,
 ) -> None:
     """
     Evaluates the user's message for behavioral preference signals.
     Uses fast deterministic pattern matching (No external LLM / No RAG).
+    Increments observed interactions, and adapted_response_count if adaptation_used is True.
     """
     if not user_id or not user_message:
         return
@@ -270,8 +272,8 @@ def observe_interaction(
     msg = user_message.strip().lower()
 
     try:
-        # Increment interaction counter
-        db.increment_adaptation_interaction_count(user_id)
+        # Increment interaction counters
+        db.increment_adaptation_interaction_count(user_id, adapted_used=adaptation_used)
 
         # 1. Check explicit patterns first (weight = EXPLICIT_SIGNAL_WEIGHT)
         detected_explicit = set()
@@ -294,7 +296,7 @@ def observe_interaction(
                         break
 
     except Exception as e:
-        logger.warning(f"Adaptation observation failed for {user_id}: {e}")
+        logger.exception(f"Adaptation observation failed for {user_id}: {e}")
 
 
 # ─── Strategy Tracking & Feedback ─────────────────────────────────────────────
@@ -456,9 +458,12 @@ def get_strategy_score(
 ) -> float:
     """
     Computes a confidence-safe smoothed Bayesian score for a strategy,
-    optionally applying gradual half-life decay to older evidence:
+    optionally applying gradual half-life decay to older evidence separately
+    for successes and failures:
     (effective_successes + prior_success) / (effective_successes + effective_failures + prior_total)
     Default prior gives 1/2 = 0.50 when no evidence exists.
+    Note: Separate decay is an approximation because successes/failures are aggregated rather
+    than individually timestamped.
     """
     if strategy not in SUPPORTED_STRATEGIES:
         return 0.50
@@ -470,24 +475,37 @@ def get_strategy_score(
         fail = max(0, strat_data.get("failures", 0))
 
         if apply_decay and (succ > 0 or fail > 0):
-            decay = calculate_evidence_decay(strat_data.get("last_updated"), now_time=now_time)
-            eff_succ = succ * decay
-            eff_fail = fail * decay
+            # Positives age by last_success_at; negatives age by last_failure_at
+            succ_decay = calculate_evidence_decay(
+                strat_data.get("last_success_at") or strat_data.get("last_updated"),
+                now_time=now_time
+            )
+            fail_decay = calculate_evidence_decay(
+                strat_data.get("last_failure_at") or strat_data.get("last_updated"),
+                now_time=now_time
+            )
+            eff_succ = succ * succ_decay
+            eff_fail = fail * fail_decay
         else:
             eff_succ = float(succ)
             eff_fail = float(fail)
 
         return round((eff_succ + prior_success) / (eff_succ + eff_fail + prior_total), 3)
     except Exception as e:
-        logger.warning(f"Error calculating strategy score for {user_id}/{strategy}: {e}")
+        logger.exception(f"Error calculating strategy score for {user_id}/{strategy}: {e}")
         return 0.50
 
 
-def is_strategy_suppressed(user_id: str, strategy: str) -> bool:
+def is_strategy_suppressed(
+    user_id: str,
+    strategy: str,
+    now_time: Optional[datetime] = None,
+) -> bool:
     """
     Checks if a strategy is suppressed due to repeated negative feedback.
-    Suppressed if total evidence >= MIN_STRATEGY_EVIDENCE and failures > successes (or score < 0.40).
-    A single dislike does NOT permanently ban or suppress a strategy.
+    Recency-aware: old failures decay over time so strategies are recoverable.
+    Conservative: requires sufficient effective negative evidence; a single recent success
+    does not immediately clear recent repeated failures.
     """
     if strategy not in SUPPORTED_STRATEGIES:
         return True
@@ -498,24 +516,33 @@ def is_strategy_suppressed(user_id: str, strategy: str) -> bool:
             return False
         succ = max(0, data.get("successes", 0))
         fail = max(0, data.get("failures", 0))
-        total = succ + fail
-        if total < MIN_STRATEGY_EVIDENCE:
+        if succ + fail < MIN_STRATEGY_EVIDENCE:
             return False
-        if fail > succ:
-            return True
-        score = get_strategy_score(user_id, strategy, apply_decay=False)
-        return score < 0.40
+
+        succ_decay = calculate_evidence_decay(
+            data.get("last_success_at") or data.get("last_updated"),
+            now_time=now_time
+        )
+        fail_decay = calculate_evidence_decay(
+            data.get("last_failure_at") or data.get("last_updated"),
+            now_time=now_time
+        )
+        eff_succ = succ * succ_decay
+        eff_fail = fail * fail_decay
+
+        score = (eff_succ + 1.0) / (eff_succ + eff_fail + 2.0)
+        return (eff_fail > eff_succ and eff_fail >= 1.5) or (score < 0.45 and eff_fail > eff_succ)
     except Exception as e:
-        logger.warning(f"Error checking strategy suppression for {user_id}/{strategy}: {e}")
+        logger.exception(f"Error checking strategy suppression for {user_id}/{strategy}: {e}")
         return False
 
 
-def get_avoided_strategies(user_id: str) -> list[str]:
+def get_avoided_strategies(user_id: str, now_time: Optional[datetime] = None) -> list[str]:
     """Returns list of supported strategies that are currently suppressed due to negative feedback."""
     try:
-        return [s for s in sorted(SUPPORTED_STRATEGIES) if is_strategy_suppressed(user_id, s)]
+        return [s for s in sorted(SUPPORTED_STRATEGIES) if is_strategy_suppressed(user_id, s, now_time=now_time)]
     except Exception as e:
-        logger.warning(f"Error getting avoided strategies for {user_id}: {e}")
+        logger.exception(f"Error getting avoided strategies for {user_id}: {e}")
         return []
 
 
@@ -537,7 +564,7 @@ def get_preferred_strategies(
         for strat, data in stats.items():
             if strat not in SUPPORTED_STRATEGIES:
                 continue
-            if is_strategy_suppressed(user_id, strat):
+            if is_strategy_suppressed(user_id, strat, now_time=now_time):
                 continue
 
             succ = max(0, data.get("successes", 0))
@@ -551,33 +578,33 @@ def get_preferred_strategies(
         candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
         return [c[0] for c in candidates]
     except Exception as e:
-        logger.warning(f"Error getting preferred strategies for {user_id}: {e}")
+        logger.exception(f"Error getting preferred strategies for {user_id}: {e}")
         return []
 
 
 # ─── Task Domain & Conflict Resolution ────────────────────────────────────────
 
+PROG_PATTERNS = [
+    re.compile(r"\b(code|python|javascript|typescript|c\+\+|golang|rust|function|syntax|bug|error|exception|script|api|implement|class|method|compile|compiler|algorithm|array|sql|query|debug|library|git|bash|regex)\b", re.IGNORECASE),
+    re.compile(r"\b(write a function|unit test|write code|code example|source code|stack trace)\b", re.IGNORECASE),
+]
+CONCEPT_PATTERNS = [
+    re.compile(r"\b(concept|conceptual|theory|theoretical|architecture|overview|history|philosophy|tradeoffs|trade-offs)\b", re.IGNORECASE),
+    re.compile(r"\b(why does|how does|explain the difference|what is the meaning|compare and contrast|high-level explanation)\b", re.IGNORECASE),
+]
+
+
 def _detect_task_domain(user_message: str) -> str:
     """
     Determines query intent/domain deterministically without LLM calls.
+    Uses regex word boundaries to avoid false substring matches inside unrelated words.
     Returns 'programming', 'conceptual', or 'general'.
     """
     if not user_message:
         return "general"
-    msg = user_message.lower()
 
-    prog_keywords = [
-        "code", "python", "javascript", "function", "syntax", "bug", "error",
-        "exception", "script", "api", "implement", "class", "method", "compile",
-        "algorithm", "array", "sql", "query", "debug", "library", "git", "bash",
-    ]
-    concept_keywords = [
-        "concept", "theory", "why", "architecture", "overview", "explain the difference",
-        "history", "what is the meaning", "philosophy", "compare", "tradeoffs",
-    ]
-
-    prog_matches = sum(1 for kw in prog_keywords if kw in msg)
-    concept_matches = sum(1 for kw in concept_keywords if kw in msg)
+    prog_matches = sum(len(pat.findall(user_message)) for pat in PROG_PATTERNS)
+    concept_matches = sum(len(pat.findall(user_message)) for pat in CONCEPT_PATTERNS)
 
     if prog_matches > concept_matches and prog_matches > 0:
         return "programming"
@@ -731,6 +758,52 @@ def get_strategy_context(user_id: str, user_message: str = "") -> str:
 
 # ─── Context Generation for Prompt Injection ──────────────────────────────────
 
+def is_adaptation_used(user_id: str, user_message: str = "") -> bool:
+    """
+    Returns True only when learned adaptation (learned preference dimension,
+    preferred response strategy, or avoided strategy) meaningfully influences the prompt.
+    Returns False for new users or unevidenced default profiles (confidence == 0.50).
+    """
+    try:
+        profile = get_adaptation_profile(user_id)
+        msg = (user_message or "").lower()
+        requests_detail = bool(re.search(r"\b(in detail|comprehensive|deep dive|elaborate|thorough|in-depth)\b", msg))
+        requests_concise = bool(re.search(r"\b(keep it (short|brief)|be concise|quick answer|tl;?dr|just the answer)\b", msg))
+        forbids_code = bool(re.search(r"\b(no code|don't give me code|without code|no programming|just explain it)\b", msg))
+        requests_code = bool(re.search(r"\b(show me|write|give me|implement).*(code|python|implementation|script)\b", msg)) or (
+            bool(re.search(r"\b(code|implementation|script)\b", msg)) and not forbids_code
+        )
+        forbids_steps = bool(re.search(r"\b(all at once|no steps|skip the steps|no need for steps|no step by step|final result only|just give me the final result)\b", msg))
+
+        active_learned_prefs = False
+        verb = profile.get("verbosity", {})
+        if verb.get("confidence", 0.5) >= CONFIDENCE_THRESHOLD:
+            v_val = verb.get("value")
+            if (v_val == "concise" and not requests_detail) or (v_val == "detailed" and not requests_concise):
+                active_learned_prefs = True
+
+        code = profile.get("code_examples", {})
+        if code.get("confidence", 0.5) >= CONFIDENCE_THRESHOLD:
+            c_val = code.get("value")
+            if (c_val is True and not forbids_code) or (c_val is False and not requests_code):
+                active_learned_prefs = True
+
+        for dim in ("technical_depth", "examples", "tone"):
+            item = profile.get(dim, {})
+            if item.get("confidence", 0.5) >= CONFIDENCE_THRESHOLD:
+                active_learned_prefs = True
+
+        step = profile.get("step_by_step", {})
+        if step.get("confidence", 0.5) >= CONFIDENCE_THRESHOLD and step.get("value") and not forbids_steps:
+            active_learned_prefs = True
+
+        strat_ctx = get_strategy_context(user_id, user_message)
+        return bool(strat_ctx) or active_learned_prefs
+    except Exception as e:
+        logger.exception(f"Error checking is_adaptation_used for {user_id}: {e}")
+        return False
+
+
 def get_adaptation_context(user_id: str, user_message: str = "") -> str:
     """
     Generates a concise behavioral guidance string for prompt injection.
@@ -742,21 +815,30 @@ def get_adaptation_context(user_id: str, user_message: str = "") -> str:
         profile = get_adaptation_profile(user_id)
         lines = []
 
+        msg = (user_message or "").lower()
+        requests_detail = bool(re.search(r"\b(in detail|comprehensive|deep dive|elaborate|thorough|in-depth)\b", msg))
+        requests_concise = bool(re.search(r"\b(keep it (short|brief)|be concise|quick answer|tl;?dr|just the answer)\b", msg))
+        forbids_code = bool(re.search(r"\b(no code|don't give me code|without code|no programming|just explain it)\b", msg))
+        requests_code = bool(re.search(r"\b(show me|write|give me|implement).*(code|python|implementation|script)\b", msg)) or (
+            bool(re.search(r"\b(code|implementation|script)\b", msg)) and not forbids_code
+        )
+        forbids_steps = bool(re.search(r"\b(all at once|no steps|skip the steps|no need for steps|no step by step|final result only|just give me the final result)\b", msg))
+
         # 1. Verbosity
         verb = profile.get("verbosity", {})
         if verb.get("confidence", 0) >= CONFIDENCE_THRESHOLD:
             v_val = verb.get("value")
-            if v_val == "concise":
+            if v_val == "concise" and not requests_detail:
                 lines.append("- Verbosity: Prefer concise, direct, and to-the-point answers. Omit boilerplate and unnecessary filler.")
-            elif v_val == "detailed":
+            elif v_val == "detailed" and not requests_concise:
                 lines.append("- Verbosity: Provide thorough, comprehensive explanations with depth.")
 
         # 2. Code Examples
         code = profile.get("code_examples", {})
         if code.get("confidence", 0) >= CONFIDENCE_THRESHOLD:
-            if code.get("value"):
+            if code.get("value") and not forbids_code:
                 lines.append("- Code Examples: Include clean, runnable code examples whenever applicable.")
-            else:
+            elif not code.get("value") and not requests_code:
                 lines.append("- Code Examples: Avoid unprompted code snippets; focus on conceptual and architectural explanations.")
 
         # 3. Technical Depth
@@ -770,7 +852,7 @@ def get_adaptation_context(user_id: str, user_message: str = "") -> str:
 
         # 4. Step by Step
         step = profile.get("step_by_step", {})
-        if step.get("confidence", 0) >= CONFIDENCE_THRESHOLD and step.get("value"):
+        if step.get("confidence", 0) >= CONFIDENCE_THRESHOLD and step.get("value") and not forbids_steps:
             lines.append("- Structure: Prefer structured, step-by-step breakdowns.")
 
         # 5. Examples
@@ -795,8 +877,12 @@ def get_adaptation_context(user_id: str, user_message: str = "") -> str:
         # 7. Preferred Strategy Context (Phase 3 Closed-Loop)
         strat_context = get_strategy_context(user_id, user_message)
         has_any_strategy = bool(get_preferred_strategies(user_id))
+        has_learned_profile = any(
+            isinstance(v, dict) and v.get("confidence", 0.5) >= CONFIDENCE_THRESHOLD
+            for v in profile.values()
+        )
 
-        if not lines and not strat_context and not has_any_strategy:
+        if not lines and not strat_context and not has_any_strategy and not has_learned_profile:
             return ""
 
         header = "--- User response preferences ---\n"
@@ -822,7 +908,7 @@ def get_adaptation_context(user_id: str, user_message: str = "") -> str:
         return header + body + footer
 
     except Exception as e:
-        logger.error(f"Failed to generate adaptation context for {user_id}: {e}")
+        logger.exception(f"Failed to generate adaptation context for {user_id}: {e}")
         return ""
 
 
@@ -863,6 +949,7 @@ def get_adaptation_metrics(user_id: str) -> dict:
         strat_stats = db.get_strategy_stats(user_id)
         profile_rec = db.get_adaptation_profile(user_id)
         interaction_count = profile_rec.get("interaction_count", 0) if profile_rec else 0
+        adapted_count = profile_rec.get("adapted_response_count", 0) if profile_rec else 0
 
         tot_strat_succ = sum(s.get("successes", 0) for s in strat_stats.values())
         tot_strat_fail = sum(s.get("failures", 0) for s in strat_stats.values())
@@ -883,17 +970,19 @@ def get_adaptation_metrics(user_id: str) -> dict:
             "feedback_count": feedback_stats["total_feedback"],
             "positive_feedback_rate": feedback_stats["positive_rate"],
             "strategy_success_rate": strategy_success_rate,
-            "adapted_responses": interaction_count,
+            "observed_interactions": interaction_count,
+            "adapted_responses": adapted_count,
             "preferred_strategy": preferred_strat,
             "strategy_evidence": strat_evidence,
             "preference_confidence": avg_conf,
         }
     except Exception as e:
-        logger.error(f"Error computing adaptation metrics for {user_id}: {e}")
+        logger.exception(f"Error computing adaptation metrics for {user_id}: {e}")
         return {
             "feedback_count": 0,
             "positive_feedback_rate": 0.0,
             "strategy_success_rate": 0.0,
+            "observed_interactions": 0,
             "adapted_responses": 0,
             "preferred_strategy": None,
             "strategy_evidence": 0,

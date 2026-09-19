@@ -552,7 +552,7 @@ def assemble_chat_prompt_context(
     aug_meta["user_memory_context"] = user_memory_context
     aug_meta["conversation_context"] = conversation_context
     aug_meta["strategy"] = policy.get("preferred_strategy")
-    aug_meta["adaptation_used"] = bool(policy.get("preferred_strategy") or adaptation_context)
+    aug_meta["adaptation_used"] = adaptation.is_adaptation_used(user_id, message)
     aug_meta["policy"] = policy
     return system_override, aug_meta
 
@@ -670,6 +670,7 @@ def chat(req: ChatRequest):
             agent_response=response,
             intent=intent,
             sentiment=sentiment.get("label") if isinstance(sentiment, dict) else str(sentiment),
+            adaptation_used=aug_meta.get("adaptation_used", False),
         )
     except Exception as e:
         print(f"⚠️ Adaptation observation failed: {e}")
@@ -840,6 +841,7 @@ def chat_stream(req: ChatRequest):
                 agent_response=full_response,
                 intent=intent,
                 sentiment=sentiment.get("label") if isinstance(sentiment, dict) else str(sentiment),
+                adaptation_used=aug_meta.get("adaptation_used", False),
             )
         except Exception as e:
             print(f"⚠️ Adaptation observation failed: {e}")
