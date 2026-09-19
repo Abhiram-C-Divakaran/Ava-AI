@@ -22,6 +22,13 @@ DEEPL_API_KEY   = os.getenv("DEEPL_API_KEY", "")          # free tier: 500k char
 JUDGE0_API_KEY  = os.getenv("JUDGE0_API_KEY", "")         # optional — works without for basic langs
 JUDGE0_URL      = "https://judge0-ce.p.rapidapi.com"
 
+# Code execution safety: disable by default in production unless explicitly enabled
+ENABLE_CODE_EXECUTION = (
+    os.getenv("ENABLE_CODE_EXECUTION", "false").lower() in ("true", "1")
+    if os.getenv("ENVIRONMENT") == "production"
+    else os.getenv("ENABLE_CODE_EXECUTION", "true").lower() in ("true", "1")
+)
+
 # Judge0 language IDs for common languages
 JUDGE0_LANG_IDS = {
     "python": 71, "python3": 71,
@@ -167,6 +174,14 @@ def execute_code(lang: str, code: str, stdin: str = "") -> dict:
     Execute code via Judge0 CE. Returns {stdout, stderr, status, time, memory}.
     Works without API key on the free public endpoint (rate limited).
     """
+    if not ENABLE_CODE_EXECUTION:
+        return {
+            "stdout": "",
+            "stderr": "Code execution is disabled in production environment.",
+            "success": False,
+            "status": "Disabled",
+        }
+
     lang_id = JUDGE0_LANG_IDS.get(lang.lower(), 71)  # default Python
 
     # Try RapidAPI Judge0 if key is available, else use public CE

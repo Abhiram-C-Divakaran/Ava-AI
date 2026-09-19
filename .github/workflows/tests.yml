@@ -2,7 +2,7 @@ name: CI Tests
 
 on:
   push:
-    branches: [ main, phase-3-closed-loop-learning ]
+    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening ]
   pull_request:
     branches: [ main ]
 
@@ -35,8 +35,12 @@ jobs:
 
       - name: Static compilation check
         run: |
-          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py
+          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py test_adaptation.py test_security.py
 
       - name: Run adaptation test suite
         run: |
           python -m unittest test_adaptation.py -v
+
+      - name: Run security test suite
+        run: |
+          python -m unittest test_security.py -v

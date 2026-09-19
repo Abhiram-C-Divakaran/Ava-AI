@@ -9,16 +9,21 @@ import io
 import re
 import secrets
 import aiohttp
+import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Any, Union
 from io import BytesIO
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from llm import call_llm, call_llm_streaming, call_llm_with_constraints
 from MLpipeline import SentimentAnalyzer, IntentClassifier, FrustrationDetector
@@ -30,6 +35,48 @@ import powers
 
 from dotenv import load_dotenv
 load_dotenv()
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if ENVIRONMENT == "production":
+        raise RuntimeError("SECRET_KEY must be configured in production environment")
+    SECRET_KEY = "dev_insecure_secret_key_change_in_production"
+
+# Structured Logging
+try:
+    from pythonjsonlogger.json import JsonFormatter
+except ImportError:
+    try:
+        from pythonjsonlogger import jsonlogger as JsonFormatter
+    except ImportError:
+        JsonFormatter = None
+
+logger = logging.getLogger("ava")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    sh = logging.StreamHandler()
+    if JsonFormatter:
+        sh.setFormatter(JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    else:
+        sh.setFormatter(logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s"))
+    logger.addHandler(sh)
+
+def log_event(event_name: str, **kwargs):
+    safe_data = {"event": event_name}
+    for k, v in kwargs.items():
+        if k in ("password", "token", "access_token", "secret", "cookie", "code", "authorization"):
+            continue
+        safe_data[k] = v
+    logger.info(json.dumps(safe_data))
+
+def rate_limit_key(request: Request) -> str:
+    user_id = request.session.get("user_id")
+    if user_id:
+        return f"user:{user_id}"
+    return f"ip:{get_remote_address(request)}"
+
+limiter = Limiter(key_func=rate_limit_key)
 
 # OAuth
 from authlib.integrations.starlette_client import OAuth, OAuthError
@@ -53,20 +100,69 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Ava AI", version="2.3.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", str(uuid.uuid4())))
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    same_site="lax",
+    https_only=(ENVIRONMENT == "production"),
+)
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+# ─── Health & Readiness Endpoints ──────────────────────────────────────────
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/ready")
+def ready_check():
+    try:
+        with db.get_conn() as conn:
+            conn.execute("SELECT 1").fetchone()
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        logger.exception("Readiness check failed")
+        raise HTTPException(status_code=503, detail="Service unavailable")
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 def require_admin(request: Request):
     if not request.session.get("is_admin"):
         raise HTTPException(status_code=401, detail="Admin authentication required")
+
+def require_user(request: Request) -> str:
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user_id
+
+def require_same_user(request: Request, requested_user_id: str) -> str:
+    current_user = require_user(request)
+    if current_user != requested_user_id and not request.session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden: access denied")
+    return current_user
 
 oauth = OAuth()
 oauth.register(
@@ -124,8 +220,8 @@ def _detect_translation(message: str) -> dict | None:
 
 # ─── Pydantic models ────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+    user_id: Optional[str] = None
+    message: str = Field(..., min_length=1, max_length=20000)
     session_id: Optional[str] = None
     doc_id: Optional[str] = None
     image_base64: Optional[str] = None
@@ -136,56 +232,57 @@ class ChatRequest(BaseModel):
     web_search: Optional[bool] = False
 
 class FeedbackRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     session_id: str
     message_id: str
     helpful: bool
 
 class SignupRequest(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
     terms_accepted: Optional[bool] = False
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1, max_length=128)
 
 class SuggestionRequest(BaseModel):
-    user_id: str
-    current_input: str
+    user_id: Optional[str] = None
+    current_input: str = Field(..., max_length=1000)
 
 class PPTRequest(BaseModel):
-    user_id: str
-    topic: str
-    slides: int = 5
+    user_id: Optional[str] = None
+    topic: str = Field(..., min_length=1, max_length=200)
+    slides: int = Field(default=5, ge=1, le=20)
 
 class ImageRequest(BaseModel):
-    user_id: str
-    prompt: str
+    user_id: Optional[str] = None
+    prompt: str = Field(..., min_length=1, max_length=1000)
 
 class PreferencesUpdate(BaseModel):
-    custom_instructions: Optional[str] = None
-    personality: Optional[str] = None
-    theme: Optional[str] = None
-    birth_date: Optional[str] = None
-    gender: Optional[str] = None
+    custom_instructions: Optional[str] = Field(None, max_length=5000)
+    personality: Optional[str] = Field(None, max_length=50)
+    theme: Optional[str] = Field(None, max_length=20)
+    birth_date: Optional[str] = Field(None, max_length=20)
+    gender: Optional[str] = Field(None, max_length=20)
 
 class RenameRequest(BaseModel):
-    new_title: str
+    new_title: str = Field(..., min_length=1, max_length=255)
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 class TermsAcceptRequest(BaseModel):
     terms_accepted: bool
 
 # ─── Auth ──────────────────────────────────────────────────────────────
 @app.post("/api/auth/signup")
-def signup(req: SignupRequest):
-    if len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+@limiter.limit("5/minute")
+def signup(req: SignupRequest, request: Request):
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     if db.email_exists(req.email):
         raise HTTPException(status_code=409, detail="Email already exists")
     
@@ -197,7 +294,8 @@ def signup(req: SignupRequest):
         password=req.password,
         terms_accepted=req.terms_accepted
     )
-    
+    request.session["user_id"] = user_id
+    log_event("user_signup_success")
     return {
         "user_id": user_id, 
         "name": req.name.strip(), 
@@ -207,15 +305,18 @@ def signup(req: SignupRequest):
     }
 
 @app.post("/api/auth/login")
+@limiter.limit("5/minute")
 def login(req: LoginRequest, request: Request):
     user = db.get_user_by_email(req.email)
     if not user or not db.verify_password(req.password, user["password_hash"], user["password_salt"]):
+        log_event("login_failed")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     request.session["user_id"] = user["user_id"]
     is_admin = user.get("is_admin", 0) == 1
     if is_admin:
         request.session["is_admin"] = True
         request.session["admin_verified"] = True
+    log_event("login_success", is_admin=is_admin)
     return {
         "user_id": user["user_id"],
         "name": user["name"],
@@ -227,6 +328,7 @@ def login(req: LoginRequest, request: Request):
 @app.post("/api/auth/logout")
 async def logout(request: Request):
     request.session.clear()
+    log_event("logout_success")
     return {"status": "logged out"}
 
 # ─── Google OAuth ──────────────────────────────────────────────────────
@@ -242,45 +344,29 @@ async def google_auth(request: Request):
     Uses userinfo endpoint as fallback when id_token is not available.
     """
     try:
-        # Get the token from the request
         token = await oauth.google.authorize_access_token(request)
-        
-        # Debug: log token keys
-        print(f"Token keys: {list(token.keys()) if token else 'No token'}")
-        
-        # Try to get user info from id_token first
         user_info = None
         
-        if 'id_token' in token:
+        if token and 'id_token' in token:
             try:
                 user_info = await oauth.google.parse_id_token(request, token)
-                print(f"Got user info from id_token: {user_info.get('email') if user_info else 'None'}")
-            except Exception as e:
-                print(f"Failed to parse id_token: {e}")
+            except Exception:
                 user_info = None
         
-        # If no id_token or parsing failed, use userinfo endpoint
-        if not user_info:
+        if not user_info and token:
             access_token = token.get('access_token')
             if not access_token:
                 raise HTTPException(status_code=400, detail="No access token received")
             
-            print(f"Using userinfo endpoint with access token")
-            
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     'https://openidconnect.googleapis.com/v1/userinfo',
                     headers={'Authorization': f'Bearer {access_token}'}
                 ) as resp:
                     if resp.status != 200:
-                        error_text = await resp.text()
-                        print(f"Userinfo error: {resp.status} - {error_text}")
-                        raise HTTPException(
-                            status_code=400, 
-                            detail=f"Failed to get user info: {resp.status}"
-                        )
+                        raise HTTPException(status_code=400, detail="Failed to retrieve user info")
                     user_info = await resp.json()
-                    print(f"Got user info from userinfo: {user_info.get('email') if user_info else 'None'}")
         
         if not user_info:
             raise HTTPException(status_code=400, detail="Failed to get user information")
@@ -290,14 +376,11 @@ async def google_auth(request: Request):
             raise HTTPException(status_code=400, detail="No email provided by Google")
         
         name = user_info.get('name', email.split('@')[0])
-        # Handle Google accounts with no name
         if not name or name.strip() == '':
             name = email.split('@')[0]
         
-        # Check if user exists
         user = db.get_user_by_email(email)
         if not user:
-            # Create new user
             user_id = str(uuid.uuid4())
             temp_pw = secrets.token_urlsafe(16)
             db.create_user(
@@ -307,12 +390,15 @@ async def google_auth(request: Request):
                 password=temp_pw, 
                 terms_accepted=True
             )
-            print(f"Created new user: {email}")
         else:
             user_id = user['user_id']
-            print(f"Existing user: {email}")
         
-        # Return HTML with user data
+        request.session["user_id"] = user_id
+        if user and user.get("is_admin", 0) == 1:
+            request.session["is_admin"] = True
+            request.session["admin_verified"] = True
+        log_event("oauth_login_success", provider="google")
+        
         safe_name = name.replace("'", "\\'")
         html = f"""
         <!DOCTYPE html>
@@ -405,23 +491,17 @@ async def google_auth(request: Request):
         """
         return HTMLResponse(content=html)
         
-    except OAuthError as e:
-        print(f"OAuth Error: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"OAuth error: {str(e)}")
-    except KeyError as e:
-        print(f"KeyError: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Missing expected field: {str(e)}")
-    except aiohttp.ClientError as e:
-        print(f"HTTP Client Error: {str(e)}")
-        raise HTTPException(status_code=502, detail=f"Failed to contact Google: {str(e)}")
+    except HTTPException:
+        log_event("oauth_login_failed")
+        raise
     except Exception as e:
-        print(f"Unexpected error in google_auth: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
+        logger.exception("Unexpected error in google_auth")
+        log_event("oauth_login_failed")
+        raise HTTPException(status_code=400, detail="Authentication failed")
 
 # ─── Admin auth ──────────────────────────────────────────────────────
 @app.post("/api/auth/admin-verify")
+@limiter.limit("5/minute")
 async def admin_verify(request: Request, payload: dict):
     password = payload.get("admin_password")
     if not password:
@@ -429,9 +509,11 @@ async def admin_verify(request: Request, payload: dict):
     if not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="Admin password not configured")
     if password != ADMIN_PASSWORD:
+        log_event("admin_verify_failed")
         raise HTTPException(status_code=401, detail="Invalid admin password")
     request.session["is_admin"] = True
     request.session["admin_verified"] = True
+    log_event("admin_verify_success")
     return {"status": "ok"}
 
 @app.get("/api/auth/admin-status")
@@ -445,6 +527,7 @@ async def admin_status(request: Request):
 async def admin_logout(request: Request):
     request.session.pop("is_admin", None)
     request.session.pop("admin_verified", None)
+    log_event("admin_logout")
     return {"status": "ok"}
 
 # ─── Image vision via Groq ─────────────────────────────────────────────────────
@@ -559,9 +642,23 @@ def assemble_chat_prompt_context(
 
 # ─── Chat (non‑streaming) ──────────────────────────────────────────────
 @app.post("/api/chat")
-def chat(req: ChatRequest):
-    # Debug: log the received mode
-    print(f"🔍 [Non-streaming] Received mode: {req.mode}")
+@limiter.limit("30/minute")
+def chat(req: ChatRequest, request: Request):
+    current_user = require_user(request)
+    if req.user_id and req.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+    user_id = current_user
+
+    if req.session_id:
+        sess = db.get_session(req.session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if sess["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
+    if req.doc_id:
+        doc = db.get_document(req.doc_id)
+        if doc and doc["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
 
     # ─── Memory storage command ──────────────────────────────────────────────
     memory_code_match = re.match(r"^Remember this code:\s*(.+)$", req.message, re.IGNORECASE)
@@ -571,11 +668,11 @@ def chat(req: ChatRequest):
         message_id = str(uuid.uuid4())
         session_id = req.session_id or str(uuid.uuid4())
         if not req.session_id:
-            db.create_session(session_id, req.user_id, title=req.message[:50])
+            db.create_session(session_id, user_id, title=req.message[:50])
         db.save_message(
             message_id=message_id,
             session_id=session_id,
-            user_id=req.user_id,
+            user_id=user_id,
             user_message=req.message,
             agent_response=response_text,
             intent="memory_storage",
@@ -583,7 +680,7 @@ def chat(req: ChatRequest):
             frustration=0.0,
             latency_ms=0,
         )
-        memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, response_text)
+        memory.maybe_refresh_user_memory(user_id, session_id, req.message, response_text)
         return {
             "response": response_text,
             "message_id": message_id,
@@ -591,12 +688,12 @@ def chat(req: ChatRequest):
             "metadata": {"intent": "memory_storage", "sentiment": {"label": "neutral"}, "frustration_score": 0.0}
         }
 
-    prefs = db.get_user_preferences(req.user_id)
+    prefs = db.get_user_preferences(user_id)
     custom_instructions = prefs.get("custom_instructions", "")
     personality = prefs.get("personality", "friendly")
 
     system_override, aug_meta = assemble_chat_prompt_context(
-        user_id=req.user_id,
+        user_id=user_id,
         message=req.message,
         session_id=req.session_id,
         doc_id=req.doc_id,
@@ -628,11 +725,11 @@ def chat(req: ChatRequest):
                 message_id = str(uuid.uuid4())
                 session_id = req.session_id or str(uuid.uuid4())
                 if not req.session_id:
-                    db.create_session(session_id, req.user_id, title=req.message[:50])
-                db.save_message(message_id=message_id, session_id=session_id, user_id=req.user_id,
+                    db.create_session(session_id, user_id, title=req.message[:50])
+                db.save_message(message_id=message_id, session_id=session_id, user_id=user_id,
                     user_message=req.message, agent_response=response, intent=intent,
                     sentiment=sentiment, frustration=frustration, latency_ms=0)
-                memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, response)
+                memory.maybe_refresh_user_memory(user_id, session_id, req.message, response)
                 return {"response": response, "message_id": message_id, "session_id": session_id,
                     "metadata": {"intent": intent, "sentiment": sentiment, "frustration_score": frustration}}
 
@@ -653,20 +750,21 @@ def chat(req: ChatRequest):
                 mode=req.mode or "flash",
             )
     except Exception as e:
-        response = f"I'm sorry, I encountered an error: {str(e)}"
+        logger.exception("Chat LLM execution failed")
+        response = "I'm sorry, I encountered an error processing your request."
 
     latency_ms = int((time.time() - start_time) * 1000)
     message_id = str(uuid.uuid4())
     session_id = req.session_id or str(uuid.uuid4())
     if not req.session_id:
-        db.create_session(session_id, req.user_id, title=req.message[:50])
-    db.save_message(message_id=message_id, session_id=session_id, user_id=req.user_id,
+        db.create_session(session_id, user_id, title=req.message[:50])
+    db.save_message(message_id=message_id, session_id=session_id, user_id=user_id,
         user_message=req.message, agent_response=response, intent=intent,
         sentiment=sentiment, frustration=frustration, latency_ms=latency_ms)
-    memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, response)
+    memory.maybe_refresh_user_memory(user_id, session_id, req.message, response)
     try:
         adaptation.observe_interaction(
-            user_id=req.user_id,
+            user_id=user_id,
             user_message=req.message,
             agent_response=response,
             intent=intent,
@@ -674,7 +772,15 @@ def chat(req: ChatRequest):
             adaptation_used=aug_meta.get("adaptation_used", False),
         )
     except Exception as e:
-        print(f"⚠️ Adaptation observation failed: {e}")
+        logger.warning(f"Adaptation observation failed: {e}")
+
+    log_event(
+        "chat_completed",
+        latency_ms=latency_ms,
+        intent=intent,
+        adaptation_used=aug_meta.get("adaptation_used", False),
+        strategy=aug_meta.get("strategy")
+    )
 
     return {"response": response, "message_id": message_id, "session_id": session_id,
         "metadata": {"intent": intent, "sentiment": sentiment, "frustration_score": frustration,
@@ -684,9 +790,23 @@ def chat(req: ChatRequest):
 
 # ─── Chat streaming ─────────────────────────────────────────────────────
 @app.post("/api/chat/stream")
-def chat_stream(req: ChatRequest):
-    # Debug: log the received mode
-    print(f"🔍 [Streaming] Received mode: {req.mode}")
+@limiter.limit("30/minute")
+def chat_stream(req: ChatRequest, request: Request):
+    current_user = require_user(request)
+    if req.user_id and req.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+    user_id = current_user
+
+    if req.session_id:
+        sess = db.get_session(req.session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if sess["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
+    if req.doc_id:
+        doc = db.get_document(req.doc_id)
+        if doc and doc["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
 
     def generate():
         # ─── Memory storage command ──────────────────────────────────────────────
@@ -699,11 +819,11 @@ def chat_stream(req: ChatRequest):
             message_id = str(uuid.uuid4())
             session_id = req.session_id or str(uuid.uuid4())
             if not req.session_id:
-                db.create_session(session_id, req.user_id, title=req.message[:50])
+                db.create_session(session_id, user_id, title=req.message[:50])
             db.save_message(
                 message_id=message_id,
                 session_id=session_id,
-                user_id=req.user_id,
+                user_id=user_id,
                 user_message=req.message,
                 agent_response=response_text,
                 intent="memory_storage",
@@ -711,16 +831,16 @@ def chat_stream(req: ChatRequest):
                 frustration=0.0,
                 latency_ms=latency_ms,
             )
-            memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, response_text)
+            memory.maybe_refresh_user_memory(user_id, session_id, req.message, response_text)
             yield f"data: {json.dumps({'done': True, 'message_id': message_id, 'session_id': session_id, 'metadata': {'intent': 'memory_storage', 'sentiment': {'label': 'neutral'}, 'frustration_score': 0.0}})}\n\n"
             return
 
-        prefs = db.get_user_preferences(req.user_id)
+        prefs = db.get_user_preferences(user_id)
         custom_instructions = prefs.get("custom_instructions", "")
         personality = prefs.get("personality", "friendly")
 
         system_override, aug_meta = assemble_chat_prompt_context(
-            user_id=req.user_id,
+            user_id=user_id,
             message=req.message,
             session_id=req.session_id,
             doc_id=req.doc_id,
@@ -769,39 +889,54 @@ def chat_stream(req: ChatRequest):
                     pass
 
             if not full_response:
-                stream = call_llm_streaming(
-                    req.message,
-                    custom_instructions=custom_instructions,
-                    personality=personality,
-                    system_prompt_override=system_override,
-                    mode=req.mode or "flash"
-                )
-                for chunk in stream:
-                    full_response += chunk
-                    yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                try:
+                    stream = call_llm_streaming(
+                        req.message,
+                        custom_instructions=custom_instructions,
+                        personality=personality,
+                        system_prompt_override=system_override,
+                        mode=req.mode or "flash"
+                    )
+                    for chunk in stream:
+                        full_response += chunk
+                        yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                except Exception as e:
+                    logger.exception("Streaming LLM translation fallback failed")
+                    full_response = "I encountered an error processing your request."
+                    yield f"data: {json.dumps({'chunk': full_response})}\n\n"
 
         elif req.image_base64:
-            vision_resp = call_llm_with_vision(
-                req.message, req.image_base64, req.image_mime or "image/jpeg",
-                system_prompt=system_override, file_context=file_context
-            )
-            full_response = vision_resp
-            yield f"data: {json.dumps({'chunk': vision_resp})}\n\n"
+            try:
+                vision_resp = call_llm_with_vision(
+                    req.message, req.image_base64, req.image_mime or "image/jpeg",
+                    system_prompt=system_override, file_context=file_context
+                )
+                full_response = vision_resp
+                yield f"data: {json.dumps({'chunk': vision_resp})}\n\n"
+            except Exception as e:
+                logger.exception("Vision LLM failed")
+                full_response = "I encountered an error processing the image."
+                yield f"data: {json.dumps({'chunk': full_response})}\n\n"
 
         else:
             from llm import _detect_word_count_constraint
             word_target = _detect_word_count_constraint(req.message)
             if word_target is not None:
-                constrained_resp = call_llm_with_constraints(
-                    req.message,
-                    base_system_prompt=system_override,
-                    custom_instructions=custom_instructions,
-                    personality=personality,
-                    max_tokens=1200,
-                    mode=req.mode or "flash",
-                )
-                full_response = constrained_resp
-                yield f"data: {json.dumps({'chunk': constrained_resp})}\n\n"
+                try:
+                    constrained_resp = call_llm_with_constraints(
+                        req.message,
+                        base_system_prompt=system_override,
+                        custom_instructions=custom_instructions,
+                        personality=personality,
+                        max_tokens=1200,
+                        mode=req.mode or "flash",
+                    )
+                    full_response = constrained_resp
+                    yield f"data: {json.dumps({'chunk': constrained_resp})}\n\n"
+                except Exception as e:
+                    logger.exception("Constrained LLM failed")
+                    full_response = "I encountered an error processing your request."
+                    yield f"data: {json.dumps({'chunk': full_response})}\n\n"
             else:
                 try:
                     stream = call_llm_streaming(
@@ -815,18 +950,19 @@ def chat_stream(req: ChatRequest):
                         full_response += chunk
                         yield f"data: {json.dumps({'chunk': chunk})}\n\n"
                 except Exception as e:
-                    full_response = f"I encountered an error: {str(e)}"
+                    logger.exception("Streaming LLM failed")
+                    full_response = "I encountered an error processing your request."
                     yield f"data: {json.dumps({'chunk': full_response})}\n\n"
 
         latency_ms = int((time.time() - start_time) * 1000)
         message_id = str(uuid.uuid4())
         session_id = req.session_id or str(uuid.uuid4())
         if not req.session_id:
-            db.create_session(session_id, req.user_id, title=req.message[:50])
+            db.create_session(session_id, user_id, title=req.message[:50])
         db.save_message(
             message_id=message_id,
             session_id=session_id,
-            user_id=req.user_id,
+            user_id=user_id,
             user_message=req.message,
             agent_response=full_response,
             intent=intent,
@@ -834,10 +970,10 @@ def chat_stream(req: ChatRequest):
             frustration=frustration,
             latency_ms=latency_ms
         )
-        memory.maybe_refresh_user_memory(req.user_id, session_id, req.message, full_response)
+        memory.maybe_refresh_user_memory(user_id, session_id, req.message, full_response)
         try:
             adaptation.observe_interaction(
-                user_id=req.user_id,
+                user_id=user_id,
                 user_message=req.message,
                 agent_response=full_response,
                 intent=intent,
@@ -845,7 +981,15 @@ def chat_stream(req: ChatRequest):
                 adaptation_used=aug_meta.get("adaptation_used", False),
             )
         except Exception as e:
-            print(f"⚠️ Adaptation observation failed: {e}")
+            logger.warning(f"Adaptation observation failed: {e}")
+
+        log_event(
+            "chat_stream_completed",
+            latency_ms=latency_ms,
+            intent=intent,
+            adaptation_used=aug_meta.get("adaptation_used", False),
+            strategy=aug_meta.get("strategy")
+        )
 
         yield f"data: {json.dumps({'done': True, 'message_id': message_id, 'session_id': session_id, 'metadata': {'intent': intent, 'sentiment': sentiment, 'frustration_score': frustration, 'searched': aug_meta.get('searched', False), 'deepl_used': aug_meta.get('deepl_used', False), 'strategy': aug_meta.get('strategy'), 'adaptation_used': aug_meta.get('adaptation_used', False)}})}\n\n"
 
@@ -853,13 +997,17 @@ def chat_stream(req: ChatRequest):
 
 # ─── Voice transcription ─────────────────────────────────────────────────
 @app.post("/api/transcribe")
-async def transcribe_audio(audio: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def transcribe_audio(request: Request, audio: UploadFile = File(...)):
+    require_user(request)
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     if not GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="GROQ_API_KEY not set")
     audio_bytes = await audio.read()
     if len(audio_bytes) < 1000:
         raise HTTPException(status_code=400, detail="Audio too short")
+    if len(audio_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio file exceeds 10MB limit")
     content_type = audio.content_type or "audio/webm"
     ext = "webm" if "webm" in content_type else "ogg" if "ogg" in content_type else "m4a" if "m4a" in content_type else "webm"
     filename = f"recording.{ext}"
@@ -880,7 +1028,8 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+        logger.exception("Audio transcription failed")
+        raise HTTPException(status_code=500, detail="Transcription failed")
 
 # ─── Code execution ─────────────────────────────────────────────────────
 class RunRequest(BaseModel):
@@ -889,20 +1038,27 @@ class RunRequest(BaseModel):
     stdin: str = ""
 
 @app.post("/api/run")
-def run_code(req: RunRequest):
+@limiter.limit("10/minute")
+def run_code(req: RunRequest, request: Request):
+    require_user(request)
     result = powers.execute_code(req.lang, req.code, req.stdin)
     formatted = powers.format_execution_result(req.lang, req.code, result)
     return {"output": formatted, "raw": result}
 
 # ─── Suggestions ──────────────────────────────────────────────────────
 @app.post("/api/suggestions")
-def get_suggestions(req: SuggestionRequest):
-    past = db.get_similar_past_queries(req.user_id, req.current_input)
+def get_suggestions(req: SuggestionRequest, request: Request):
+    current_user = require_user(request)
+    if req.user_id and req.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+    past = db.get_similar_past_queries(current_user, req.current_input)
     return {"suggestions": past}
 
 # ─── PPT ──────────────────────────────────────────────────────────────
 @app.post("/api/generate-ppt")
-async def generate_ppt(req: PPTRequest):
+@limiter.limit("5/minute")
+async def generate_ppt(req: PPTRequest, request: Request):
+    require_user(request)
     if not PPT_AVAILABLE:
         raise HTTPException(status_code=501, detail="python-pptx not installed")
     prompt = f"Generate exactly {req.slides} slides for a presentation about \"{req.topic}\". Return ONLY a JSON array of objects with keys: \"title\", \"content\". Example: [{{\"title\": \"Intro\", \"content\": \"...\"}}]"
@@ -914,7 +1070,7 @@ async def generate_ppt(req: PPTRequest):
             slides_data = [{"title": req.topic, "content": llm_resp[:200]}]
         else:
             slides_data = json.loads(llm_resp[start:end])
-    except:
+    except Exception:
         slides_data = [{"title": req.topic, "content": f"Presentation about {req.topic}"}]
     prs = Presentation()
     for slide in slides_data[:req.slides]:
@@ -925,12 +1081,18 @@ async def generate_ppt(req: PPTRequest):
     ppt_bytes = BytesIO()
     prs.save(ppt_bytes)
     ppt_bytes.seek(0)
-    return FileResponse(ppt_bytes, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        filename=f"{req.topic.replace(' ', '_')}.pptx")
+    safe_topic = re.sub(r"[^\w\-.]", "_", req.topic)
+    return Response(
+        content=ppt_bytes.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f"attachment; filename={safe_topic}.pptx"}
+    )
 
 # ─── Image Generation ─────────────────────────────────────────────────
 @app.post("/api/generate-image")
-async def generate_image(req: ImageRequest):
+@limiter.limit("5/minute")
+async def generate_image(req: ImageRequest, request: Request):
+    require_user(request)
     if not REPLICATE_AVAILABLE or not os.getenv("REPLICATE_API_KEY"):
         return {"image_url": "https://placekitten.com/512/512", "mock": True}
     try:
@@ -941,25 +1103,46 @@ async def generate_image(req: ImageRequest):
         url = output[0] if isinstance(output, list) else output
         return {"image_url": url, "mock": False}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Image generation error")
+        raise HTTPException(status_code=500, detail="Image generation failed")
 
 # ─── Feedback ─────────────────────────────────────────────────────────
 @app.post("/api/feedback")
-def feedback(req: FeedbackRequest):
-    db.save_feedback(req.user_id, req.session_id, req.message_id, req.helpful)
+@limiter.limit("30/minute")
+def feedback(req: FeedbackRequest, request: Request):
+    current_user = require_user(request)
+    if req.user_id and req.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+    user_id = current_user
+
+    if req.session_id:
+        sess = db.get_session(req.session_id)
+        if not sess:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if sess["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
+    if req.message_id:
+        msg = db.get_message(req.message_id)
+        if msg and msg["user_id"] != current_user:
+            raise HTTPException(status_code=403, detail="Forbidden: message does not belong to you")
+
+    db.save_feedback(user_id, req.session_id, req.message_id, req.helpful)
     if not req.helpful:
-        sol = db.get_last_agent_response(req.user_id, req.session_id)
+        sol = db.get_last_agent_response(user_id, req.session_id)
         if sol:
-            db.save_failed_solution(req.user_id, req.session_id, sol)
+            db.save_failed_solution(user_id, req.session_id, sol)
     try:
-        adaptation.process_feedback(req.user_id, req.message_id, req.helpful)
+        adaptation.process_feedback(user_id, req.message_id, req.helpful)
     except Exception as e:
-        print(f"⚠️ Adaptation feedback processing failed: {e}")
+        logger.warning(f"Adaptation feedback processing failed: {e}")
+
+    log_event("feedback_recorded", helpful=req.helpful)
     return {"status": "recorded"}
 
 # ─── Adaptation Endpoints ─────────────────────────────────────────────
 @app.get("/api/adaptation/{user_id}")
-def get_user_adaptation(user_id: str):
+def get_user_adaptation(user_id: str, request: Request):
+    require_same_user(request, user_id)
     profile = adaptation.get_adaptation_profile(user_id)
     context = adaptation.get_adaptation_context(user_id)
     strategy_stats = db.get_strategy_stats(user_id)
@@ -977,8 +1160,10 @@ def get_user_adaptation(user_id: str):
     }
 
 @app.delete("/api/adaptation/{user_id}")
-def reset_user_adaptation(user_id: str):
+def reset_user_adaptation(user_id: str, request: Request):
+    require_same_user(request, user_id)
     adaptation.reset_adaptation_profile(user_id)
+    log_event("adaptation_profile_reset", user_id=user_id)
     return {"status": "reset", "user_id": user_id, "message": "Adaptation profile reset to defaults"}
 
 class AdaptationPatchRequest(BaseModel):
@@ -987,10 +1172,12 @@ class AdaptationPatchRequest(BaseModel):
     confidence: Optional[Any] = 0.85
 
 @app.patch("/api/adaptation/{user_id}")
-def patch_user_adaptation(user_id: str, req: AdaptationPatchRequest):
+def patch_user_adaptation(user_id: str, req: AdaptationPatchRequest, request: Request):
+    require_same_user(request, user_id)
     try:
         conf = req.confidence if req.confidence is not None else 0.85
         updated = adaptation.set_manual_preference(user_id, req.preference, req.value, conf)
+        log_event("adaptation_preference_patched", user_id=user_id, preference=req.preference)
         return {"status": "updated", "user_id": user_id, "profile": updated}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -999,67 +1186,98 @@ def patch_user_adaptation(user_id: str, req: AdaptationPatchRequest):
 
 # ─── Sessions ─────────────────────────────────────────────────────────
 @app.get("/api/sessions/{user_id}")
-def list_sessions(user_id: str):
+def list_sessions(user_id: str, request: Request):
+    require_same_user(request, user_id)
     return {"sessions": db.get_sessions_for_user(user_id)}
 
 @app.get("/api/sessions/{user_id}/{session_id}/messages")
-def session_messages(user_id: str, session_id: str):
+def session_messages(user_id: str, session_id: str, request: Request):
+    require_same_user(request, user_id)
+    sess = db.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
     return {"messages": db.get_session_messages(session_id)}
 
 @app.delete("/api/sessions/{user_id}/{session_id}")
-def delete_session(user_id: str, session_id: str):
+def delete_session(user_id: str, session_id: str, request: Request):
+    require_same_user(request, user_id)
+    sess = db.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
     deleted = db.delete_session(user_id, session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "deleted"}
 
 @app.put("/api/sessions/{user_id}/{session_id}/rename")
-def rename_session(user_id: str, session_id: str, req: RenameRequest):
+def rename_session(user_id: str, session_id: str, req: RenameRequest, request: Request):
+    require_same_user(request, user_id)
+    sess = db.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
     success = db.update_session_title(user_id, session_id, req.new_title.strip())
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"status": "updated"}
 
 @app.post("/api/sessions/{user_id}/{session_id}/pin")
-def pin_session(user_id: str, session_id: str, pinned: bool):
+def pin_session(user_id: str, session_id: str, pinned: bool, request: Request):
+    require_same_user(request, user_id)
+    sess = db.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
     db.set_pin(user_id, session_id, pinned)
     return {"status": "ok"}
 
 @app.get("/api/search/{user_id}")
-def search_sessions(user_id: str, q: str):
+def search_sessions(user_id: str, q: str, request: Request):
+    require_same_user(request, user_id)
     return {"sessions": db.search_sessions(user_id, q)}
 
 # ─── User Preferences ──────────────────────────────────────────────────
 @app.get("/api/user/preferences/{user_id}")
-def get_preferences(user_id: str):
+def get_preferences(user_id: str, request: Request):
+    require_same_user(request, user_id)
     prefs = db.get_user_preferences(user_id)
     if not prefs:
         prefs = {"custom_instructions": "", "personality": "friendly", "theme": "light"}
     return prefs
 
 @app.put("/api/user/preferences/{user_id}")
-def update_preferences(user_id: str, req: PreferencesUpdate):
+def update_preferences(user_id: str, req: PreferencesUpdate, request: Request):
+    require_same_user(request, user_id)
     update_data = {k: v for k, v in req.dict().items() if v is not None}
     db.update_user_preferences(user_id, update_data)
     return {"status": "updated"}
 
 # ─── Password Change ───────────────────────────────────────────────────
 @app.put("/api/user/password/{user_id}")
-def change_password(user_id: str, req: ChangePasswordRequest):
+@limiter.limit("5/minute")
+def change_password(user_id: str, req: ChangePasswordRequest, request: Request):
+    require_same_user(request, user_id)
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not db.verify_password(req.current_password, user["password_hash"], user["password_salt"]):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
     db.update_password(user_id, req.new_password)
+    log_event("password_changed", user_id=user_id)
     return {"status": "updated"}
 
 # ─── Terms Acceptance ───────────────────────────────────────────────────
 @app.get("/api/user/terms/{user_id}")
-def get_terms_status(user_id: str):
-    """Check if a user has accepted the terms and privacy policy."""
+def get_terms_status(user_id: str, request: Request):
+    require_same_user(request, user_id)
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1069,14 +1287,13 @@ def get_terms_status(user_id: str):
     }
 
 @app.put("/api/user/terms/{user_id}")
-def update_terms_acceptance(user_id: str, req: TermsAcceptRequest):
-    """Update terms acceptance status for a user."""
+def update_terms_acceptance(user_id: str, req: TermsAcceptRequest, request: Request):
+    require_same_user(request, user_id)
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     db.update_terms_acceptance(user_id, req.terms_accepted)
-    
     return {
         "terms_accepted": req.terms_accepted,
         "terms_accepted_date": datetime.now(timezone.utc).isoformat() if req.terms_accepted else None
@@ -1085,17 +1302,33 @@ def update_terms_acceptance(user_id: str, req: TermsAcceptRequest):
 # ─── Document Upload ──────────────────────────────────────────────────
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".xls", ".pptx", ".csv", ".tsv", ".txt", ".md", ".log"}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 @app.post("/api/upload-document")
 async def upload_document(
+    request: Request,
     user_id: str = Form(...),
     file: UploadFile = File(...)
 ):
+    current_user = require_user(request)
+    if user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+
+    filename = os.path.basename(file.filename)
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"File extension '{file_ext}' is not supported")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File size exceeds maximum allowed 10MB")
+
     doc_id = str(uuid.uuid4())
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    file_path = os.path.join(UPLOAD_DIR, f"{doc_id}{file_ext}")
+    safe_filename = f"{doc_id}{file_ext}"
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
     with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(content)
 
     text = ""
     if file_ext == ".pdf":
@@ -1162,17 +1395,24 @@ async def upload_document(
         except Exception as e:
             text = f"[Text extraction error: {str(e)}]"
 
-    db.save_document(doc_id, user_id, file.filename, file_path, text)
+    db.save_document(doc_id, user_id, filename, file_path, text)
+    log_event("document_uploaded", user_id=user_id, doc_id=doc_id)
     return {
         "doc_id": doc_id,
-        "filename": file.filename,
+        "filename": filename,
         "text_preview": text[:300]
     }
 
 # ─── Share ────────────────────────────────────────────────────────────
 @app.get("/api/share/{session_id}")
-def get_share_link(session_id: str, user_id: str):
-    token = db.get_or_create_share_token(session_id, user_id)
+def get_share_link(session_id: str, request: Request):
+    current_user = require_user(request)
+    sess = db.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if sess["user_id"] != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to you")
+    token = db.get_or_create_share_token(session_id, current_user)
     return {"share_url": f"/share/{token}"}
 
 @app.get("/share/{token}")
@@ -1213,17 +1453,18 @@ def share_data(token: str):
 
 # ─── Export ────────────────────────────────────────────────────────────
 @app.get("/api/export/{user_id}")
-def export_data(user_id: str):
+def export_data(user_id: str, request: Request):
+    require_same_user(request, user_id)
     user = db.get_user_by_id(user_id)
     sessions = db.get_sessions_for_user(user_id)
     messages = db.get_all_messages(user_id)
-    feedback = db.get_feedback(user_id)
+    feedback_data = db.get_feedback(user_id)
     docs = db.get_user_documents(user_id)
     data = {
         "user": user,
         "sessions": sessions,
         "messages": messages,
-        "feedback": feedback,
+        "feedback": feedback_data,
         "documents": docs
     }
     json_str = json.dumps(data, indent=2, default=str)
@@ -1231,56 +1472,66 @@ def export_data(user_id: str):
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         zf.writestr("ava_export.json", json_str)
     zip_buffer.seek(0)
-    return FileResponse(zip_buffer, media_type="application/zip", filename="ava_export.zip")
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=ava_export.zip"}
+    )
 
 # ─── Web Search ────────────────────────────────────────────────────────
 @app.get("/api/web-search")
-def web_search(query: str):
+def web_search(query: str, request: Request):
+    require_user(request)
     results = search.web_search(query)
     return {"results": results}
 
 # ─── Memory ───────────────────────────────────────────────────────────
 @app.get("/api/memory/{user_id}")
-def get_memory(user_id: str):
+def get_memory(user_id: str, request: Request):
+    require_same_user(request, user_id)
     stats = db.get_user_stats(user_id)
     recent = db.get_recent_messages(user_id, limit=5)
     user_mem = db.get_user_memory(user_id)
     return {"stats": stats, "recent": recent, "remembered_facts": user_mem["memory_text"]}
 
 @app.delete("/api/memory/{user_id}")
-def clear_memory(user_id: str):
+def clear_memory(user_id: str, request: Request):
+    require_same_user(request, user_id)
     db.delete_user_data(user_id)
     return {"message": "Data cleared"}
 
 # ─── Cross-session user memory ──────────────────────────────────────
 @app.get("/api/user-memory/{user_id}")
-def get_user_memory(user_id: str):
+def get_user_memory(user_id: str, request: Request):
+    require_same_user(request, user_id)
     return db.get_user_memory(user_id)
 
 @app.delete("/api/user-memory/{user_id}")
-def clear_user_memory(user_id: str):
+def clear_user_memory(user_id: str, request: Request):
+    require_same_user(request, user_id)
     db.clear_user_memory(user_id)
     return {"status": "cleared"}
 
 # ─── Reviews ──────────────────────────────────────────────────────────
 REVIEW_IMAGE_DIR = "review_images"
 os.makedirs(REVIEW_IMAGE_DIR, exist_ok=True)
-ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
+class ReviewSubmitRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field("", max_length=2000)
+    user_id: Optional[str] = None
+
 @app.post("/api/reviews")
-async def submit_review(payload: dict):
+async def submit_review(payload: ReviewSubmitRequest, request: Request):
     try:
-        rating = payload.get("rating")
-        comment = payload.get("comment", "")
-        user_id = payload.get("user_id")
-
-        if rating is None or rating < 1 or rating > 5:
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
-
         reviewer_name = "Guest"
-        if user_id:
-            user = db.get_user_by_id(user_id)
+        if payload.user_id:
+            current_user = request.session.get("user_id")
+            if current_user and current_user != payload.user_id:
+                raise HTTPException(status_code=403, detail="Forbidden: user_id mismatch")
+            user = db.get_user_by_id(payload.user_id)
             if user:
                 reviewer_name = user["name"]
 
@@ -1289,17 +1540,17 @@ async def submit_review(payload: dict):
             review_id=review_id,
             reviewer_name=reviewer_name,
             reviewer_title=None,
-            rating=rating,
-            review_text=comment,
+            rating=payload.rating,
+            review_text=payload.comment,
             image_path=None
         )
+        log_event("review_submitted", rating=payload.rating)
         return {"review_id": review_id, "status": "submitted"}
-
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Review submission error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Review submission error")
+        raise HTTPException(status_code=500, detail="Review submission failed")
 
 def _serialize_review_for_public(r: dict) -> dict:
     return {
@@ -1377,25 +1628,29 @@ def admin_delete_review(review_id: str, request: Request):
 
 # ─── Analytics ────────────────────────────────────────────────────────
 @app.get("/api/analytics")
-def analytics():
+def analytics(request: Request):
+    require_admin(request)
     return db.get_global_analytics()
 
 @app.get("/api/analytics/{user_id}")
-def user_analytics(user_id: str):
+def user_analytics(user_id: str, request: Request):
+    require_same_user(request, user_id)
     return db.get_user_stats(user_id)
 
-# ─── Static ───────────────────────────────────────────────────────────
+# ─── Static Files & Admin Page ───────────────────────────────────────
 STATIC_DIR = (
     os.path.join(os.path.dirname(__file__), "static")
     if os.path.isdir(os.path.join(os.path.dirname(__file__), "static"))
     else os.path.dirname(__file__)
 )
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
-# ─── Cache-busting route for admin.html ──────────────────────────────
+# ─── Cache-busting route for admin.html (protected) ──────────────────
 @app.get("/admin.html")
-async def admin_page():
+async def admin_page(request: Request):
+    require_admin(request)
     return FileResponse(
         os.path.join(STATIC_DIR, "admin.html"),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
     )
+
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
