@@ -125,17 +125,21 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 
             CREATE TABLE IF NOT EXISTS adaptation_profiles (
-                user_id           TEXT PRIMARY KEY,
-                profile_json      TEXT NOT NULL,
-                updated_at        TEXT NOT NULL,
-                interaction_count INTEGER NOT NULL DEFAULT 0
+                user_id                TEXT PRIMARY KEY,
+                profile_json           TEXT NOT NULL,
+                updated_at             TEXT NOT NULL,
+                interaction_count      INTEGER NOT NULL DEFAULT 0,
+                adapted_response_count INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
-                user_id    TEXT NOT NULL,
-                strategy   TEXT NOT NULL,
-                successes  INTEGER NOT NULL DEFAULT 0,
-                failures   INTEGER NOT NULL DEFAULT 0,
+                user_id         TEXT NOT NULL,
+                strategy        TEXT NOT NULL,
+                successes       INTEGER NOT NULL DEFAULT 0,
+                failures        INTEGER NOT NULL DEFAULT 0,
+                last_updated    TEXT,
+                last_success_at TEXT,
+                last_failure_at TEXT,
                 PRIMARY KEY (user_id, strategy)
             );
 
@@ -177,6 +181,26 @@ def init_db():
             pass
         try:
             conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # Add missing columns to adaptation_strategy_stats (if they don't exist)
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_updated TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_success_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_failure_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # Add adapted_response_count column to adaptation_profiles (if it doesn't exist)
+        try:
+            conn.execute("ALTER TABLE adaptation_profiles ADD COLUMN adapted_response_count INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
 
@@ -773,7 +797,7 @@ def get_adaptation_profile(user_id: str) -> dict | None:
     """Retrieve adaptation profile for user_id. Returns dict with parsed profile_json, or None."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT user_id, profile_json, updated_at, interaction_count FROM adaptation_profiles WHERE user_id = ?",
+            "SELECT user_id, profile_json, updated_at, interaction_count, adapted_response_count FROM adaptation_profiles WHERE user_id = ?",
             (user_id,)
         ).fetchone()
         if not row:
@@ -782,24 +806,45 @@ def get_adaptation_profile(user_id: str) -> dict | None:
             profile_data = json.loads(row["profile_json"])
         except Exception:
             profile_data = {}
+        row_keys = row.keys() if hasattr(row, "keys") else []
+        adapted_count = row["adapted_response_count"] if "adapted_response_count" in row_keys else 0
         return {
             "user_id": row["user_id"],
             "profile": profile_data,
             "updated_at": row["updated_at"],
             "interaction_count": row["interaction_count"],
+            "adapted_response_count": adapted_count,
         }
 
 
-def set_adaptation_profile(user_id: str, profile: dict, interaction_count: int | None = None) -> None:
+def set_adaptation_profile(
+    user_id: str,
+    profile: dict,
+    interaction_count: int | None = None,
+    adapted_response_count: int | None = None,
+) -> None:
     """Persist or update adaptation profile JSON for user_id."""
     now = _now()
     profile_json = json.dumps(profile)
     with get_conn() as conn:
-        if interaction_count is not None:
+        if interaction_count is not None and adapted_response_count is not None:
             conn.execute(
                 """
-                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count, adapted_response_count)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    profile_json = excluded.profile_json,
+                    updated_at = excluded.updated_at,
+                    interaction_count = excluded.interaction_count,
+                    adapted_response_count = excluded.adapted_response_count
+                """,
+                (user_id, profile_json, now, interaction_count, adapted_response_count)
+            )
+        elif interaction_count is not None:
+            conn.execute(
+                """
+                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count, adapted_response_count)
+                VALUES (?, ?, ?, ?, 0)
                 ON CONFLICT(user_id) DO UPDATE SET
                     profile_json = excluded.profile_json,
                     updated_at = excluded.updated_at,
@@ -810,8 +855,8 @@ def set_adaptation_profile(user_id: str, profile: dict, interaction_count: int |
         else:
             conn.execute(
                 """
-                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
-                VALUES (?, ?, ?, 0)
+                INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count, adapted_response_count)
+                VALUES (?, ?, ?, 0, 0)
                 ON CONFLICT(user_id) DO UPDATE SET
                     profile_json = excluded.profile_json,
                     updated_at = excluded.updated_at
@@ -828,57 +873,86 @@ def clear_adaptation_profile(user_id: str) -> bool:
         return c1 > 0
 
 
-def increment_adaptation_interaction_count(user_id: str) -> int:
-    """Increment interaction count for user's adaptation profile."""
+def increment_adaptation_interaction_count(user_id: str, adapted_used: bool = False) -> int:
+    """Increment interaction count for user's adaptation profile, and adapted_response_count if adapted_used is True."""
     now = _now()
+    adapted_delta = 1 if adapted_used else 0
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count)
-            VALUES (?, '{}', ?, 1)
+            INSERT INTO adaptation_profiles (user_id, profile_json, updated_at, interaction_count, adapted_response_count)
+            VALUES (?, '{}', ?, 1, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 interaction_count = adaptation_profiles.interaction_count + 1,
+                adapted_response_count = adaptation_profiles.adapted_response_count + ?,
                 updated_at = excluded.updated_at
             """,
-            (user_id, now)
+            (user_id, now, adapted_delta, adapted_delta)
         )
         row = conn.execute("SELECT interaction_count FROM adaptation_profiles WHERE user_id = ?", (user_id,)).fetchone()
         return row["interaction_count"] if row else 1
 
 
-def record_strategy_feedback(user_id: str, strategy: str, helpful: bool) -> None:
-    """Track successes and failures for behavioral response strategies."""
+def record_strategy_feedback(user_id: str, strategy: str, helpful: bool, timestamp: str | None = None) -> None:
+    """Track successes, failures, and timestamps for behavioral response strategies."""
+    now = timestamp or _now()
     with get_conn() as conn:
         if helpful:
             conn.execute(
                 """
-                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
-                VALUES (?, ?, 1, 0)
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures, last_updated, last_success_at)
+                VALUES (?, ?, 1, 0, ?, ?)
                 ON CONFLICT(user_id, strategy) DO UPDATE SET
-                    successes = adaptation_strategy_stats.successes + 1
+                    successes = adaptation_strategy_stats.successes + 1,
+                    last_updated = excluded.last_updated,
+                    last_success_at = excluded.last_success_at
                 """,
-                (user_id, strategy)
+                (user_id, strategy, now, now)
             )
         else:
             conn.execute(
                 """
-                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures)
-                VALUES (?, ?, 0, 1)
+                INSERT INTO adaptation_strategy_stats (user_id, strategy, successes, failures, last_updated, last_failure_at)
+                VALUES (?, ?, 0, 1, ?, ?)
                 ON CONFLICT(user_id, strategy) DO UPDATE SET
-                    failures = adaptation_strategy_stats.failures + 1
+                    failures = adaptation_strategy_stats.failures + 1,
+                    last_updated = excluded.last_updated,
+                    last_failure_at = excluded.last_failure_at
                 """,
-                (user_id, strategy)
+                (user_id, strategy, now, now)
             )
 
 
 def get_strategy_stats(user_id: str) -> dict[str, dict]:
-    """Return all strategy success/failure statistics for user_id."""
+    """Return all strategy statistics with timestamps for user_id."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT strategy, successes, failures FROM adaptation_strategy_stats WHERE user_id = ?",
+            """
+            SELECT strategy, successes, failures, last_updated, last_success_at, last_failure_at
+            FROM adaptation_strategy_stats WHERE user_id = ?
+            """,
             (user_id,)
         ).fetchall()
         return {
-            row["strategy"]: {"successes": row["successes"], "failures": row["failures"]}
+            row["strategy"]: {
+                "successes": row["successes"],
+                "failures": row["failures"],
+                "last_updated": row["last_updated"],
+                "last_success_at": row["last_success_at"],
+                "last_failure_at": row["last_failure_at"],
+            }
             for row in rows
+        }
+
+
+def get_user_feedback_stats(user_id: str) -> dict:
+    """Return total feedback count and positive feedback count for user_id."""
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) AS c FROM feedback WHERE user_id = ?", (user_id,)).fetchone()["c"]
+        positive = conn.execute("SELECT COUNT(*) AS c FROM feedback WHERE user_id = ? AND helpful = 1", (user_id,)).fetchone()["c"]
+        return {
+            "total_feedback": total,
+            "positive_feedback": positive,
+            "negative_feedback": total - positive,
+            "positive_rate": round(positive / total, 3) if total > 0 else 0.0,
         }
