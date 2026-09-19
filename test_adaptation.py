@@ -81,6 +81,8 @@ from main import app, assemble_chat_prompt_context
 class TestBehavioralAdaptationHardened(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from main import limiter
+        limiter.enabled = False
         cls._orig_db_path = db.DB_PATH
         cls.temp_dir = tempfile.TemporaryDirectory()
         cls.test_db_path = os.path.join(cls.temp_dir.name, "test_adaptation.db")
@@ -90,11 +92,20 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        from main import limiter
+        limiter.enabled = True
         db.DB_PATH = cls._orig_db_path
         try:
             cls.temp_dir.cleanup()
         except Exception:
             pass
+
+    def _authenticate(self, user_id: str, email: str = None) -> None:
+        """Authenticate self.client as user_id by creating user and logging in."""
+        email = email or f"{user_id}@example.com"
+        db.create_user(user_id, name="Test User", email=email, password="password123")
+        resp = self.client.post("/api/auth/login", json={"email": email, "password": "password123"})
+        self.assertEqual(resp.status_code, 200)
 
     # 1. Concise preference learning
     def test_01_concise_preference(self):
@@ -341,6 +352,8 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
         self.assertIn("concise_direct", db.get_strategy_stats(user_id))
 
         # 7. Call DELETE endpoint
+        login_resp = self.client.post("/api/auth/login", json={"email": email, "password": "password123"})
+        self.assertEqual(login_resp.status_code, 200)
         resp = self.client.delete(f"/api/adaptation/{user_id}")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "reset")
@@ -471,6 +484,7 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
     def test_15_invalid_preference_value(self):
         """Test 15 — Reject invalid preference values with HTTP 400."""
         user_id = f"test_inv_val_{uuid.uuid4().hex[:8]}"
+        self._authenticate(user_id)
 
         # Invalid verbosity value
         r1 = self.client.patch(f"/api/adaptation/{user_id}", json={"preference": "verbosity", "value": "banana"})
@@ -493,6 +507,7 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
     def test_16_invalid_confidence_value(self):
         """Test 16 — Reject invalid confidence values with HTTP 400 (do not silently clamp API requests)."""
         user_id = f"test_inv_conf_{uuid.uuid4().hex[:8]}"
+        self._authenticate(user_id)
 
         # Confidence > 1.0
         r1 = self.client.patch(f"/api/adaptation/{user_id}", json={"preference": "verbosity", "value": "concise", "confidence": 1.5})
@@ -918,6 +933,7 @@ class TestBehavioralAdaptationHardened(unittest.TestCase):
         self.assertLessEqual(metrics["preference_confidence"], 1.0)
 
         # Check API endpoint GET /api/adaptation/{user_id}
+        self._authenticate(user_id)
         res = self.client.get(f"/api/adaptation/{user_id}")
         self.assertEqual(res.status_code, 200)
         data = res.json()

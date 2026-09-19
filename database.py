@@ -16,9 +16,10 @@ DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "neurosup
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
     try:
         yield conn
         conn.commit()
@@ -30,6 +31,10 @@ def _now() -> str:
 
 def init_db():
     with get_conn() as conn:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -345,6 +350,18 @@ def get_sessions_for_user(user_id: str) -> list[dict]:
             (user_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+def get_session(session_id: str) -> dict | None:
+    """Retrieve a single session by session_id."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+        return dict(row) if row else None
+
+def get_message(message_id: str) -> dict | None:
+    """Retrieve a single message by message_id."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM messages WHERE message_id = ?", (message_id,)).fetchone()
+        return dict(row) if row else None
 
 def get_session_messages(session_id: str) -> list[dict]:
     with get_conn() as conn:
