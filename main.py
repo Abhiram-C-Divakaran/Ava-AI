@@ -510,12 +510,16 @@ def chat(req: ChatRequest):
     custom_instructions = prefs.get("custom_instructions", "")
     personality = prefs.get("personality", "friendly")
 
-    if req.session_id:
-        recent = db.get_recent_messages(req.user_id, session_id=req.session_id, limit=20)
-    else:
-        recent = db.get_recent_messages(req.user_id, limit=20)
-
-    context = "\n".join([f"User: {m['user_message']}\nAva: {m['agent_response']}" for m in recent]) if recent else ""
+    # Build memory context without cross-session conversation bleed.
+    # Session history is scoped to the active chat and summarized by memory.py;
+    # durable user facts are stored separately and intentionally carried across chats.
+    session_context = memory.get_session_context(req.user_id, req.session_id) if req.session_id else ""
+    user_memory_context = memory.get_user_memory_context(req.user_id)
+    context = "\n".join(
+        part.strip()
+        for part in (user_memory_context, session_context)
+        if part and part.strip()
+    )
 
     sentiment = sentiment_analyzer.analyze(req.message)
     intent = intent_classifier.classify(req.message)
@@ -644,12 +648,16 @@ def chat_stream(req: ChatRequest):
         custom_instructions = prefs.get("custom_instructions", "")
         personality = prefs.get("personality", "friendly")
 
-        if req.session_id:
-            recent = db.get_recent_messages(req.user_id, session_id=req.session_id, limit=20)
-        else:
-            recent = db.get_recent_messages(req.user_id, limit=20)
-
-        context = "\n".join([f"User: {m['user_message']}\nAva: {m['agent_response']}" for m in recent]) if recent else ""
+        # Build memory context without cross-session conversation bleed.
+        # Session history is scoped to the active chat and summarized by memory.py;
+        # durable user facts are stored separately and intentionally carried across chats.
+        session_context = memory.get_session_context(req.user_id, req.session_id) if req.session_id else ""
+        user_memory_context = memory.get_user_memory_context(req.user_id)
+        context = "\n".join(
+            part.strip()
+            for part in (user_memory_context, session_context)
+            if part and part.strip()
+        )
 
         sentiment = sentiment_analyzer.analyze(req.message)
         intent = intent_classifier.classify(req.message)
