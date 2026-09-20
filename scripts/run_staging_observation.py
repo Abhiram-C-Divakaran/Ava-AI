@@ -13,19 +13,19 @@ Executes comprehensive staging validation:
    - Feedback Loop & Strategy Recovery
    - Online Hot Backup & Disposable Restore
    - Structured JSON Logging & Secret Masking
-2. 60-Interaction Human Evaluation Rubric:
+2. 60-Case Automated Behavioral-Policy Evaluation (Structural Adaptation Suite):
    - 10 General queries
    - 10 Programming tasks
    - 10 Explanatory requests
    - 10 Memory recall prompts
    - 10 Behavioral adaptation demonstrations
    - 10 Explicit current-request overrides
-   - Evaluated on 1–5 scoring rubric:
-     * Memory Consistency (1-5)
-     * Adaptation Adherence (1-5)
+   - Evaluated on 1–5 structural rubric:
+     * Memory Consistency & Injection (1-5)
+     * Adaptation Adherence & State (1-5)
      * Override Correctness (1-5)
      * Tool/Execution Robustness (1-5)
-     * Overall Quality (1-5)
+     * Overall Policy Quality (1-5)
 
 Usage:
     python scripts/run_staging_observation.py
@@ -353,10 +353,10 @@ def run_staging_observation():
         logger.removeHandler(handler)
 
     # =========================================================================
-    # PART 2: 60-INTERACTION HUMAN EVALUATION RUBRIC
+    # PART 2: 60-CASE AUTOMATED BEHAVIORAL-POLICY EVALUATION (STRUCTURAL)
     # =========================================================================
     print("\n" + "-" * 76)
-    print("PART 2: 60-INTERACTION EVALUATION RUBRIC")
+    print("PART 2: 60-CASE AUTOMATED BEHAVIORAL-POLICY EVALUATION")
     print("-" * 76)
 
     cases_file = os.path.join(BASE_DIR, "evaluation", "staging_eval_cases.json")
@@ -463,7 +463,7 @@ def run_staging_observation():
     # PART 3: RESULTS SUMMARY & METRICS
     # =========================================================================
     print("\n" + "=" * 76)
-    print("  60-INTERACTION EVALUATION RUBRIC RESULTS (1.00 – 5.00 SCALE)")
+    print("  60-CASE AUTOMATED BEHAVIORAL-POLICY EVALUATION RESULTS (1.00 – 5.00)")
     print("=" * 76)
     print(f"{'Category':<16} | {'Count':<5} | {'Memory':<8} | {'Adaptation':<10} | {'Override':<8} | {'Robustness':<10} | {'Overall'}")
     print("-" * 76)
@@ -505,7 +505,7 @@ def run_staging_observation():
     print(f"  • Adaptation Failures:        {stats['adaptation_failures']}")
     print(f"  • Hot Backup/Restore Passed:  {stats['backup_restore_pass']}")
     print(f"  • Credential Redaction Pass:  {stats['log_redaction_pass']}")
-    print(f"  • 60-Interaction Mean Score:  {total_mean_quality:.2f} / 5.0")
+    print(f"  • 60-Case Policy Mean Score:  {total_mean_quality:.2f} / 5.0")
 
     success = (
         stats["errors_5xx"] == 0 and

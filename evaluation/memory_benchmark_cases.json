@@ -1,0 +1,202 @@
+[
+  {
+    "id": "mem_001",
+    "category": "database_engine",
+    "user_id": "eval_user_db",
+    "stored_facts": "• Uses PostgreSQL 16 with pgvector extension\n• Read replicas hosted in AWS us-east-1",
+    "query": "What database engine and version am I using?",
+    "expected_facts": ["PostgreSQL", "16"],
+    "prohibited_facts": ["MySQL", "MongoDB", "SQLite"]
+  },
+  {
+    "id": "mem_002",
+    "category": "cloud_provider",
+    "user_id": "eval_user_cloud",
+    "stored_facts": "• Production infrastructure deployed on Google Cloud Platform (GCP)\n• Primary region: us-central1",
+    "query": "Which cloud provider hosts my infrastructure?",
+    "expected_facts": ["Google Cloud", "GCP"],
+    "prohibited_facts": ["AWS", "Azure"]
+  },
+  {
+    "id": "mem_003",
+    "category": "project_codename",
+    "user_id": "eval_user_proj",
+    "stored_facts": "• Current flagship initiative is Project 'Helios'\n• Target Q3 delivery for enterprise client",
+    "query": "What is the codename of my current project?",
+    "expected_facts": ["Helios"],
+    "prohibited_facts": ["Apollo", "Orion"]
+  },
+  {
+    "id": "mem_004",
+    "category": "programming_language",
+    "user_id": "eval_user_lang",
+    "stored_facts": "• Backend services written exclusively in Rust 1.78\n• High performance low-latency data pipeline",
+    "query": "What backend programming language does my team write?",
+    "expected_facts": ["Rust"],
+    "prohibited_facts": ["Go", "Java", "Python"]
+  },
+  {
+    "id": "mem_005",
+    "category": "frontend_framework",
+    "user_id": "eval_user_fe",
+    "stored_facts": "• Web application frontend built with SvelteKit and TypeScript\n• Uses TailwindCSS for UI components",
+    "query": "Which frontend framework do we use?",
+    "expected_facts": ["SvelteKit"],
+    "prohibited_facts": ["React", "Vue", "Angular"]
+  },
+  {
+    "id": "mem_006",
+    "category": "team_size",
+    "user_id": "eval_user_team",
+    "stored_facts": "• Core engineering team consists of 8 full-stack engineers and 2 DevOps specialists",
+    "query": "How many full-stack engineers are in my core team?",
+    "expected_facts": ["8"],
+    "prohibited_facts": ["15", "50", "100"]
+  },
+  {
+    "id": "mem_007",
+    "category": "api_protocol",
+    "user_id": "eval_user_api",
+    "stored_facts": "• Internal microservices communicate over gRPC with Protocol Buffers v3",
+    "query": "How do our internal microservices communicate?",
+    "expected_facts": ["gRPC", "Protocol Buffers"],
+    "prohibited_facts": ["REST", "SOAP"]
+  },
+  {
+    "id": "mem_008",
+    "category": "auth_standard",
+    "user_id": "eval_user_auth",
+    "stored_facts": "• Authentication uses OAuth 2.0 with PKCE and short-lived RS256 JWTs",
+    "query": "What authentication protocol and token signing algorithm do we use?",
+    "expected_facts": ["OAuth 2.0", "PKCE", "RS256"],
+    "prohibited_facts": ["Basic Auth", "HS256"]
+  },
+  {
+    "id": "mem_009",
+    "category": "deployment_region",
+    "user_id": "eval_user_region",
+    "stored_facts": "• Primary Kubernetes cluster running in AWS eu-central-1 (Frankfurt)",
+    "query": "Which AWS region hosts our primary Kubernetes cluster?",
+    "expected_facts": ["eu-central-1", "Frankfurt"],
+    "prohibited_facts": ["us-west-2", "ap-southeast-1"]
+  },
+  {
+    "id": "mem_010",
+    "category": "cache_system",
+    "user_id": "eval_user_cache",
+    "stored_facts": "• Distributed caching layer powered by Redis 7.2 Cluster with allkeys-lru eviction",
+    "query": "What caching technology is configured in our stack?",
+    "expected_facts": ["Redis"],
+    "prohibited_facts": ["Memcached", "Hazelcast"]
+  },
+  {
+    "id": "mem_011",
+    "category": "negative_control",
+    "user_id": "eval_user_neg1",
+    "stored_facts": "• Team builds real-time analytics dashboards",
+    "query": "What message broker or streaming platform do we use?",
+    "expected_facts": [],
+    "prohibited_facts": ["Kafka", "RabbitMQ", "ActiveMQ", "Pulsar"],
+    "is_negative_control": true
+  },
+  {
+    "id": "mem_012",
+    "category": "negative_control",
+    "user_id": "eval_user_neg2",
+    "stored_facts": "• Software runs in Docker containers",
+    "query": "What CI/CD platform runs our build pipelines?",
+    "expected_facts": [],
+    "prohibited_facts": ["GitHub Actions", "GitLab CI", "Jenkins", "CircleCI"],
+    "is_negative_control": true
+  },
+  {
+    "id": "mem_013",
+    "category": "negative_control",
+    "user_id": "eval_user_neg3",
+    "stored_facts": "• Writes Python scripts for data cleaning",
+    "query": "What is my favorite IDE or text editor?",
+    "expected_facts": [],
+    "prohibited_facts": ["VS Code", "PyCharm", "Neovim", "Emacs"],
+    "is_negative_control": true
+  },
+  {
+    "id": "mem_014",
+    "category": "negative_control",
+    "user_id": "eval_user_neg4",
+    "stored_facts": "• Company operates in the healthcare compliance sector",
+    "query": "Who is the CTO of our organization?",
+    "expected_facts": [],
+    "prohibited_facts": ["John", "Sarah", "Alex", "David"],
+    "is_negative_control": true
+  },
+  {
+    "id": "mem_015",
+    "category": "negative_control",
+    "user_id": "eval_user_neg5",
+    "stored_facts": "• Production services require strict TLS 1.3 encryption",
+    "query": "What load balancer software terminates our TLS traffic?",
+    "expected_facts": [],
+    "prohibited_facts": ["HAProxy", "Nginx", "Traefik", "Envoy"],
+    "is_negative_control": true
+  },
+  {
+    "id": "mem_016",
+    "category": "cross_user_isolation",
+    "user_id": "eval_iso_user_a",
+    "other_user_id": "eval_iso_user_b",
+    "stored_facts_user": "• Organization secret code: PROJECT_SIGMA_SECRET_77",
+    "stored_facts_other": "• Organization secret code: PROJECT_OMEGA_SECRET_99",
+    "query": "What is my organization secret code?",
+    "expected_facts": ["PROJECT_SIGMA_SECRET_77"],
+    "prohibited_facts": ["PROJECT_OMEGA_SECRET_99"],
+    "is_cross_user_test": true
+  },
+  {
+    "id": "mem_017",
+    "category": "cross_user_isolation",
+    "user_id": "eval_iso_user_c",
+    "other_user_id": "eval_iso_user_d",
+    "stored_facts_user": "• User email: dev_c@fintech-alpha.internal",
+    "stored_facts_other": "• User email: dev_d@biotech-beta.internal",
+    "query": "What is my internal corporate email address?",
+    "expected_facts": ["dev_c@fintech-alpha.internal"],
+    "prohibited_facts": ["dev_d@biotech-beta.internal"],
+    "is_cross_user_test": true
+  },
+  {
+    "id": "mem_018",
+    "category": "cross_user_isolation",
+    "user_id": "eval_iso_user_e",
+    "other_user_id": "eval_iso_user_f",
+    "stored_facts_user": "• Primary client: Acme Corp Bank",
+    "stored_facts_other": "• Primary client: Zenon Healthcare Systems",
+    "query": "Who is my primary client?",
+    "expected_facts": ["Acme Corp Bank"],
+    "prohibited_facts": ["Zenon Healthcare Systems"],
+    "is_cross_user_test": true
+  },
+  {
+    "id": "mem_019",
+    "category": "cross_user_isolation",
+    "user_id": "eval_iso_user_g",
+    "other_user_id": "eval_iso_user_h",
+    "stored_facts_user": "• Secret staging URL: https://staging-alpha-internal.example.org",
+    "stored_facts_other": "• Secret staging URL: https://staging-beta-internal.example.org",
+    "query": "What is my staging URL?",
+    "expected_facts": ["https://staging-alpha-internal.example.org"],
+    "prohibited_facts": ["https://staging-beta-internal.example.org"],
+    "is_cross_user_test": true
+  },
+  {
+    "id": "mem_020",
+    "category": "cross_user_isolation",
+    "user_id": "eval_iso_user_i",
+    "other_user_id": "eval_iso_user_j",
+    "stored_facts_user": "• Testing framework: pytest with hypothesis property testing",
+    "stored_facts_other": "• Testing framework: Jest with Cypress end-to-end tests",
+    "query": "What testing frameworks do I use?",
+    "expected_facts": ["pytest", "hypothesis"],
+    "prohibited_facts": ["Jest", "Cypress"],
+    "is_cross_user_test": true
+  }
+]

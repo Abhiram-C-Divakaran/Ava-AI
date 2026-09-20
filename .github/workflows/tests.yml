@@ -2,7 +2,7 @@ name: CI Tests
 
 on:
   push:
-    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening, phase-5-release-readiness ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -35,7 +35,7 @@ jobs:
 
       - name: Static compilation check
         run: |
-          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py scripts/smoke_test.py scripts/smoke_test_core.py scripts/load_test.py scripts/run_controlled_load_test.py scripts/backup_db.py scripts/restore_db.py scripts/verify_backup_restore.py
+          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py evaluation/evaluate_memory.py evaluation/evaluate_convergence_and_strategies.py evaluation/run_response_eval.py evaluation/process_human_reviews.py evaluation/regressions/test_regression_suite.py scripts/smoke_test.py scripts/smoke_test_core.py scripts/load_test.py scripts/run_controlled_load_test.py scripts/backup_db.py scripts/restore_db.py scripts/verify_backup_restore.py scripts/run_staging_observation.py scripts/audit_dependencies.py
 
       - name: Run adaptation test suite (45 tests)
         run: |
@@ -49,9 +49,25 @@ jobs:
         run: |
           python -m unittest test_reliability.py -v
 
+      - name: Run post-release regression test suite
+        run: |
+          python -m unittest evaluation/regressions/test_regression_suite.py -v
+
       - name: Run offline adaptation quality evaluation (8 scenarios)
         run: |
           python evaluation/evaluate_adaptation.py
+
+      - name: Run independent factual memory benchmark
+        run: |
+          python evaluation/evaluate_memory.py
+
+      - name: Run convergence, reversal & strategy benchmark
+        run: |
+          python evaluation/evaluate_convergence_and_strategies.py
+
+      - name: Run dependency security audit
+        run: |
+          python scripts/audit_dependencies.py
 
   docker-smoke:
     name: Docker Release & Persistence Verification

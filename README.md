@@ -227,13 +227,37 @@ Validates persistent storage, online SQLite backup/restore, schema migrations tr
 python -m unittest test_reliability.py -v
 ```
 
-### 4. Behavioral Adaptation Quality Evaluation
+### 4. Behavioral Adaptation Evaluation (8 Scenarios)
 Offline evaluation against 8 canonical multi-turn behavioral scenarios (programmers, students, analysts, reversals, and overrides):
 ```bash
 python evaluation/evaluate_adaptation.py
 ```
 
-### 5. Deployment Smoke Test & Load Benchmark
+### 5. 60-Case Automated Behavioral-Policy Evaluation (Structural)
+Structural regression suite verifying prompt construction, adaptation policy state, memory presence, override logic, and tool runtime stability across 60 cases:
+```bash
+python scripts/run_staging_observation.py
+```
+
+### 6. Real Response A/B Quality Evaluation (Blind Generation)
+Generates paired outputs (Variant A: baseline without adaptation vs. Variant B: adapted with behavioral policy) with randomized presentation for blind human evaluation:
+```bash
+python evaluation/run_response_eval.py
+```
+
+### 7. Independent Factual Memory Benchmark
+Evaluates factual memory recall accuracy, omission rate, false-memory rate, and cross-user isolation:
+```bash
+python evaluation/evaluate_memory.py
+```
+
+### 8. Adaptation Convergence & Strategy Learning Benchmark
+Empirically measures signal thresholds required for preference convergence across all 6 dimensions, preference reversal dynamics, and the 6-strategy learning matrix:
+```bash
+python evaluation/evaluate_convergence_and_strategies.py
+```
+
+### 9. Deployment Smoke Test & Load Benchmark
 Validate active deployment health, auth, session, chat, feedback, and concurrency under write load:
 ```bash
 # Smoke test active server
