@@ -129,7 +129,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     same_site="lax",
-    https_only=(ENVIRONMENT == "production"),
+    https_only=config.SESSION_HTTPS_ONLY,
 )
 
 @app.middleware("http")

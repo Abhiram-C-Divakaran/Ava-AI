@@ -43,6 +43,7 @@ docker run -d \
   --name "$CONTAINER_NAME_1" \
   -p "$HOST_PORT:8000" \
   -e ENVIRONMENT=production \
+  -e SESSION_HTTPS_ONLY=false \
   -e SECRET_KEY="ci_testing_secret_key_that_is_at_least_32_bytes_long" \
   -e ALLOWED_ORIGINS="http://localhost:8000,http://127.0.0.1:8000" \
   -e GROQ_API_KEY="dummy_key_ci" \
@@ -103,6 +104,7 @@ docker run -d \
   --name "$CONTAINER_NAME_2" \
   -p "$HOST_PORT:8000" \
   -e ENVIRONMENT=production \
+  -e SESSION_HTTPS_ONLY=false \
   -e SECRET_KEY="ci_testing_secret_key_that_is_at_least_32_bytes_long" \
   -e ALLOWED_ORIGINS="http://localhost:8000,http://127.0.0.1:8000" \
   -e GROQ_API_KEY="dummy_key_ci" \

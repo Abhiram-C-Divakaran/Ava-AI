@@ -86,6 +86,7 @@ jobs:
             --name ava-rc-test \
             -p 8000:8000 \
             -e ENVIRONMENT=production \
+            -e SESSION_HTTPS_ONLY=false \
             -e SECRET_KEY=test_only_ci_secret_that_is_at_least_32_bytes_long \
             -e ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000 \
             -e GROQ_API_KEY=dummy_key_for_ci_offline \

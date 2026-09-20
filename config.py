@@ -19,6 +19,13 @@ if not SECRET_KEY:
     else:
         SECRET_KEY = "dev_insecure_secret_key_change_in_production"
 
+# Session Cookie Security
+SESSION_HTTPS_ONLY = (
+    os.getenv("SESSION_HTTPS_ONLY", "true").lower() in ("true", "1")
+    if ENVIRONMENT == "production"
+    else os.getenv("SESSION_HTTPS_ONLY", "false").lower() in ("true", "1")
+)
+
 # CORS Configuration
 ALLOWED_ORIGINS = [
     origin.strip()
