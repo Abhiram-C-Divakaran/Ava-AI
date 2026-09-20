@@ -35,7 +35,7 @@ jobs:
 
       - name: Static compilation check
         run: |
-          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py evaluation/evaluate_memory.py evaluation/evaluate_convergence_and_strategies.py evaluation/run_response_eval.py evaluation/process_human_reviews.py evaluation/regressions/test_regression_suite.py scripts/smoke_test.py scripts/smoke_test_core.py scripts/load_test.py scripts/run_controlled_load_test.py scripts/backup_db.py scripts/restore_db.py scripts/verify_backup_restore.py scripts/run_staging_observation.py scripts/audit_dependencies.py
+          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py evaluation/evaluate_memory.py evaluation/evaluate_convergence_and_strategies.py evaluation/run_response_eval.py evaluation/process_human_reviews.py evaluation/test_evaluation_integrity.py evaluation/regressions/test_regression_suite.py scripts/smoke_test.py scripts/smoke_test_core.py scripts/load_test.py scripts/run_controlled_load_test.py scripts/backup_db.py scripts/restore_db.py scripts/verify_backup_restore.py scripts/run_staging_observation.py scripts/audit_dependencies.py
 
       - name: Run adaptation test suite (45 tests)
         run: |
@@ -48,6 +48,10 @@ jobs:
       - name: Run reliability test suite (19 tests)
         run: |
           python -m unittest test_reliability.py -v
+
+      - name: Run evaluation integrity test suite (15 tests)
+        run: |
+          python -m unittest evaluation/test_evaluation_integrity.py -v
 
       - name: Run post-release regression test suite
         run: |

@@ -1,0 +1,54 @@
+name: Live LLM Quality Evaluation (Manual Release Quality Check)
+
+on:
+  workflow_dispatch:
+    inputs:
+      temperature:
+        description: "Sampling temperature for Llama 3.3 (default 0.2)"
+        required: false
+        default: "0.2"
+      seed:
+        description: "Randomization seed for A/B presentation (default 42)"
+        required: false
+        default: "42"
+
+jobs:
+  live-eval:
+    name: Run 60-Case Blind A/B Live Groq Generation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Live Response Evaluation Harness
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python evaluation/run_response_eval.py \
+            --mode live \
+            --temperature ${{ github.event.inputs.temperature || '0.2' }} \
+            --seed ${{ github.event.inputs.seed || '42' }}
+
+      - name: Upload Live Evaluation Results Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-evaluation-results
+          path: |
+            evaluation/results/live/
+            evaluation/response_eval_results_internal.json
+            evaluation/human_review_dataset.json
+            evaluation/human_review_template.csv
+            evaluation/run_metadata.json
+          retention-days: 30
