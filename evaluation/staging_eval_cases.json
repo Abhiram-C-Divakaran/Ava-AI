@@ -1,0 +1,712 @@
+[
+  {
+    "id": "gen_01",
+    "category": "general",
+    "name": "Greeting and Capabilities Overview",
+    "description": "General assistant introduction and greeting without specific domain jargon.",
+    "user_message": "Hello Ava, what can you help me with today?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["Ava"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_02",
+    "category": "general",
+    "name": "Time Zone Conversion Calculation",
+    "description": "General utility query converting meeting times across timezones.",
+    "user_message": "If a meeting is scheduled for 2:30 PM UTC, what time is that in New York (EDT) and Tokyo (JST)?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_03",
+    "category": "general",
+    "name": "Travel Itinerary Planning",
+    "description": "Structured 3-day travel itinerary with balanced pacing.",
+    "user_message": "Plan a 3-day itinerary for a first-time visitor in Tokyo focusing on cultural landmarks and local cuisine.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_04",
+    "category": "general",
+    "name": "Professional Follow-Up Email",
+    "description": "Drafting polite and professional business communication.",
+    "user_message": "Draft a professional follow-up email to a client after a productive quarterly review meeting.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_05",
+    "category": "general",
+    "name": "Mechanical vs Membrane Keyboards",
+    "description": "Objective product category comparison with pros and cons.",
+    "user_message": "What are the main differences between mechanical and membrane keyboards for typing comfort and durability?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_06",
+    "category": "general",
+    "name": "Product Name Brainstorming",
+    "description": "Creative brainstorming query for tech branding.",
+    "user_message": "Brainstorm 5 catchy, modern names for an AI-powered developer productivity tool.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_07",
+    "category": "general",
+    "name": "Project Management Core Principles",
+    "description": "Summarizing fundamental managerial concepts.",
+    "user_message": "What are the four core principles of agile project management?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_08",
+    "category": "general",
+    "name": "Renewable vs Non-Renewable Energy",
+    "description": "Clear conceptual comparison of energy resources.",
+    "user_message": "Explain the difference between renewable and non-renewable energy with two examples of each.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_09",
+    "category": "general",
+    "name": "Nutritional Grocery List Review",
+    "description": "Practical health and lifestyle analysis.",
+    "user_message": "Review this grocery list for balanced nutrition: oats, eggs, spinach, salmon, Greek yogurt, apples, almonds.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "gen_10",
+    "category": "general",
+    "name": "Conference Abstract Polishing",
+    "description": "Editorial review and refinement of scientific text.",
+    "user_message": "Please proofread and tighten this sentence: In this study we demonstrate that the model achieved very superior performance on benchmarks.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_01",
+    "category": "programming",
+    "name": "Python Debounce Decorator",
+    "description": "Implement thread-safe debounce decorator in Python.",
+    "user_message": "Write a Python decorator that debounces a function call with a configurable delay in seconds.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_02",
+    "category": "programming",
+    "name": "TypeScript Generic Repository",
+    "description": "Define TypeScript generic repository pattern with CRUD interfaces.",
+    "user_message": "Show a TypeScript generic repository interface and in-memory implementation for an entity with an id field.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_03",
+    "category": "programming",
+    "name": "SQL Rolling Average Window Function",
+    "description": "Write standard SQL window query for 7-day rolling revenue.",
+    "user_message": "Write an ANSI SQL query to compute a 7-day rolling average of daily revenue from an orders table.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_04",
+    "category": "programming",
+    "name": "Rust Custom Error Handling",
+    "description": "Implement custom error enum in Rust using thiserror pattern.",
+    "user_message": "Demonstrate idiomatic Rust custom error handling using an enum with IO and Parse error variants.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_05",
+    "category": "programming",
+    "name": "Go Concurrency Worker Pool",
+    "description": "Worker pool pattern in Go using channels and sync.WaitGroup.",
+    "user_message": "Write a clean Go worker pool example with 3 worker goroutines processing jobs from a channel.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_06",
+    "category": "programming",
+    "name": "Fast Palindrome Check O(1) Space",
+    "description": "Two-pointer string palindrome check ignoring punctuation and case.",
+    "user_message": "Write a Python function to check if an alphanumeric string is a palindrome with O(1) auxiliary space.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_07",
+    "category": "programming",
+    "name": "Docker Multi-Stage Build for FastAPI",
+    "description": "Production Dockerfile with non-root security and virtual environment copy.",
+    "user_message": "Provide a production-ready multi-stage Dockerfile for a FastAPI Python application running with non-root user.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_08",
+    "category": "programming",
+    "name": "React Window Resize Hook",
+    "description": "Custom React hook with cleanup listener and SSR check.",
+    "user_message": "Create a React useWindowSize custom hook that tracks window width and height with cleanup on unmount.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_09",
+    "category": "programming",
+    "name": "Bash Log Rotation Script",
+    "description": "Shell script rotating logs larger than 50MB and compressing with gzip.",
+    "user_message": "Write a bash script that finds logs in /var/log/app older than 7 days and compresses them with gzip.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "prog_10",
+    "category": "programming",
+    "name": "Git Merge Conflict Resolution Workflow",
+    "description": "Exact git commands for inspecting and resolving rebase conflicts.",
+    "user_message": "What git commands do I run when encountering a conflict during git rebase main?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_01",
+    "category": "explanatory",
+    "name": "DNS Resolution Mechanism",
+    "description": "End-to-end breakdown from browser cache to root nameservers and TLDs.",
+    "user_message": "Explain step by step how DNS resolution works when I type a URL into my browser.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_02",
+    "category": "explanatory",
+    "name": "Raft Consensus and Leader Election",
+    "description": "Conceptual explanation of randomized election timeouts and heartbeat RPCs.",
+    "user_message": "How does leader election work in the Raft distributed consensus algorithm?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_03",
+    "category": "explanatory",
+    "name": "B-Tree Database Index Structure",
+    "description": "Structural explanation of B-Trees, page sizes, and low disk seek depth.",
+    "user_message": "Why do relational databases use B-Trees for indexing rather than binary search trees?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_04",
+    "category": "explanatory",
+    "name": "JavaScript Event Loop and Call Stack",
+    "description": "Mechanism of microtasks, macrotasks, and non-blocking I/O.",
+    "user_message": "Explain how the JavaScript event loop handles microtasks versus macrotasks.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_05",
+    "category": "explanatory",
+    "name": "TLS 1.3 Handshake Protocol",
+    "description": "Cryptographic key exchange and symmetric cipher derivation.",
+    "user_message": "How does the TLS 1.3 handshake achieve 1-RTT security during connection establishment?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_06",
+    "category": "explanatory",
+    "name": "Mark and Sweep Garbage Collection",
+    "description": "Root sets, traversal, and memory compaction.",
+    "user_message": "Explain the mark-and-sweep garbage collection algorithm and how it deals with cyclic references.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_07",
+    "category": "explanatory",
+    "name": "Database Normalization Forms",
+    "description": "Walkthrough from unnormalized data to 1NF, 2NF, and 3NF.",
+    "user_message": "Explain 1st, 2nd, and 3rd normal forms in relational database design with a practical example.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_08",
+    "category": "explanatory",
+    "name": "CSS Flexbox vs Grid Layout Models",
+    "description": "One-dimensional content-driven vs two-dimensional layout-driven design.",
+    "user_message": "When should a frontend developer choose CSS Grid over CSS Flexbox?",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_09",
+    "category": "explanatory",
+    "name": "CAP Theorem Architectural Tradeoffs",
+    "description": "Consistency, Availability, Partition tolerance trade-offs.",
+    "user_message": "Explain the CAP theorem and why distributed systems must choose between CP and AP during network partitions.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "exp_10",
+    "category": "explanatory",
+    "name": "Zero-Knowledge Proofs Concept",
+    "description": "Prover, verifier, completeness, soundness, and zero-knowledge properties.",
+    "user_message": "Explain the intuition behind Zero-Knowledge Proofs (ZKPs) using a simple analogy.",
+    "expected_policy": {},
+    "expected_prompt_contains": [],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_01",
+    "category": "memory_recall",
+    "name": "Project Name Memory Recall",
+    "description": "Verifying cross-session factual memory recall of user project name.",
+    "setup_memory": "User is the lead engineer for Project Orion, a real-time satellite telemetry ingestion system.",
+    "user_message": "What is the name of my primary project that I am engineering?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["Orion"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_02",
+    "category": "memory_recall",
+    "name": "Primary Programming Language Recall",
+    "description": "Recalling user preferred language stored in persistent factual memory.",
+    "setup_memory": "User writes backend microservices primarily in Rust using Actix-web and Tokio.",
+    "user_message": "Which programming language do I prefer for my microservice backends?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["Rust"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_03",
+    "category": "memory_recall",
+    "name": "Cloud Deployment Region Recall",
+    "description": "Recalling target deployment region from factual memory.",
+    "setup_memory": "Production infrastructure is deployed in AWS eu-central-1 (Frankfurt).",
+    "user_message": "What cloud region is my production infrastructure hosted in?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["eu-central-1"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_04",
+    "category": "memory_recall",
+    "name": "Job Title and Responsibilities Recall",
+    "description": "Recalling professional title from factual memory.",
+    "setup_memory": "User is a Principal Infrastructure Architect responsible for Kubernetes cluster reliability.",
+    "user_message": "What is my current professional role and main responsibility?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["Principal Infrastructure Architect"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_05",
+    "category": "memory_recall",
+    "name": "Testing Framework Preference Recall",
+    "description": "Recalling testing stack from persistent memory.",
+    "setup_memory": "User exclusively uses pytest with the hypothesis property-based testing plugin.",
+    "user_message": "Which test runner and property testing library do I use?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["pytest", "hypothesis"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_06",
+    "category": "memory_recall",
+    "name": "Database Constraint Recall",
+    "description": "Recalling primary relational database engine.",
+    "setup_memory": "Target database engine is PostgreSQL 16 with pgvector extension enabled.",
+    "user_message": "Which database engine and version am I targeting for the application?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["PostgreSQL 16"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_07",
+    "category": "memory_recall",
+    "name": "Code Formatting Standard Recall",
+    "description": "Recalling code formatting conventions.",
+    "setup_memory": "User adheres strictly to Black formatting with 88-character line length limits.",
+    "user_message": "What line length limit do I enforce for Python code formatting?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["88"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_08",
+    "category": "memory_recall",
+    "name": "CI Platform Recall",
+    "description": "Recalling build and deployment tooling.",
+    "setup_memory": "User deploys CI/CD pipelines through GitHub Actions utilizing self-hosted Linux runners.",
+    "user_message": "Where are my automated CI/CD workflows executed?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["GitHub Actions"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_09",
+    "category": "memory_recall",
+    "name": "Historical Incident Record Recall",
+    "description": "Recalling past production postmortem context.",
+    "setup_memory": "User experienced a major production outage on July 14th caused by a Redis connection pool exhaustion.",
+    "user_message": "What caused our production outage on July 14th?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["Redis"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "mem_10",
+    "category": "memory_recall",
+    "name": "Current Sprint Goal Recall",
+    "description": "Recalling ongoing operational sprint milestone.",
+    "setup_memory": "Current sprint goal is migrating legacy session cookies to OAuth2 JWT Bearer tokens.",
+    "user_message": "What is our primary milestone for the current sprint?",
+    "expected_policy": {},
+    "expected_prompt_contains": ["OAuth2 JWT"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_01",
+    "category": "adaptation",
+    "name": "Concise Programmer Strategy Adaptation",
+    "description": "Profile adapts to concise_with_code after repeated short code interactions.",
+    "setup_interactions": [
+      {"user_message": "Keep your answers short and show Python code.", "strategy": "concise_with_code", "feedback": true},
+      {"user_message": "Only show code, no filler text.", "strategy": "concise_with_code", "feedback": true},
+      {"user_message": "Brief python function please.", "strategy": "concise_with_code", "feedback": true}
+    ],
+    "user_message": "How do I reverse a list in Python?",
+    "expected_policy": {"preferred_strategy": "concise_with_code", "verbosity": "concise"},
+    "expected_prompt_contains": ["concise", "code"],
+    "expected_prompt_excludes": ["detailed explanation"]
+  },
+  {
+    "id": "adapt_02",
+    "category": "adaptation",
+    "name": "Step-by-Step Student Adaptation",
+    "description": "Profile adapts to detailed_step_by_step with step_by_step enabled.",
+    "setup_interactions": [
+      {"user_message": "Please explain this step by step, I am learning.", "strategy": "detailed_step_by_step", "feedback": true},
+      {"user_message": "Walk me through this step-by-step please.", "strategy": "detailed_step_by_step", "feedback": true},
+      {"user_message": "Give me a structured step by step explanation.", "strategy": "detailed_step_by_step", "feedback": true}
+    ],
+    "user_message": "How does quicksort partition an array?",
+    "expected_policy": {"preferred_strategy": "detailed_step_by_step", "step_by_step": true},
+    "expected_prompt_contains": ["step-by-step"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_03",
+    "category": "adaptation",
+    "name": "Detailed Technical Analyst Adaptation",
+    "description": "Profile adapts to detailed_explanation and high verbosity.",
+    "setup_interactions": [
+      {"user_message": "Give me a comprehensive deep dive and detailed explanation.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Explain in much more detail with thorough breakdown.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "I need an in-depth analysis of this topic.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "How does the Linux virtual memory manager handle page faults?",
+    "expected_policy": {"preferred_strategy": "detailed_explanation", "verbosity": "detailed"},
+    "expected_prompt_contains": ["detailed"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_04",
+    "category": "adaptation",
+    "name": "Code-First Developer Adaptation",
+    "description": "Profile adapts to code_first strategy.",
+    "setup_interactions": [
+      {"user_message": "Put the code first before explaining anything.", "strategy": "code_first", "feedback": true},
+      {"user_message": "Code upfront immediately, then notes.", "strategy": "code_first", "feedback": true},
+      {"user_message": "Start with code implementation first.", "strategy": "code_first", "feedback": true}
+    ],
+    "user_message": "How do I implement a LRU cache in Python?",
+    "expected_policy": {"preferred_strategy": "code_first"},
+    "expected_prompt_contains": ["code implementation"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_05",
+    "category": "adaptation",
+    "name": "Formal Professional Tone Adaptation",
+    "description": "Profile adapts to formal tone.",
+    "setup_interactions": [
+      {"user_message": "Use a formal and professional tone in your replies.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Keep it formal, avoid colloquial expressions.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Please maintain a professional formal style.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Summarize the quarterly revenue guidance for the board.",
+    "expected_policy": {"tone": "formal"},
+    "expected_prompt_contains": ["formal"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_06",
+    "category": "adaptation",
+    "name": "Direct Minimalist Adaptation",
+    "description": "Profile adapts to concise_direct and direct tone.",
+    "setup_interactions": [
+      {"user_message": "Be direct and concise. Cut the fluff.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Short answer only, be direct.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Give me a brief, direct answer.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Is HTTP/3 based on TCP or UDP?",
+    "expected_policy": {"preferred_strategy": "concise_direct", "verbosity": "concise", "tone": "direct"},
+    "expected_prompt_contains": ["direct"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_07",
+    "category": "adaptation",
+    "name": "Beginner Technical Depth Adaptation",
+    "description": "Profile adapts to beginner technical depth.",
+    "setup_interactions": [
+      {"user_message": "Explain like I am a beginner, simple language please.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "I am new to programming, keep explanations beginner friendly.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Beginner level explanation please.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "What is an API?",
+    "expected_policy": {"technical_depth": "beginner"},
+    "expected_prompt_contains": ["beginner"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_08",
+    "category": "adaptation",
+    "name": "Advanced Technical Depth Adaptation",
+    "description": "Profile adapts to advanced technical depth.",
+    "setup_interactions": [
+      {"user_message": "Advanced technical explanation, assume deep systems engineering knowledge.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "High technical depth, advanced architecture details.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Advanced level breakdown please.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "How does kernel bypass networking work with DPDK?",
+    "expected_policy": {"technical_depth": "advanced"},
+    "expected_prompt_contains": ["advanced"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_09",
+    "category": "adaptation",
+    "name": "Step-by-Step with Code Adaptation",
+    "description": "Profile adapts to step_by_step_code strategy.",
+    "setup_interactions": [
+      {"user_message": "Explain step by step and include code at each step.", "strategy": "step_by_step_code", "feedback": true},
+      {"user_message": "Step by step walkthrough with code snippets.", "strategy": "step_by_step_code", "feedback": true},
+      {"user_message": "Provide code along with each step.", "strategy": "step_by_step_code", "feedback": true}
+    ],
+    "user_message": "How do I build a simple CLI in Python using argparse?",
+    "expected_policy": {"preferred_strategy": "step_by_step_code"},
+    "expected_prompt_contains": ["step-by-step", "code"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "adapt_10",
+    "category": "adaptation",
+    "name": "Friendly Tone with Examples Adaptation",
+    "description": "Profile adapts to friendly tone and examples enabled.",
+    "setup_interactions": [
+      {"user_message": "I love friendly explanations with good real-world examples!", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Keep it friendly and warm with plenty of examples.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Warm friendly tone with examples please.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "How does caching help web applications?",
+    "expected_policy": {"tone": "friendly", "examples": true},
+    "expected_prompt_contains": ["friendly"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "ovr_01",
+    "category": "override",
+    "name": "Concise Profile Overridden by Detailed Request",
+    "description": "User trained on concise profile explicitly requests a comprehensive detailed breakdown.",
+    "setup_interactions": [
+      {"user_message": "Keep it short, brief answers only.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Be concise, short answer.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Brief answers only.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Give me a long, comprehensive, and detailed explanation of how Kubernetes scheduling works.",
+    "expected_policy": {"preferred_strategy": "concise_direct"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": ["Prefer concise"]
+  },
+  {
+    "id": "ovr_02",
+    "category": "override",
+    "name": "Detailed Profile Overridden by One-Line Request",
+    "description": "User trained on detailed profile explicitly requests a one-line answer.",
+    "setup_interactions": [
+      {"user_message": "Explain in great detail, comprehensive overview.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Deep dive in full detail.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Detailed explanation please.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "Give me a one sentence brief answer: What is the speed of light in vacuum?",
+    "expected_policy": {"preferred_strategy": "detailed_explanation"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": ["Provide thorough, comprehensive"]
+  },
+  {
+    "id": "ovr_03",
+    "category": "override",
+    "name": "Code-First Profile Overridden by High-Level Request",
+    "description": "User trained on code_first explicitly requests high-level conceptual explanation with no code.",
+    "setup_interactions": [
+      {"user_message": "Show code first immediately.", "strategy": "code_first", "feedback": true},
+      {"user_message": "Code first always.", "strategy": "code_first", "feedback": true},
+      {"user_message": "Start with code implementation.", "strategy": "code_first", "feedback": true}
+    ],
+    "user_message": "Explain the business value of microservices at a high level without any code.",
+    "expected_policy": {"preferred_strategy": "code_first"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "ovr_04",
+    "category": "override",
+    "name": "No-Code Profile Overridden by Code Snippet Request",
+    "description": "User profile with code_examples=False overridden by explicit request for code.",
+    "setup_interactions": [
+      {"user_message": "No code, just explain in plain English.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Plain text only, skip code snippets.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "No code examples please.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "Show me the exact Python code snippet to read JSON from a file.",
+    "expected_policy": {},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": ["Avoid unprompted code snippets"]
+  },
+  {
+    "id": "ovr_05",
+    "category": "override",
+    "name": "Step-by-Step Profile Overridden by Direct Answer",
+    "description": "User profile with step_by_step=True overridden by request for direct conclusion.",
+    "setup_interactions": [
+      {"user_message": "Explain step by step.", "strategy": "detailed_step_by_step", "feedback": true},
+      {"user_message": "Step by step breakdown.", "strategy": "detailed_step_by_step", "feedback": true},
+      {"user_message": "Walk through step by step.", "strategy": "detailed_step_by_step", "feedback": true}
+    ],
+    "user_message": "Just give me the bottom-line direct answer without steps: Which sorting algorithm is stable by default, Quicksort or Mergesort?",
+    "expected_policy": {"preferred_strategy": "detailed_step_by_step"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": ["Prefer structured, step-by-step"]
+  },
+  {
+    "id": "ovr_06",
+    "category": "override",
+    "name": "Formal Profile Overridden by Casual Conversational Request",
+    "description": "User profile with formal tone overridden by casual instruction.",
+    "setup_interactions": [
+      {"user_message": "Use a formal tone.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Keep language formal.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Formal business tone.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Explain quantum computing like you're chatting with a friend at a coffee shop, super casual.",
+    "expected_policy": {"tone": "formal"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "ovr_07",
+    "category": "override",
+    "name": "Beginner Depth Overridden by Deep Architectural Analysis",
+    "description": "User profile with beginner depth overridden by explicit low-level architecture request.",
+    "setup_interactions": [
+      {"user_message": "Explain for a beginner.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Keep it simple for beginners.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Beginner friendly only.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "Provide an advanced low-level analysis of how SQLite B-Tree balancing handles write-ahead logs during checkpointing.",
+    "expected_policy": {"technical_depth": "beginner"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "ovr_08",
+    "category": "override",
+    "name": "Advanced Depth Overridden by ELI5 Explanation",
+    "description": "User profile with advanced depth overridden by ELI5 request.",
+    "setup_interactions": [
+      {"user_message": "Advanced deep technical breakdown.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "High technical depth always.", "strategy": "detailed_explanation", "feedback": true},
+      {"user_message": "Advanced architecture.", "strategy": "detailed_explanation", "feedback": true}
+    ],
+    "user_message": "Explain how encryption works like I am 5 years old (ELI5).",
+    "expected_policy": {"technical_depth": "advanced"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": []
+  },
+  {
+    "id": "ovr_09",
+    "category": "override",
+    "name": "Concise Profile Overridden by Step-by-Step Tutorial Request",
+    "description": "Concise profile overridden by explicit request for step-by-step tutorial.",
+    "setup_interactions": [
+      {"user_message": "Keep answers short.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Be brief.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Short answers.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Give me a complete, numbered step-by-step tutorial on setting up a virtual environment in Python.",
+    "expected_policy": {"preferred_strategy": "concise_direct"},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": ["Prefer concise"]
+  },
+  {
+    "id": "ovr_10",
+    "category": "override",
+    "name": "Bullet-Points Preference Overridden by Narrative Request",
+    "description": "User requests flowing narrative paragraph overriding structured bullets.",
+    "setup_interactions": [
+      {"user_message": "Use bullet points for your answers.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Format answers in bullets.", "strategy": "concise_direct", "feedback": true},
+      {"user_message": "Bullet list format please.", "strategy": "concise_direct", "feedback": true}
+    ],
+    "user_message": "Write a continuous narrative essay in 2 paragraphs about the history of computing, without any bullet points.",
+    "expected_policy": {},
+    "expected_prompt_contains": ["overrides any learned preference"],
+    "expected_prompt_excludes": []
+  }
+]

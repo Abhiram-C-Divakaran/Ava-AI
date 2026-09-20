@@ -1,7 +1,7 @@
-# Release Verification Report — Ava AI v1.0.0-rc1
+# Release Verification Report — Ava AI v1.0.0
 
-**Release Target**: `v1.0.0-rc1`  
-**Branch**: `phase-5-release-readiness`  
+**Release Target**: `v1.0.0`  
+**Branch**: `phase-6-stable-release`  
 **Base Model**: `llama-3.3-70b-versatile` (Strictly Non-RAG, frozen weights, closed-loop behavioral adaptation)  
 **Verification Date**: 2026-09-20  
 
@@ -30,6 +30,7 @@
 ## 2. Test Suite Breakdown
 
 ### Automated Test Matrix
+- **Behavioral Modeling**: Models exactly 6 preference dimensions (`verbosity`, `technical_depth`, `code_examples`, `step_by_step`, `examples`, `tone`) and 6 predefined strategies (`concise_direct`, `concise_with_code`, `detailed_step_by_step`, `step_by_step_code`, `code_first`, `detailed_explanation`).
 - **Adaptation Tests**: 45 / 45 passed
 - **Security Tests**: 22 / 22 passed
   - *Added*: Complete user data deletion flow (testing granular memory clear, adaptation reset, session delete, total user delete).
@@ -53,8 +54,8 @@
 ## 3. Operational Smoke & Docker Persistence Verification
 
 ### Core Offline Smoke Test (`scripts/smoke_test.py --offline` / `scripts/smoke_test_core.py`)
-- Health Check (`GET /health`): **PASS** -> HTTP 200 (`{"status": "ok", "version": "1.0.0-rc1"}`)
-- Readiness Check (`GET /ready`): **PASS** -> HTTP 200 (`{"status": "ready", "version": "1.0.0-rc1", "database": "connected", "storage": "writable"}`)
+- Health Check (`GET /health`): **PASS** -> HTTP 200 (`{"status": "ok", "version": "1.0.0"}`)
+- Readiness Check (`GET /ready`): **PASS** -> HTTP 200 (`{"status": "ready", "version": "1.0.0", "database": "connected", "storage": "writable"}`)
 - User Registration (`POST /api/auth/signup`): **PASS** -> HTTP 200
 - User Login (`POST /api/auth/login`): **PASS** -> HTTP 200 (secure session cookie)
 - Session Listing (`GET /api/sessions/{user_id}`): **PASS** -> HTTP 200
@@ -126,7 +127,7 @@
 
 ---
 
-## 7. Release Candidate Verdict
+## 7. Stable Release Verdict
 
-All 28 release readiness verification criteria have been successfully tested and satisfied.  
-**Recommendation**: Ava AI is verified and ready for `v1.0.0-rc1` release candidate tagging and staging observation.
+All release readiness verification criteria, staging observation flows, and 60-interaction evaluation benchmarks have been successfully tested and satisfied.  
+**Recommendation**: Ava AI is verified, hardened, and approved for **stable `v1.0.0` production release**.
