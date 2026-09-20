@@ -1,12 +1,13 @@
-# Ava AI — Release Readiness Checklist (`v1.0.0-rc1`)
+# Ava AI — Release Readiness Checklist (`v1.0.0`)
 
-This document establishes the pre-deployment verification criteria, configuration hardening checks, testing standards, and disaster recovery procedures for **Ava AI `v1.0.0-rc1`**.
+This document establishes the pre-deployment verification criteria, configuration hardening checks, testing standards, and disaster recovery procedures for **Ava AI `v1.0.0`**.
 
 ---
 
 ## 1. System Architecture & Model Constraints
 
 - [x] **Core Architecture**: `AVA = LLM + Persistent Factual Memory + Session Memory + Behavioral Preference Learning + Feedback-Driven Strategy Learning + Closed-Loop Behavioral Adaptation`.
+- [x] **Behavioral Modeling**: Ava models exactly 6 behavioral preference dimensions (`verbosity`, `technical_depth`, `code_examples`, `step_by_step`, `examples`, `tone`) and 6 predefined behavioral response strategies (`concise_direct`, `concise_with_code`, `detailed_step_by_step`, `step_by_step_code`, `code_first`, `detailed_explanation`).
 - [x] **Base Model**: `llama-3.3-70b-versatile` via Groq API.
 - [x] **Model Weights Policy**: Model weights remain completely unchanged during user conversations (inference-only).
 - [x] **Strict Non-RAG Guarantee**: Zero vector databases, zero embeddings, zero vector indexes (FAISS, ChromaDB, Pinecone, Qdrant, Weaviate), and zero semantic top-k retrieval.
@@ -47,7 +48,7 @@ docker run -d \
   --name ava-ai \
   --env-file .env.production \
   -v /var/lib/ava/data:/app/data \
-  ava-ai:1.0.0-rc1
+  ava-ai:1.0.0
 ```
 
 ### Online Backup Procedure
@@ -84,7 +85,7 @@ Ava tracks schema migrations via the `schema_migrations` table:
 - **Liveness Probe**: `GET /health`
   - Returns HTTP 200 `{"status": "ok"}`
 - **Readiness Probe**: `GET /ready`
-  - Returns HTTP 200 `{"status": "ready", "version": "1.0.0-rc1", "database": "connected", "storage": "writable"}`
+  - Returns HTTP 200 `{"status": "ready", "version": "1.0.0", "database": "connected", "storage": "writable"}`
   - Returns HTTP 503 if database connection fails, schema is inaccessible, or storage directories are unwritable.
   - *Design Note*: External LLM (Groq) uptime does not fail the readiness probe, preventing cascading pod restarts.
 
@@ -103,7 +104,7 @@ Admin-authenticated endpoint returning real-time metrics with zero high-cardinal
 Ensure all test suites pass with 100% green status before tagging release:
 
 ```bash
-# 1. Run all 82 unit, security, and reliability tests
+# 1. Run all 86 unit, security, and reliability tests
 python -m unittest test_adaptation.py test_security.py test_reliability.py -v
 
 # 2. Run offline behavioral adaptation quality evaluation (8 test scenarios)
@@ -131,7 +132,7 @@ python scripts/load_test.py --base-url http://127.0.0.1:8000 --users 25 --reques
 
 ## 6. Pre-Flight Sign-Off & Verification Evidence
 
-- [x] **Version**: Declared as `1.0.0-rc1` in `version.py`.
+- [x] **Version**: Declared as `1.0.0` in `version.py`.
 - [x] **Configuration**: `.env.example` (development) and `.env.production.example` (production/Docker) clearly separated.
 - [x] **Restore CLI**: Canonical command `python scripts/restore_db.py <backup_file> --confirm` documented everywhere.
 - [x] **Dockerfile**: Hardened non-root user `appuser`, persistent volume path `/app/data`, and healthcheck probe.

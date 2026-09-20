@@ -23,8 +23,8 @@ Ava AI is a personal intelligence assistant designed around persistent personali
                                        ▼
 +─────────────────────────────────────────────────────────────────────────────+
 |                         BEHAVIORAL ADAPTATION ENGINE                        |
-|   - 5 Dimensional Profiles (verbosity, depth, code, tone, style)            |
-|   - 10 Discrete Strategies with dynamic Thompson/Epsilon Selection          |
+|   - 6 Dimensional Profiles (verbosity, depth, code, step-by-step, examples) |
+|   - 6 Discrete Behavioral Strategies with Recency-Aware Scoring             |
 |   - Recency-Aware Exponential Evidence Decay (Positive & Negative Half-Lives)|
 |   - Strict Current-Request Override Arbitration                             |
 +──────────────────────────────────────┬──────────────────────────────────────+
@@ -81,26 +81,23 @@ Ava is deliberately engineered **NOT** to be a vector Retrieval-Augmented Genera
 - **Primary Model**: `llama-3.3-70b-versatile` (via Groq Cloud API)
 - **Voice Transcription**: `whisper-large-v3`
 
-### The 5 Behavioral Preference Dimensions
-Every user profile tracks 5 core behavioral preferences stored with confidence scores $[0.0, 1.0]$:
+### The 6 Behavioral Preference Dimensions
+Ava currently models six behavioral preference dimensions and six predefined behavioral response strategies. Every user profile tracks these 6 core behavioral preferences stored with confidence scores $[0.0, 1.0]$:
 1. `verbosity`: `concise` | `balanced` | `detailed`
-2. `technical_depth`: `high` | `medium` | `low`
+2. `technical_depth`: `beginner` | `intermediate` | `advanced`
 3. `code_examples`: `true` | `false`
-4. `tone`: `formal` | `friendly` | `encouraging` | `direct`
-5. `explanation_style`: `bullet_points` | `code_focused` | `conceptual` | `practical`
+4. `step_by_step`: `true` | `false`
+5. `examples`: `true` | `false`
+6. `tone`: `friendly` | `direct` | `formal`
 
-### The 10 Behavioral Strategies
-When generating responses, Ava selects from 10 proven behavioral strategies tailored to the user's past feedback and current intent:
-1. `concise_direct`
-2. `concise_with_code`
-3. `detailed_explanation`
-4. `conceptual_deep_dive`
-5. `code_first`
-6. `step_by_step_tutorial`
-7. `supportive_coaching`
-8. `executive_summary`
-9. `troubleshooting_checklist`
-10. `analytical_breakdown`
+### The 6 Behavioral Response Strategies
+When generating responses, Ava selects from six predefined behavioral response strategies tailored to the user's past feedback and current intent:
+1. `concise_direct`: Provide a short, direct answer with minimal extra explanation.
+2. `concise_with_code`: Prefer concise responses with focused code examples when appropriate. Provide a short explanation followed by clean, focused code.
+3. `detailed_step_by_step`: Provide a thorough, structured, step-by-step walkthrough.
+4. `step_by_step_code`: Provide a structured, step-by-step explanation with code snippets at relevant steps.
+5. `code_first`: Lead directly with the code implementation, then provide explanation afterward.
+6. `detailed_explanation`: Provide deep conceptual and architectural explanations before practical implementation.
 
 ### Strategy Learning & Evidence Decay
 - Strategy efficacy is tracked through positive and negative feedback instances.
@@ -205,9 +202,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 
 ## 6. Testing & Evaluation
 
-The repository contains 82 automated unit tests across three suites (executing in ~7 seconds offline) plus an 8-scenario behavioral adaptation evaluation suite and deployment smoke/load benchmarks:
+The repository contains 86 automated unit tests across three suites (executing in ~7 seconds offline) plus an 8-scenario behavioral adaptation evaluation suite and deployment smoke/load benchmarks:
 
-### Run All 82 Unit Tests
+### Run All 86 Unit Tests
 ```bash
 python -m unittest test_adaptation.py test_security.py test_reliability.py -v
 ```
@@ -218,14 +215,14 @@ Validates behavioral learning, strategy statistics, Bayesian updates, exponentia
 python -m unittest test_adaptation.py -v
 ```
 
-### 2. Security Test Suite (20 Tests)
-Validates authentication, authorization, IDOR checks, rate limiting, CORS preflight, production secrets validation, path traversal prevention, and admin role enforcement:
+### 2. Security Test Suite (22 Tests)
+Validates authentication, authorization, IDOR checks, rate limiting, CORS preflight, production secrets validation, path traversal prevention, user data deletion, log credential masking, and admin role enforcement:
 ```bash
 python -m unittest test_security.py -v
 ```
 
-### 3. Operational Reliability Test Suite (17 Tests)
-Validates persistent storage, online SQLite backup/restore, schema migrations tracking, concurrent multi-threaded writes without lock contention, LLM retry and timeout policies, and external tool graceful degradation:
+### 3. Operational Reliability Test Suite (19 Tests)
+Validates persistent storage, online SQLite backup/restore, schema migrations tracking, concurrent multi-threaded writes without lock contention, LLM retry and timeout policies, external tool graceful degradation, and version surfacing:
 ```bash
 python -m unittest test_reliability.py -v
 ```
@@ -261,8 +258,8 @@ python scripts/restore_db.py /backups/ava_backup.db --confirm
 ```
 
 ### Health, Readiness & Metrics Endpoints
-- **Liveness**: `GET /health` -> `{"status": "ok", "version": "1.0.0-rc1"}`
-- **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.0-rc1", "database": "connected", "storage": "writable"}`
+- **Liveness**: `GET /health` -> `{"status": "ok", "version": "1.0.0"}`
+- **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.0", "database": "connected", "storage": "writable"}`
 - **Operational Metrics**: `GET /api/metrics` (Admin authenticated, returns counters, latencies, and uptime)
 
 ---
@@ -272,7 +269,7 @@ python scripts/restore_db.py /backups/ava_backup.db --confirm
 A hardened multi-stage production Dockerfile is included:
 ```bash
 # Build the Docker image
-docker build -t ava-ai:1.0.0-rc1 .
+docker build -t ava-ai:1.0.0 .
 
 # Run container with persistent host volume
 docker run -d \
@@ -283,7 +280,7 @@ docker run -d \
   -e ADMIN_PASSWORD="your_secure_admin_password" \
   -v /var/lib/ava/data:/app/data \
   --name ava-app \
-  ava-ai:1.0.0-rc1
+  ava-ai:1.0.0
 ```
 
 ### Reverse Proxy & Rate Limiting Behind Proxies
