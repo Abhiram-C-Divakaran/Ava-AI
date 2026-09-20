@@ -615,6 +615,7 @@ def assemble_chat_prompt_context(
     web_search: Optional[bool] = False,
     custom_instructions: str = "",
     personality: str = "friendly",
+    adaptation_enabled: bool = True,
 ) -> tuple[str, dict]:
     """
     Constructs the augmented system prompt with correct conceptual separation:
@@ -622,6 +623,10 @@ def assemble_chat_prompt_context(
     - adaptation_context = learned behavioral response preferences
     - conversation_context = current-session context only (strictly session_context)
     Returns (system_prompt, aug_meta).
+    
+    The adaptation_enabled parameter is an internal evaluation switch for A/B quality
+    benchmarking (e.g. run_response_eval.py). When False, adaptation context and strategy
+    selection are bypassed while preserving persistent user memory and session history.
     """
     # 1. Session history is strictly scoped to the active chat
     session_context = memory.get_session_context(user_id, session_id) if session_id else ""
@@ -651,11 +656,12 @@ def assemble_chat_prompt_context(
 
     adaptation_context = ""
     policy = {}
-    try:
-        adaptation_context = adaptation.get_adaptation_context(user_id, message)
-        policy = adaptation.get_behavior_policy(user_id, message)
-    except Exception as e:
-        print(f"⚠️ Adaptation context build failed: {e}")
+    if adaptation_enabled:
+        try:
+            adaptation_context = adaptation.get_adaptation_context(user_id, message)
+            policy = adaptation.get_behavior_policy(user_id, message)
+        except Exception as e:
+            print(f"⚠️ Adaptation context build failed: {e}")
 
     from llm import build_system_prompt as _bsp
     _base = _bsp(custom_instructions, personality, mode or "flash")
@@ -684,7 +690,8 @@ def assemble_chat_prompt_context(
     aug_meta["user_memory_context"] = user_memory_context
     aug_meta["conversation_context"] = conversation_context
     aug_meta["strategy"] = policy.get("preferred_strategy")
-    aug_meta["adaptation_used"] = adaptation.is_adaptation_used(user_id, message)
+    aug_meta["adaptation_used"] = adaptation.is_adaptation_used(user_id, message) if adaptation_enabled else False
+    aug_meta["adaptation_enabled"] = adaptation_enabled
     aug_meta["policy"] = policy
     return system_override, aug_meta
 

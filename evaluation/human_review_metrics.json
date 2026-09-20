@@ -1,0 +1,73 @@
+{
+  "total_reviewed": 60,
+  "adapted_wins": 34,
+  "adapted_win_rate_pct": 56.67,
+  "baseline_wins": 7,
+  "baseline_win_rate_pct": 11.67,
+  "ties": 19,
+  "tie_rate_pct": 31.67,
+  "wilson_ci_95": {
+    "lower_pct": 44.1,
+    "upper_pct": 68.43
+  },
+  "dimension_means": {
+    "instruction_adherence": {
+      "adapted": 4.9,
+      "baseline": 4.78
+    },
+    "clarity": {
+      "adapted": 4.6,
+      "baseline": 4.51
+    },
+    "usefulness": {
+      "adapted": 4.64,
+      "baseline": 4.51
+    },
+    "personalization_fit": {
+      "adapted": 4.32,
+      "baseline": 3.88
+    },
+    "correctness": {
+      "adapted": 5.0,
+      "baseline": 5.0
+    }
+  },
+  "category_breakdown": {
+    "programming": {
+      "count": 10,
+      "adapted_wins": 7,
+      "baseline_wins": 3,
+      "ties": 0
+    },
+    "conceptual": {
+      "count": 10,
+      "adapted_wins": 2,
+      "baseline_wins": 1,
+      "ties": 7
+    },
+    "concise_pref": {
+      "count": 10,
+      "adapted_wins": 10,
+      "baseline_wins": 0,
+      "ties": 0
+    },
+    "detailed_pref": {
+      "count": 10,
+      "adapted_wins": 10,
+      "baseline_wins": 0,
+      "ties": 0
+    },
+    "code_conflict": {
+      "count": 10,
+      "adapted_wins": 2,
+      "baseline_wins": 0,
+      "ties": 8
+    },
+    "override": {
+      "count": 10,
+      "adapted_wins": 3,
+      "baseline_wins": 3,
+      "ties": 4
+    }
+  }
+}

@@ -23,15 +23,17 @@ The release candidate `v1.0.0-rc1` underwent extensive staging observation, empi
 | **Current-Request Override** | Explicit prompt supersedes profile | **100% override adherence** | **PASS** |
 | **Hot Backup & Restore** | Clean restore, `PRAGMA integrity_check = ok` | **Verified via CLI subprocess** | **PASS** |
 | **Credential Redaction** | 0 secrets/passwords/tokens in logs | **Verified (`[REDACTED]`)** | **PASS** |
-| **60-Interaction Rubric** | Mean score $\ge 4.50$ / 5.00 | **4.98 / 5.00** | **PASS** |
+| **60-Case Behavioral Policy Eval** | Mean score $\ge 4.50$ / 5.00 | **4.98 / 5.00** | **PASS** |
 
 ---
 
-## 2. 60-Interaction Human Evaluation Rubric Results
+## 2. 60-Case Automated Behavioral-Policy Evaluation Results
 
-A 60-interaction evaluation suite (`evaluation/staging_eval_cases.json`) was executed across 6 distinct interaction categories, evaluating responses against a standardized 1.00 – 5.00 point scale:
+A 60-case automated behavioral-policy evaluation suite (`evaluation/staging_eval_cases.json`) was executed across 6 distinct interaction categories, verifying prompt construction, adaptation policy state, memory injection, override logic, and runtime stability against a standardized 1.00 – 5.00 point structural rubric. 
 
-| Category | Interaction Count | Memory Consistency | Adaptation Adherence | Override Correctness | Tool / Runtime Robustness | Category Mean Quality |
+*(Note: This automated regression suite measures structural adaptation correctness and prompt assembly integrity. Subjective natural-language generation quality is evaluated independently through blind human review in `QUALITY_EVALUATION_REPORT.md`).*
+
+| Category | Case Count | Memory Consistency | Adaptation Adherence | Override Correctness | Tool / Runtime Robustness | Category Mean Score |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **General Inquiries** | 10 | 5.00 | 5.00 | 5.00 | 5.00 | **5.00 / 5.0** |
 | **Programming Tasks** | 10 | 5.00 | 5.00 | 5.00 | 5.00 | **5.00 / 5.0** |
@@ -42,7 +44,7 @@ A 60-interaction evaluation suite (`evaluation/staging_eval_cases.json`) was exe
 | **TOTAL / MEAN** | **60** | **5.00** | **5.00** | **5.00** | **5.00** | **4.98 / 5.0** |
 
 ### Evaluation Criteria Breakdown
-1. **Memory Consistency (5.00 / 5.00)**: Persistent user memories (e.g., Project Orion, Rust microservices, AWS eu-central-1, PostgreSQL 16) were flawlessly injected into the context without cross-user leakage or loss across session boundaries.
+1. **Memory Consistency (5.00 / 5.00)**: Persistent user memories (e.g., Project Orion, Rust microservices, AWS eu-central-1, PostgreSQL 16) were injected into the context without cross-user leakage or loss across session boundaries.
 2. **Adaptation Adherence (4.88 / 5.00)**: Behavioral preferences across the 6 modeled dimensions (`verbosity`, `technical_depth`, `code_examples`, `step_by_step`, `examples`, `tone`) and 6 response strategies were learned and applied accurately once evidence thresholds were achieved.
 3. **Override Correctness (5.00 / 5.00)**: In 10/10 test cases where the user's active prompt contradicted their learned profile (e.g., asking for detailed steps while profiled for conciseness), the prompt's explicit instruction successfully superseded the background policy.
 4. **Tool / Runtime Robustness (5.00 / 5.00)**: Zero crashes, zero unhandled exceptions, and graceful degradation across all operations.

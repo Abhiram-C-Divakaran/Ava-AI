@@ -1,0 +1,169 @@
+{
+  "total_cases": 20,
+  "recall_accuracy_pct": 100.0,
+  "omission_accuracy_pct": 100.0,
+  "false_memory_rate_pct": 0.0,
+  "cross_user_leakage_rate_pct": 0.0,
+  "cases": [
+    {
+      "case_id": "mem_001",
+      "category": "database_engine",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_002",
+      "category": "cloud_provider",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_003",
+      "category": "project_codename",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_004",
+      "category": "programming_language",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_005",
+      "category": "frontend_framework",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_006",
+      "category": "team_size",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_007",
+      "category": "api_protocol",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_008",
+      "category": "auth_standard",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_009",
+      "category": "deployment_region",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_010",
+      "category": "cache_system",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_011",
+      "category": "negative_control",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_012",
+      "category": "negative_control",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_013",
+      "category": "negative_control",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_014",
+      "category": "negative_control",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_015",
+      "category": "negative_control",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_016",
+      "category": "cross_user_isolation",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_017",
+      "category": "cross_user_isolation",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_018",
+      "category": "cross_user_isolation",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_019",
+      "category": "cross_user_isolation",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    },
+    {
+      "case_id": "mem_020",
+      "category": "cross_user_isolation",
+      "recalled": true,
+      "false_memory": false,
+      "cross_user_leakage": false,
+      "status": "PASS"
+    }
+  ]
+}

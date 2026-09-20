@@ -129,5 +129,5 @@
 
 ## 7. Stable Release Verdict
 
-All release readiness verification criteria, staging observation flows, and 60-interaction evaluation benchmarks have been successfully tested and satisfied.  
+All release readiness verification criteria, staging observation flows, and 60-case automated behavioral-policy evaluation benchmarks have been successfully tested and satisfied.  
 **Recommendation**: Ava AI is verified, hardened, and approved for **stable `v1.0.0` production release**.

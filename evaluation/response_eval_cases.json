@@ -1,0 +1,482 @@
+[
+  {
+    "id": "prog_001",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Uses Python 3.12 with asyncio.",
+    "prompt": "How do Python generators maintain state between yield statements?",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_002",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Writes systems software in Rust.",
+    "prompt": "Explain Rust Arc and Mutex memory overhead when sharing state across threads.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_003",
+    "category": "programming",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Builds web applications in TypeScript.",
+    "prompt": "Explain TypeScript conditional types and distributive behavior over naked type parameters.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_004",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "code_examples": true },
+    "stored_memory": "Works with Go microservices.",
+    "prompt": "How do buffered vs unbuffered channels differ during deadlocks in Go?",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_005",
+    "category": "programming",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Builds high-throughput analytics on PostgreSQL.",
+    "prompt": "Write a PostgreSQL window function query calculating 7-day rolling revenue.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_006",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Writes Python data processing pipelines.",
+    "prompt": "Implement an LRU cache decorator using collections.OrderedDict.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_007",
+    "category": "programming",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "intermediate", "code_examples": true },
+    "stored_memory": "Builds Docker containers.",
+    "prompt": "Show how to structure a multi-stage Dockerfile for a production Node.js application.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_008",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Develops in C++20.",
+    "prompt": "How do C++20 coroutine promises and awaitable handles operate?",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_009",
+    "category": "programming",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "intermediate", "code_examples": true },
+    "stored_memory": "Automates cloud deployments.",
+    "prompt": "Write a bash script with robust error handling (set -euo pipefail) to backup a directory.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "prog_0010",
+    "category": "programming",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": true },
+    "stored_memory": "Writes high-performance Python.",
+    "prompt": "Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "concept_001",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Architects distributed systems.",
+    "prompt": "Explain the CAP theorem tradeoffs between Consistency and Partition Tolerance in distributed databases.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_002",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Leads backend architecture.",
+    "prompt": "What is Dependency Injection and how does it decouple unit testing?",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_003",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Database administrator.",
+    "prompt": "Explain the ACID properties of relational databases with concrete concurrency anomalies.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_004",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "code_examples": false },
+    "stored_memory": "Migrating a legacy monolith.",
+    "prompt": "What are the core tradeoffs between microservices and a modular monolith?",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_005",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "API platform engineer.",
+    "prompt": "Compare REST API over-fetching with GraphQL query resolution tradeoffs.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_006",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "code_examples": false },
+    "stored_memory": "Site reliability engineer.",
+    "prompt": "Walk through recursive DNS resolution from root servers to authoritative records.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_007",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Runtimes engineer.",
+    "prompt": "Explain the generational garbage collection hypothesis and how it optimizes heap scanning.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_008",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "code_examples": false },
+    "stored_memory": "Security specialist.",
+    "prompt": "What is the difference between symmetric and asymmetric encryption in TLS key exchanges?",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_009",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Identity and access engineer.",
+    "prompt": "Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concept_010",
+    "category": "conceptual",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "code_examples": false },
+    "stored_memory": "Enterprise systems architect.",
+    "prompt": "Explain Event-Driven Architecture event sourcing vs change data capture.",
+    "constraints": { "requires_code": false }
+  },
+  {
+    "id": "concise_001",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Fast-paced DevOps lead.",
+    "prompt": "What does HTTP status code 429 signify?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_002",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "tone": "direct" },
+    "stored_memory": "Software developer.",
+    "prompt": "Git rebase vs git merge: what is the key difference?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_003",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Network systems engineer.",
+    "prompt": "Explain the TCP 3-way handshake.",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_004",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "tone": "direct" },
+    "stored_memory": "Container platform operator.",
+    "prompt": "Docker volume vs bind mount difference.",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_005",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Database administrator.",
+    "prompt": "What are Redis allkeys-lru vs volatile-lru eviction policies?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_006",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "tone": "direct" },
+    "stored_memory": "Backend developer.",
+    "prompt": "What does API idempotency mean for HTTP POST and PUT?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_007",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "intermediate", "tone": "direct" },
+    "stored_memory": "Release manager.",
+    "prompt": "What are the rules of Semantic Versioning MAJOR.MINOR.PATCH?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_008",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Full stack engineer.",
+    "prompt": "Why do browsers enforce Cross-Origin Resource Sharing (CORS)?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_009",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Concurrency researcher.",
+    "prompt": "What four conditions are necessary for deadlock to occur?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "concise_010",
+    "category": "concise_pref",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced", "tone": "direct" },
+    "stored_memory": "Kernel engineer.",
+    "prompt": "What is the difference between a process and a thread in Linux?",
+    "constraints": { "max_words": 60 }
+  },
+  {
+    "id": "detail_001",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Senior database architect.",
+    "prompt": "How do you plan and execute a zero-downtime database schema migration?",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_002",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Frontend architect.",
+    "prompt": "Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_003",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Infrastructure architect.",
+    "prompt": "Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_004",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Security architect.",
+    "prompt": "How should an enterprise securely implement JWT authentication with token rotation and revocation?",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_005",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Distributed systems engineer.",
+    "prompt": "Walk through Raft consensus leader election and log replication failure recovery.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_006",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Operating systems researcher.",
+    "prompt": "Detail the Linux process lifecycle from fork/exec through zombie and termination.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_007",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "CI/CD platform owner.",
+    "prompt": "How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_008",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Low-level systems programmer.",
+    "prompt": "Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_009",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Database internals specialist.",
+    "prompt": "Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "detail_010",
+    "category": "detailed_pref",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced", "step_by_step": true },
+    "stored_memory": "Network security engineer.",
+    "prompt": "Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.",
+    "constraints": { "min_words": 150 }
+  },
+  {
+    "id": "conflict_001",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": false, "technical_depth": "advanced" },
+    "stored_memory": "Prefers conceptual design discussions without boilerplate code.",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "constraints": { "forbids_code": true }
+  },
+  {
+    "id": "conflict_002",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": true, "technical_depth": "intermediate" },
+    "stored_memory": "Prefers code snippets with each concept.",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "conflict_003",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": false, "technical_depth": "advanced" },
+    "stored_memory": "Prefers architectural explanation.",
+    "prompt": "How does binary search work over sorted arrays?",
+    "constraints": { "forbids_code": true }
+  },
+  {
+    "id": "conflict_004",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": true, "technical_depth": "intermediate" },
+    "stored_memory": "Prefers working code implementations.",
+    "prompt": "How does binary search work over sorted arrays?",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "conflict_005",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": false, "technical_depth": "advanced" },
+    "stored_memory": "Enterprise architect.",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "constraints": { "forbids_code": true }
+  },
+  {
+    "id": "conflict_006",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": true, "technical_depth": "intermediate" },
+    "stored_memory": "Full-stack developer.",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "conflict_007",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": false, "technical_depth": "advanced" },
+    "stored_memory": "Systems analyst.",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "constraints": { "forbids_code": true }
+  },
+  {
+    "id": "conflict_008",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": true, "technical_depth": "intermediate" },
+    "stored_memory": "Backend engineer.",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "conflict_009",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": false, "technical_depth": "advanced" },
+    "stored_memory": "Product architect.",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "constraints": { "forbids_code": true }
+  },
+  {
+    "id": "conflict_010",
+    "category": "code_conflict",
+    "user_profile": { "code_examples": true, "technical_depth": "intermediate" },
+    "stored_memory": "Database developer.",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "constraints": { "requires_code": true }
+  },
+  {
+    "id": "override_001",
+    "category": "override",
+    "user_profile": { "verbosity": "concise", "technical_depth": "advanced" },
+    "stored_memory": "Trained with concise preference.",
+    "prompt": "Explain Kubernetes architecture in deep detail with a comprehensive overview.",
+    "constraints": { "explicit_override": "detailed" }
+  },
+  {
+    "id": "override_002",
+    "category": "override",
+    "user_profile": { "verbosity": "detailed", "technical_depth": "advanced" },
+    "stored_memory": "Trained with detailed preference.",
+    "prompt": "What is WebAssembly? Give me a quick, concise one-paragraph answer.",
+    "constraints": { "explicit_override": "concise" }
+  },
+  {
+    "id": "override_003",
+    "category": "override",
+    "user_profile": { "code_examples": true },
+    "stored_memory": "Trained with code_examples=True.",
+    "prompt": "Explain monads in functional programming. Do not give me code, concept only.",
+    "constraints": { "explicit_override": "no_code" }
+  },
+  {
+    "id": "override_004",
+    "category": "override",
+    "user_profile": { "code_examples": false },
+    "stored_memory": "Trained with code_examples=False.",
+    "prompt": "Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.",
+    "constraints": { "explicit_override": "requires_code" }
+  },
+  {
+    "id": "override_005",
+    "category": "override",
+    "user_profile": { "step_by_step": true },
+    "stored_memory": "Trained with step_by_step=True.",
+    "prompt": "What is the capital of Australia? Just give me the final answer all at once.",
+    "constraints": { "explicit_override": "no_steps" }
+  },
+  {
+    "id": "override_006",
+    "category": "override",
+    "user_profile": { "verbosity": "concise" },
+    "stored_memory": "Trained with concise preference.",
+    "prompt": "Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.",
+    "constraints": { "explicit_override": "detailed" }
+  },
+  {
+    "id": "override_007",
+    "category": "override",
+    "user_profile": { "verbosity": "detailed" },
+    "stored_memory": "Trained with detailed preference.",
+    "prompt": "What port does standard HTTPS use? Keep it short and brief.",
+    "constraints": { "explicit_override": "concise" }
+  },
+  {
+    "id": "override_008",
+    "category": "override",
+    "user_profile": { "code_examples": true },
+    "stored_memory": "Trained with code_examples=True.",
+    "prompt": "What are the security principles behind Zero Trust architecture? No programming code please.",
+    "constraints": { "explicit_override": "no_code" }
+  },
+  {
+    "id": "override_009",
+    "category": "override",
+    "user_profile": { "code_examples": false },
+    "stored_memory": "Trained with code_examples=False.",
+    "prompt": "Show me the exact Python code to compute Fibonacci numbers with memoization.",
+    "constraints": { "explicit_override": "requires_code" }
+  },
+  {
+    "id": "override_010",
+    "category": "override",
+    "user_profile": { "step_by_step": true },
+    "stored_memory": "Trained with step_by_step=True.",
+    "prompt": "What is the boiling point of water at sea level? Skip the steps, just the answer.",
+    "constraints": { "explicit_override": "no_steps" }
+  }
+]

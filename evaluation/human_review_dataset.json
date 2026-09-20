@@ -1,0 +1,422 @@
+[
+  {
+    "case_id": "prog_001",
+    "category": "programming",
+    "prompt": "How do Python generators maintain state between yield statements?",
+    "response_A": "Python generators maintain state via frame objects (`PyFrameObject`) heap-allocated when the generator function is called.\nWhen `yield` executes, the evaluation loop (`_PyEval_EvalFrameDefault`) saves the instruction pointer (`f_lasti`) and local value stack, setting generator state to `GEN_SUSPENDED`.\nOn `__next__()` / `send()`, execution resumes immediately at `f_lasti + 1` within the preserved frame context.\n\n```python\ndef countdown(n):\n    while n > 0:\n        yield n\n        n -= 1\n\ng = countdown(3)\nprint(next(g))  # 3 (state frozen at yield)\nprint(next(g))  # 2\n```",
+    "response_B": "Python generators are functions that allow you to declare a function that behaves like an iterator. Instead of returning a single value with `return`, they use `yield`.\nWhen a generator is called, it returns a generator iterator object without beginning execution. As you iterate over it using a loop or `next()`, Python runs the function until it encounters `yield`.\nIt pauses execution at that point, saving the state of variables, and gives back the yielded value. Next time you request an item, it continues where it left off.\n\nHere is an example:\n```python\ndef my_generator():\n    yield 1\n    yield 2\n    yield 3\n\nfor val in my_generator():\n    print(val)\n```\nGenerators are memory-efficient because they produce items one at a time on demand rather than loading an entire sequence into memory."
+  },
+  {
+    "case_id": "prog_002",
+    "category": "programming",
+    "prompt": "Explain Rust Arc and Mutex memory overhead when sharing state across threads.",
+    "response_A": "`Arc<T>` adds an 8-byte strong count and 8-byte weak count (16 bytes heap overhead per allocation) with atomic increments/decrements (cache line bounce across cores).\n`Mutex<T>` on Linux wraps `pthread_mutex_t` / `futex` (typically 40 bytes overhead) plus an OS futex syscall on contention.\nTotal heap allocation overhead: `Arc::new(Mutex::new(data))` allocates `16B (Arc) + 40B (Mutex) + sizeof(T)` on the heap.\n\n```rust\nuse std::sync::{Arc, Mutex};\nlet shared = Arc::new(Mutex::new(0));\nlet mut guard = shared.lock().unwrap();\n*guard += 1;\n```",
+    "response_B": "In Rust, `Arc<Mutex<T>>` is the standard idiom for safely sharing mutable state across multiple threads.\n`Arc` stands for Atomically Reference Counted. It allows multiple owners of the same data across threads by keeping track of the reference count atomically.\n`Mutex` provides mutual exclusion, ensuring only one thread can access the underlying data at any given time.\nWhen you combine them, `Arc` provides thread-safe shared ownership, while `Mutex` provides interior mutability and synchronized access to prevent data races."
+  },
+  {
+    "case_id": "prog_003",
+    "category": "programming",
+    "prompt": "Explain TypeScript conditional types and distributive behavior over naked type parameters.",
+    "response_A": "TypeScript conditional types take the form `T extends U ? X : Y`. When `T` is a bare type parameter (a 'naked' type parameter), the conditional type automatically distributes over union types:\n1. **Distributive Law**: Given a union `A | B`, evaluating `(A | B) extends U ? X : Y` evaluates as `(A extends U ? X : Y) | (B extends U ? X : Y)`.\n2. **Disabling Distribution**: To prevent distribution and compare the union as an atomic tuple, wrap both sides in square brackets: `[T] extends [U] ? X : Y`.\n3. **Infer Keyword**: Within the `extends` clause, `infer R` introduces a pattern-matched type variable extracted directly from structural positions.\n\n```typescript\n// Distributive: extracts non-nullable types\ntype NonNullableCustom<T> = T extends null | undefined ? never : T;\ntype Result = NonNullableCustom<string | null | number>; // string | number\n\n// Non-distributive tuple comparison\ntype IsUnion<T, U = T> = T extends any ? ([U] extends [T] ? false : true) : never;\n```",
+    "response_B": "TypeScript conditional types allow you to choose types based on conditions, written as `T extends U ? X : Y`.\nWhen you pass a union type to a conditional type, TypeScript distributes the check over each member of the union individually.\nFor example, if you pass `string | number`, it checks `string` first, then checks `number`, and combines the results."
+  },
+  {
+    "case_id": "prog_004",
+    "category": "programming",
+    "prompt": "How do buffered vs unbuffered channels differ during deadlocks in Go?",
+    "response_A": "For a deadlock to occur in a computer system, four necessary conditions known as Coffman conditions must hold simultaneously:\n1. Mutual Exclusion: At least one resource must be held in a non-shareable mode.\n2. Hold and Wait: A process must be currently holding at least one resource and requesting additional resources held by others.\n3. No Preemption: Resources cannot be forcibly confiscated; they can only be released voluntarily.\n4. Circular Wait: A closed chain of processes exists where each process holds resources needed by the next.",
+    "response_B": "Coffman's 4 conditions for deadlock: 1) **Mutual Exclusion**, 2) **Hold and Wait**, 3) **No Preemption**, 4) **Circular Wait**."
+  },
+  {
+    "case_id": "prog_005",
+    "category": "programming",
+    "prompt": "Write a PostgreSQL window function query calculating 7-day rolling revenue.",
+    "response_A": "Here is an overview of Write a PostgreSQL window function query calculating 7-day rolling revenue.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Write a PostgreSQL window function query calculating 7-day rolling revenue.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "prog_006",
+    "category": "programming",
+    "prompt": "Implement an LRU cache decorator using collections.OrderedDict.",
+    "response_A": "Here is an overview of Implement an LRU cache decorator using collections.OrderedDict.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: Implement an LRU cache decorator using collections.OrderedDict. involves structured execution patterns designed for minimal overhead and direct operational predictability.\n```python\n# Implementation snippet\ndef solve():\n    return True\n```"
+  },
+  {
+    "case_id": "prog_007",
+    "category": "programming",
+    "prompt": "Show how to structure a multi-stage Dockerfile for a production Node.js application.",
+    "response_A": "Comprehensive analysis of Show how to structure a multi-stage Dockerfile for a production Node.js application.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Show how to structure a multi-stage Dockerfile for a production Node.js application.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "prog_008",
+    "category": "programming",
+    "prompt": "How do C++20 coroutine promises and awaitable handles operate?",
+    "response_A": "In concise technical terms: How do C++20 coroutine promises and awaitable handles operate? involves structured execution patterns designed for minimal overhead and direct operational predictability.\n```python\n# Implementation snippet\ndef solve():\n    return True\n```",
+    "response_B": "Here is an overview of How do C++20 coroutine promises and awaitable handles operate?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "prog_009",
+    "category": "programming",
+    "prompt": "Write a bash script with robust error handling (set -euo pipefail) to backup a directory.",
+    "response_A": "Comprehensive analysis of Write a bash script with robust error handling (set -euo pipefail) to backup a directory.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Write a bash script with robust error handling (set -euo pipefail) to backup a directory.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "prog_0010",
+    "category": "programming",
+    "prompt": "Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet.",
+    "response_A": "Here is an overview of Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet. involves structured execution patterns designed for minimal overhead and direct operational predictability.\n```python\n# Implementation snippet\ndef solve():\n    return True\n```"
+  },
+  {
+    "case_id": "concept_001",
+    "category": "conceptual",
+    "prompt": "Explain the CAP theorem tradeoffs between Consistency and Partition Tolerance in distributed databases.",
+    "response_A": "The CAP theorem asserts that in a distributed data store subject to network partitions (P), a system must trade off Consistency (C) and Availability (A):\n- **Consistency (Linearizability)**: Every read receives the most recent write or an error. When a partition occurs between nodes, updates to one partition cannot propagate to the other. To maintain consistency, nodes must reject writes, sacrificing Availability (CP systems like ZooKeeper, etcd, Spanner).\n- **Availability**: Every non-failing node returns a non-error response without guaranteeing the latest write. During partitions, nodes accept local writes, resulting in divergent state and stale reads, sacrificing Consistency (AP systems like Cassandra, DynamoDB with eventual consistency).\n- **Partition Tolerance**: Non-negotiable in real physical networks because packet drops and network delays are physically inevitable.",
+    "response_B": "The CAP theorem, introduced by Eric Brewer, states that a distributed system can deliver at most two of three guarantees: Consistency, Availability, and Partition Tolerance.\nIn practical distributed systems, network partitions cannot be prevented due to router failures or cable disconnections. Therefore, when a partition happens, you must choose between Consistency (all nodes see identical data) and Availability (the system keeps responding to users)."
+  },
+  {
+    "case_id": "concept_002",
+    "category": "conceptual",
+    "prompt": "What is Dependency Injection and how does it decouple unit testing?",
+    "response_A": "Dependency Injection is a software design pattern where an object receives other objects that it depends on, rather than creating them inside its own code.\nThis makes your code more modular, maintainable, and flexible. When testing, you can pass mock objects or test doubles instead of real services like databases.",
+    "response_B": "Dependency Injection (DI) is an inversion-of-control technique where objects receive dependencies via constructors or parameters rather than instantiating them internally.\nIn unit testing, DI decouples code from external systems (databases, HTTP APIs) by allowing mock implementations to be injected effortlessly without monkey-patching."
+  },
+  {
+    "case_id": "concept_003",
+    "category": "conceptual",
+    "prompt": "Explain the ACID properties of relational databases with concrete concurrency anomalies.",
+    "response_A": "Here is an overview of Explain the ACID properties of relational databases with concrete concurrency anomalies.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Explain the ACID properties of relational databases with concrete concurrency anomalies.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "concept_004",
+    "category": "conceptual",
+    "prompt": "What are the core tradeoffs between microservices and a modular monolith?",
+    "response_A": "Here is an overview of What are the core tradeoffs between microservices and a modular monolith?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: What are the core tradeoffs between microservices and a modular monolith? involves structured execution patterns designed for minimal overhead and direct operational predictability."
+  },
+  {
+    "case_id": "concept_005",
+    "category": "conceptual",
+    "prompt": "Compare REST API over-fetching with GraphQL query resolution tradeoffs.",
+    "response_A": "Here is an overview of Compare REST API over-fetching with GraphQL query resolution tradeoffs.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Compare REST API over-fetching with GraphQL query resolution tradeoffs.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "concept_006",
+    "category": "conceptual",
+    "prompt": "Walk through recursive DNS resolution from root servers to authoritative records.",
+    "response_A": "In concise technical terms: Walk through recursive DNS resolution from root servers to authoritative records. involves structured execution patterns designed for minimal overhead and direct operational predictability.",
+    "response_B": "Here is an overview of Walk through recursive DNS resolution from root servers to authoritative records.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "concept_007",
+    "category": "conceptual",
+    "prompt": "Explain the generational garbage collection hypothesis and how it optimizes heap scanning.",
+    "response_A": "Here is an overview of Explain the generational garbage collection hypothesis and how it optimizes heap scanning.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Explain the generational garbage collection hypothesis and how it optimizes heap scanning.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "concept_008",
+    "category": "conceptual",
+    "prompt": "What is the difference between symmetric and asymmetric encryption in TLS key exchanges?",
+    "response_A": "In concise technical terms: What is the difference between symmetric and asymmetric encryption in TLS key exchanges? involves structured execution patterns designed for minimal overhead and direct operational predictability.",
+    "response_B": "Here is an overview of What is the difference between symmetric and asymmetric encryption in TLS key exchanges?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "concept_009",
+    "category": "conceptual",
+    "prompt": "Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.",
+    "response_A": "Here is an overview of Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "concept_010",
+    "category": "conceptual",
+    "prompt": "Explain Event-Driven Architecture event sourcing vs change data capture.",
+    "response_A": "In concise technical terms: Explain Event-Driven Architecture event sourcing vs change data capture. involves structured execution patterns designed for minimal overhead and direct operational predictability.",
+    "response_B": "Here is an overview of Explain Event-Driven Architecture event sourcing vs change data capture.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "concise_001",
+    "category": "concise_pref",
+    "prompt": "What does HTTP status code 429 signify?",
+    "response_A": "The HTTP 429 Too Many Requests status response code indicates that the user has sent too many requests in a given amount of time ('rate limiting').\nIt is commonly used by web APIs to protect servers from being overwhelmed by traffic or automated bots. Servers often include a `Retry-After` header indicating how long to wait before making another request.",
+    "response_B": "HTTP 429 Too Many Requests indicates the client has exceeded rate limits within a given timeframe. Inspect the `Retry-After` header for cooldown duration."
+  },
+  {
+    "case_id": "concise_002",
+    "category": "concise_pref",
+    "prompt": "Git rebase vs git merge: what is the key difference?",
+    "response_A": "`merge` preserves historical branch topology by creating a 2-parent merge commit. `rebase` rewrites history by replaying commits sequentially atop the target base, creating a linear history.",
+    "response_B": "The main difference between `git merge` and `git rebase` is how they integrate changes from one branch into another.\n`git merge` creates a new commit that ties together the histories of both branches, preserving the exact history of when commits occurred.\n`git rebase` moves or combines a sequence of commits to a new base commit, creating a clean, linear project history without merge commits."
+  },
+  {
+    "case_id": "concise_003",
+    "category": "concise_pref",
+    "prompt": "Explain the TCP 3-way handshake.",
+    "response_A": "The TCP three-way handshake is the method used by Transmission Control Protocol (TCP) to establish a reliable connection between a client and a server:\nFirst, the client sends a SYN packet to the server to synchronize sequence numbers.\nSecond, the server replies with a SYN-ACK packet acknowledging the client and sending its own sequence number.\nThird, the client sends an ACK packet back to the server. Both ends are now connected and can exchange data reliably.",
+    "response_B": "1. **SYN**: Client sends `SYN=1, seq=x`.\n2. **SYN-ACK**: Server sends `SYN=1, ACK=1, seq=y, ack=x+1`.\n3. **ACK**: Client sends `ACK=1, seq=x+1, ack=y+1` (state: `ESTABLISHED`)."
+  },
+  {
+    "case_id": "concise_004",
+    "category": "concise_pref",
+    "prompt": "Docker volume vs bind mount difference.",
+    "response_A": "Here is an overview of Docker volume vs bind mount difference.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: Docker volume vs bind mount difference. involves structured execution patterns designed for minimal overhead and direct operational predictability."
+  },
+  {
+    "case_id": "concise_005",
+    "category": "concise_pref",
+    "prompt": "What are Redis allkeys-lru vs volatile-lru eviction policies?",
+    "response_A": "In concise technical terms: What are Redis allkeys-lru vs volatile-lru eviction policies? involves structured execution patterns designed for minimal overhead and direct operational predictability.",
+    "response_B": "Here is an overview of What are Redis allkeys-lru vs volatile-lru eviction policies?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "concise_006",
+    "category": "concise_pref",
+    "prompt": "What does API idempotency mean for HTTP POST and PUT?",
+    "response_A": "Here is an overview of What does API idempotency mean for HTTP POST and PUT?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: What does API idempotency mean for HTTP POST and PUT? involves structured execution patterns designed for minimal overhead and direct operational predictability."
+  },
+  {
+    "case_id": "concise_007",
+    "category": "concise_pref",
+    "prompt": "What are the rules of Semantic Versioning MAJOR.MINOR.PATCH?",
+    "response_A": "Here is an overview of What are the rules of Semantic Versioning MAJOR.MINOR.PATCH?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: What are the rules of Semantic Versioning MAJOR.MINOR.PATCH? involves structured execution patterns designed for minimal overhead and direct operational predictability."
+  },
+  {
+    "case_id": "concise_008",
+    "category": "concise_pref",
+    "prompt": "Why do browsers enforce Cross-Origin Resource Sharing (CORS)?",
+    "response_A": "In concise technical terms: Why do browsers enforce Cross-Origin Resource Sharing (CORS)? involves structured execution patterns designed for minimal overhead and direct operational predictability.",
+    "response_B": "Here is an overview of Why do browsers enforce Cross-Origin Resource Sharing (CORS)?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "concise_009",
+    "category": "concise_pref",
+    "prompt": "What four conditions are necessary for deadlock to occur?",
+    "response_A": "Coffman's 4 conditions for deadlock: 1) **Mutual Exclusion**, 2) **Hold and Wait**, 3) **No Preemption**, 4) **Circular Wait**.",
+    "response_B": "For a deadlock to occur in a computer system, four necessary conditions known as Coffman conditions must hold simultaneously:\n1. Mutual Exclusion: At least one resource must be held in a non-shareable mode.\n2. Hold and Wait: A process must be currently holding at least one resource and requesting additional resources held by others.\n3. No Preemption: Resources cannot be forcibly confiscated; they can only be released voluntarily.\n4. Circular Wait: A closed chain of processes exists where each process holds resources needed by the next."
+  },
+  {
+    "case_id": "concise_010",
+    "category": "concise_pref",
+    "prompt": "What is the difference between a process and a thread in Linux?",
+    "response_A": "Here is an overview of What is the difference between a process and a thread in Linux?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "In concise technical terms: What is the difference between a process and a thread in Linux? involves structured execution patterns designed for minimal overhead and direct operational predictability."
+  },
+  {
+    "case_id": "detail_001",
+    "category": "detailed_pref",
+    "prompt": "How do you plan and execute a zero-downtime database schema migration?",
+    "response_A": "Zero-downtime migrations allow continuous availability during schema changes.\nYou first add new database columns without modifying existing ones. Then update application code to write to both old and new columns. After backfilling historical rows, switch read traffic to the new column, and finally delete the deprecated column.",
+    "response_B": "Zero-downtime schema migrations follow the Expand-Contract (Parallel Run) pattern:\n1. **Phase 1 (Expand)**: Add the new column/table as nullable or with safe defaults. Do not alter or drop existing structures. Existing application versions continue writing to old fields.\n2. **Phase 2 (Dual-Write)**: Deploy an application update that writes to both old and new schema locations while reading from the old location.\n3. **Phase 3 (Backfill)**: Run asynchronous background migration jobs to copy existing legacy data into the new schema structure.\n4. **Phase 4 (Switch Reads)**: Deploy an update that reads from the new schema while continuing dual writes.\n5. **Phase 5 (Contract)**: Stop writes to the old columns/tables and safely drop deprecated structures once all services are verified."
+  },
+  {
+    "case_id": "detail_002",
+    "category": "detailed_pref",
+    "prompt": "Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.",
+    "response_A": "Comprehensive analysis of Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "detail_003",
+    "category": "detailed_pref",
+    "prompt": "Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.",
+    "response_A": "Here is an overview of Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "detail_004",
+    "category": "detailed_pref",
+    "prompt": "How should an enterprise securely implement JWT authentication with token rotation and revocation?",
+    "response_A": "Comprehensive analysis of How should an enterprise securely implement JWT authentication with token rotation and revocation?:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of How should an enterprise securely implement JWT authentication with token rotation and revocation?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "detail_005",
+    "category": "detailed_pref",
+    "prompt": "Walk through Raft consensus leader election and log replication failure recovery.",
+    "response_A": "Here is an overview of Walk through Raft consensus leader election and log replication failure recovery.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Walk through Raft consensus leader election and log replication failure recovery.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "detail_006",
+    "category": "detailed_pref",
+    "prompt": "Detail the Linux process lifecycle from fork/exec through zombie and termination.",
+    "response_A": "Here is an overview of Detail the Linux process lifecycle from fork/exec through zombie and termination.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Detail the Linux process lifecycle from fork/exec through zombie and termination.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "detail_007",
+    "category": "detailed_pref",
+    "prompt": "How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?",
+    "response_A": "Comprehensive analysis of How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "detail_008",
+    "category": "detailed_pref",
+    "prompt": "Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.",
+    "response_A": "Comprehensive analysis of Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "detail_009",
+    "category": "detailed_pref",
+    "prompt": "Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.",
+    "response_A": "Comprehensive analysis of Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "detail_010",
+    "category": "detailed_pref",
+    "prompt": "Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.",
+    "response_A": "Here is an overview of Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Comprehensive analysis of Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices."
+  },
+  {
+    "case_id": "conflict_001",
+    "category": "code_conflict",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "response_A": "The Observer pattern establishes a one-to-many dependency where state changes in a Subject automatically notify and update registered Observers.\nKey Architectural Advantages:\n- **Loose Coupling**: Subjects interact strictly through abstract observer interfaces without knowing concrete subscriber classes.\n- **Open/Closed Principle**: New observer types can be registered at runtime without modifying subject implementation.\n- **Event-Driven Decoupling**: Enables reactive architectures where multiple independent components respond to domain events.",
+    "response_B": "The Observer pattern allows an object (the subject) to maintain a list of its dependents (observers) and notify them automatically of any state changes.\nIt promotes loose coupling and is widely used in event handling systems and user interfaces."
+  },
+  {
+    "case_id": "conflict_002",
+    "category": "code_conflict",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "response_A": "The Observer pattern allows an object (the subject) to maintain a list of its dependents (observers) and notify them automatically of any state changes.\nIt promotes loose coupling and is widely used in event handling systems and user interfaces.",
+    "response_B": "The Observer pattern defines a one-to-many subscription model between a Subject and Observers.\n\n```python\nclass Subject:\n    def __init__(self):\n        self._observers = []\n    def attach(self, observer):\n        self._observers.append(observer)\n    def notify(self, data):\n        for obs in self._observers:\n            obs.update(data)\n\nclass ConcreteObserver:\n    def update(self, data):\n        print(f'Received update: {data}')\n\ns = Subject()\ns.attach(ConcreteObserver())\ns.notify('Event triggered')\n```"
+  },
+  {
+    "case_id": "conflict_003",
+    "category": "code_conflict",
+    "prompt": "How does binary search work over sorted arrays?",
+    "response_A": "Here is an overview of How does binary search work over sorted arrays?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of How does binary search work over sorted arrays?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "conflict_004",
+    "category": "code_conflict",
+    "prompt": "How does binary search work over sorted arrays?",
+    "response_A": "Here is an overview of How does binary search work over sorted arrays?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of How does binary search work over sorted arrays?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "conflict_005",
+    "category": "code_conflict",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "response_A": "The Circuit Breaker pattern detects failures and prevents the application from constantly attempting to execute an operation that's likely to fail.\nIt has three states: Closed (requests pass), Open (requests fail immediately without calling downstream), and Half-Open (trial requests to test recovery).",
+    "response_B": "The Circuit Breaker pattern prevents cascading failures in distributed systems by failing fast when downstream services become unhealthy:\n- **Closed State**: Normal operation. Requests route to downstream service. Consecutive errors are tracked.\n- **Open State**: Once failure rate crosses threshold, breaker trips. Requests immediately fail with cached fallback responses, giving downstream services time to recover.\n- **Half-Open State**: After a cooldown period, limited trial requests are allowed through. If successful, breaker resets to Closed; if failures persist, it reverts to Open."
+  },
+  {
+    "case_id": "conflict_006",
+    "category": "code_conflict",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "response_A": "The Circuit Breaker transitions between Closed, Open, and Half-Open states:\n\n```python\nimport time\n\nclass CircuitBreaker:\n    def __init__(self, failure_threshold=3, recovery_time=10):\n        self.threshold = failure_threshold\n        self.recovery = recovery_time\n        self.failures = 0\n        self.state = 'CLOSED'\n        self.last_failure = 0\n\n    def call(self, func, *args):\n        if self.state == 'OPEN':\n            if time.time() - self.last_failure > self.recovery:\n                self.state = 'HALF-OPEN'\n            else:\n                raise RuntimeError('Circuit Breaker OPEN - Fast Fail')\n        try:\n            res = func(*args)\n            self.failures = 0\n            self.state = 'CLOSED'\n            return res\n        except Exception as e:\n            self.failures += 1\n            self.last_failure = time.time()\n            if self.failures >= self.threshold:\n                self.state = 'OPEN'\n            raise e\n```",
+    "response_B": "The Circuit Breaker pattern detects failures and prevents the application from constantly attempting to execute an operation that's likely to fail.\nIt has three states: Closed (requests pass), Open (requests fail immediately without calling downstream), and Half-Open (trial requests to test recovery)."
+  },
+  {
+    "case_id": "conflict_007",
+    "category": "code_conflict",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "response_A": "Here is an overview of How does exponential backoff with jitter prevent thundering herds?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of How does exponential backoff with jitter prevent thundering herds?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "conflict_008",
+    "category": "code_conflict",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "response_A": "Here is an overview of How does exponential backoff with jitter prevent thundering herds?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of How does exponential backoff with jitter prevent thundering herds?:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "conflict_009",
+    "category": "code_conflict",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "response_A": "Here is an overview of Explain how pagination works using offset-based vs cursor-based strategies.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of Explain how pagination works using offset-based vs cursor-based strategies.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "conflict_010",
+    "category": "code_conflict",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "response_A": "Here is an overview of Explain how pagination works using offset-based vs cursor-based strategies.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of Explain how pagination works using offset-based vs cursor-based strategies.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_001",
+    "category": "override",
+    "prompt": "Explain Kubernetes architecture in deep detail with a comprehensive overview.",
+    "response_A": "Comprehensive analysis of Explain Kubernetes architecture in deep detail with a comprehensive overview.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Explain Kubernetes architecture in deep detail with a comprehensive overview.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_002",
+    "category": "override",
+    "prompt": "What is WebAssembly? Give me a quick, concise one-paragraph answer.",
+    "response_A": "WebAssembly (Wasm) is a high-performance, low-level binary instruction format designed as a portable compilation target for languages like C++, Rust, and Go, enabling near-native execution speeds alongside JavaScript inside modern sandboxed web browsers and serverless runtimes.",
+    "response_B": "WebAssembly (Wasm) is a high-performance, low-level binary instruction format designed as a portable compilation target for languages like C++, Rust, and Go, enabling near-native execution speeds alongside JavaScript inside modern sandboxed web browsers and serverless runtimes."
+  },
+  {
+    "case_id": "override_003",
+    "category": "override",
+    "prompt": "Explain monads in functional programming. Do not give me code, concept only.",
+    "response_A": "Here is an overview of Explain monads in functional programming. Do not give me code, concept only.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of Explain monads in functional programming. Do not give me code, concept only.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_004",
+    "category": "override",
+    "prompt": "Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.",
+    "response_A": "Here is an overview of Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_005",
+    "category": "override",
+    "prompt": "What is the capital of Australia? Just give me the final answer all at once.",
+    "response_A": "Canberra.",
+    "response_B": "Canberra."
+  },
+  {
+    "case_id": "override_006",
+    "category": "override",
+    "prompt": "Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.",
+    "response_A": "Comprehensive analysis of Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.:\n1. **Core Fundamentals**: Key architectural mechanisms and operational characteristics.\n2. **Underlying Constraints**: Tradeoffs, edge cases, and performance considerations.\n3. **Production Recommendations**: Industry standards and deployment best practices.",
+    "response_B": "Here is an overview of Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_007",
+    "category": "override",
+    "prompt": "What port does standard HTTPS use? Keep it short and brief.",
+    "response_A": "Port 443.",
+    "response_B": "Port 443."
+  },
+  {
+    "case_id": "override_008",
+    "category": "override",
+    "prompt": "What are the security principles behind Zero Trust architecture? No programming code please.",
+    "response_A": "Here is an overview of What are the security principles behind Zero Trust architecture? No programming code please.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of What are the security principles behind Zero Trust architecture? No programming code please.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_009",
+    "category": "override",
+    "prompt": "Show me the exact Python code to compute Fibonacci numbers with memoization.",
+    "response_A": "Here is an overview of Show me the exact Python code to compute Fibonacci numbers with memoization.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability.",
+    "response_B": "Here is an overview of Show me the exact Python code to compute Fibonacci numbers with memoization.:\nThis is an important concept in software engineering and system design.\nIt involves multiple considerations across implementation, maintenance, and scalability."
+  },
+  {
+    "case_id": "override_010",
+    "category": "override",
+    "prompt": "What is the boiling point of water at sea level? Skip the steps, just the answer.",
+    "response_A": "100 \u00b0C (212 \u00b0F).",
+    "response_B": "100 \u00b0C (212 \u00b0F)."
+  }
+]
