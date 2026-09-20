@@ -65,7 +65,7 @@ python -c "import database as db; print('Integrity:', db.check_database_integrit
 ### Restore Procedure
 Restores database from backup, creates an automatic safety backup of current state, runs any pending migrations, and verifies restored integrity:
 ```bash
-python scripts/restore_db.py --source /backups/ava_backup_20260920.db
+python scripts/restore_db.py /backups/ava_backup_20260920.db --confirm
 ```
 
 ### Schema Version Tracking
@@ -117,22 +117,39 @@ python scripts/load_test.py --base-url http://127.0.0.1:8000 --users 25 --reques
 ```
 
 ### Test Suite Breakdown
-| Suite | File | Tests | Coverage Scope |
-| :--- | :--- | :--- | :--- |
-| **Adaptation** | `test_adaptation.py` | 45 | Preference learning, decays, strategy recovery, policy overrides, multi-user isolation |
-| **Security** | `test_security.py` | 20 | Auth isolation, CSRF/session cookies, rate limiting, SQL injection defense, path traversal |
-| **Reliability** | `test_reliability.py` | 17 | Persistence, backups, restores, schema versioning, retry policies, fallback degradation |
-| **Evaluation** | `evaluation/evaluate_adaptation.py` | 8 | Realistic multi-turn persona evaluation (coders, students, analysts, reversals) |
-| **Smoke Test**| `scripts/smoke_test.py` | 9 | End-to-end operational sanity check (/health, /ready, auth, chat, feedback, logout) |
+| Suite | File | Tests | Status | Coverage Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Adaptation** | `test_adaptation.py` | 45 | **45/45 PASS** | Preference learning, decays, strategy recovery, policy overrides, multi-user isolation |
+| **Security** | `test_security.py` | 22 | **22/22 PASS** | Auth isolation, CSRF/session cookies, rate limiting, SQL injection defense, path traversal, user data deletion, log redaction |
+| **Reliability** | `test_reliability.py` | 19 | **19/19 PASS** | Persistence, backups, restores, schema versioning, retry policies, fallback degradation, provider resilience, version surfacing |
+| **Evaluation** | `evaluation/evaluate_adaptation.py` | 8 | **8/8 PASS** | Realistic multi-turn persona evaluation (coders, students, analysts, reversals) |
+| **Core Smoke** | `scripts/smoke_test.py --offline` | 11 | **11/11 PASS** | End-to-end operational sanity check (/health, /ready, signup, login, session, memory, adaptation, IDOR denial, logout) |
+| **Backup / Restore** | `scripts/verify_backup_restore.py` | CLI | **PASS** | Live hot backup and restore operational execution via subprocess with integrity verification |
+| **Concurrency Load** | `scripts/run_controlled_load_test.py` | 680 reqs | **PASS** | 10, 25, 50 concurrent users: 100% success rate, 0 SQLite lock errors |
 
 ---
 
-## 6. Pre-Flight Sign-Off
+## 6. Pre-Flight Sign-Off & Verification Evidence
 
-- [x] Version declared as `1.0.0-rc1` in `version.py`.
-- [x] Dockerfile configured with non-root user `appuser`, persistent volume paths, and robust healthcheck.
-- [x] All 82 unit tests passing (0 failures, 0 errors).
-- [x] Adaptation quality evaluation 8/8 passing.
-- [x] Deployment smoke test passing.
-- [x] Concurrency load test passing with 0 SQLite lock errors.
-- [x] CI workflow updated and green on GitHub Actions.
+- [x] **Version**: Declared as `1.0.0-rc1` in `version.py`.
+- [x] **Configuration**: `.env.example` (development) and `.env.production.example` (production/Docker) clearly separated.
+- [x] **Restore CLI**: Canonical command `python scripts/restore_db.py <backup_file> --confirm` documented everywhere.
+- [x] **Dockerfile**: Hardened non-root user `appuser`, persistent volume path `/app/data`, and healthcheck probe.
+- [x] **All Automated Tests**: 86 / 86 passing (0 failures, 0 errors across adaptation, security, and reliability).
+- [x] **Adaptation Quality Evaluation**: 8 / 8 scenarios passing.
+- [x] **Operational Smoke Test**: 11 / 11 verification steps passing (`scripts/smoke_test.py --offline`).
+- [x] **Docker Volume Persistence**: Verified across container recreation (`scripts/test_docker_persistence.sh`).
+- [x] **Operational Hot Backup & Restore**: Live subprocess CLI execution verified (`scripts/verify_backup_restore.py`).
+- [x] **Controlled Concurrency Load Test**:
+  - *Date*: 2026-09-20 09:15:06 UTC
+  - *Environment*: Local WAL SQLite, mocked LLM inference
+  - *Concurrency*: 10, 25, 50 concurrent users
+  - *Request Count*: 680 total requests
+  - *Error Rate*: 0.0% (100.0% success rate across all tiers)
+  - *SQLite Lock Errors*: **0**
+  - *Latency Results*:
+    - 10 users: avg 154.89ms | p50 146.46ms | p95 326.73ms | p99 424.31ms
+    - 25 users: avg 289.28ms | p50 185.56ms | p95 1108.59ms | p99 1872.07ms
+    - 50 users: avg 541.75ms | p50 377.54ms | p95 2033.54ms | p99 4064.51ms
+- [x] **CI Pipeline**: Two-stage GitHub Actions pipeline (`test` -> `docker-smoke`) defined in `.github/workflows/tests.yml`.
+- [x] **Release Verification Report**: Documented in `RELEASE_VERIFICATION.md`.

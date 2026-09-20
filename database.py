@@ -851,6 +851,8 @@ def delete_user_data(user_id: str) -> None:
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM documents WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM user_memory WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM adaptation_profiles WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM adaptation_strategy_stats WHERE user_id = ?", (user_id,))
 
 # ─── Cross-session user memory (Claude-style persistent memory) ───────────────
 def get_user_memory(user_id: str) -> dict:

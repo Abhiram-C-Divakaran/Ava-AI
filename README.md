@@ -174,10 +174,16 @@ Phase 4 introduces rigorous production hardening across all layers of the applic
    ```
 
 4. **Configure environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` to provide your `GROQ_API_KEY` and a cryptographically secure `SECRET_KEY`.
+   - For local development:
+     ```bash
+     cp .env.example .env
+     ```
+     Edit `.env` to provide your `GROQ_API_KEY` and a cryptographically secure `SECRET_KEY`.
+   - For production Docker deployments:
+     ```bash
+     cp .env.production.example .env.production
+     ```
+     Ensure `DB_PATH`, `UPLOAD_DIR`, and `REVIEW_IMAGE_DIR` map to `/app/data/...` persistent volume storage.
 
 ---
 
@@ -251,17 +257,17 @@ Safely backup the active SQLite database without taking Ava offline, and restore
 python scripts/backup_db.py --dest /backups/ava_backup_$(date +%Y%m%d_%H%M%S).db
 
 # Safe restore with integrity check and migrations
-python scripts/restore_db.py --source /backups/ava_backup.db
+python scripts/restore_db.py /backups/ava_backup.db --confirm
 ```
 
 ### Health, Readiness & Metrics Endpoints
-- **Liveness**: `GET /health` -> `{"status": "ok"}`
+- **Liveness**: `GET /health` -> `{"status": "ok", "version": "1.0.0-rc1"}`
 - **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.0-rc1", "database": "connected", "storage": "writable"}`
 - **Operational Metrics**: `GET /api/metrics` (Admin authenticated, returns counters, latencies, and uptime)
 
 ---
 
-## 8. Docker Deployment
+## 8. Docker Deployment & Reverse Proxy Setup
 
 A hardened multi-stage production Dockerfile is included:
 ```bash
@@ -279,6 +285,11 @@ docker run -d \
   --name ava-app \
   ava-ai:1.0.0-rc1
 ```
+
+### Reverse Proxy & Rate Limiting Behind Proxies
+When deploying Ava behind a reverse proxy (e.g. Nginx, Cloudflare, Traefik, Caddy, AWS ALB, Render, Railway, Fly.io):
+- **Rate Limiting**: Authenticated requests are rate-limited per user ID (`user:{user_id}`). Unauthenticated requests (e.g., signup/login) are rate-limited by IP (`ip:{client_ip}`).
+- **Trusted Proxies**: Do not blindly trust spoofable `X-Forwarded-For` headers from untrusted clients. Configure your upstream proxy (e.g., Nginx `proxy_set_header X-Forwarded-For $remote_addr;` or Uvicorn `--proxy-headers --forwarded-allow-ips`) to safely map real client IPs.
 
 ---
 

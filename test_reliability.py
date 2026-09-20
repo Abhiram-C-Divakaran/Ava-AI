@@ -347,6 +347,42 @@ class TestOperationalReliability(unittest.TestCase):
         resp_unauth = unauth_client.get("/api/metrics")
         self.assertEqual(resp_unauth.status_code, 401)
 
+    # 18. Optional provider absence resilience
+    def test_18_optional_providers_absence_resilience(self):
+        """Ava starts and reports ready even if optional external integration keys are unset."""
+        from version import __version__
+        with patch.dict(os.environ, {
+            "BRAVE_API_KEY": "",
+            "DEEPL_API_KEY": "",
+            "REPLICATE_API_KEY": "",
+            "GOOGLE_CLIENT_ID": "",
+            "GOOGLE_CLIENT_SECRET": ""
+        }, clear=False):
+            client = TestClient(app)
+            # Health check succeeds
+            resp_health = client.get("/health")
+            self.assertEqual(resp_health.status_code, 200)
+            self.assertEqual(resp_health.json().get("status"), "ok")
+
+            # Readiness probe succeeds
+            resp_ready = client.get("/ready")
+            self.assertEqual(resp_ready.status_code, 200)
+            self.assertEqual(resp_ready.json().get("status"), "ready")
+
+    # 19. Version surfacing on /health and /ready
+    def test_19_version_surfacing_on_health_and_ready(self):
+        """Both /health and /ready endpoints surface the canonical __version__."""
+        from version import __version__
+        client = TestClient(app)
+        resp_health = client.get("/health")
+        self.assertEqual(resp_health.status_code, 200)
+        self.assertEqual(resp_health.json().get("version"), __version__)
+
+        resp_ready = client.get("/ready")
+        self.assertEqual(resp_ready.status_code, 200)
+        self.assertEqual(resp_ready.json().get("version"), __version__)
+
 
 if __name__ == "__main__":
     unittest.main()
+

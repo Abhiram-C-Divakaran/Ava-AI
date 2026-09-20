@@ -1,0 +1,45 @@
+{
+  "benchmark_results": [
+    {
+      "users": 10,
+      "total_requests": 80,
+      "duration_sec": 1.4,
+      "throughput_rps": 57.2,
+      "success_rate_pct": 100.0,
+      "error_rate_pct": 0.0,
+      "avg_ms": 154.89,
+      "p50_ms": 146.46,
+      "p95_ms": 326.73,
+      "p99_ms": 424.31,
+      "sqlite_lock_errors": 0
+    },
+    {
+      "users": 25,
+      "total_requests": 200,
+      "duration_sec": 3.21,
+      "throughput_rps": 62.3,
+      "success_rate_pct": 100.0,
+      "error_rate_pct": 0.0,
+      "avg_ms": 289.28,
+      "p50_ms": 185.56,
+      "p95_ms": 1108.59,
+      "p99_ms": 1872.07,
+      "sqlite_lock_errors": 0
+    },
+    {
+      "users": 50,
+      "total_requests": 400,
+      "duration_sec": 6.01,
+      "throughput_rps": 66.5,
+      "success_rate_pct": 100.0,
+      "error_rate_pct": 0.0,
+      "avg_ms": 541.75,
+      "p50_ms": 377.54,
+      "p95_ms": 2033.54,
+      "p99_ms": 4064.51,
+      "sqlite_lock_errors": 0
+    }
+  ],
+  "integrity": "ok",
+  "date": "2026-09-20 09:15:06 UTC"
+}

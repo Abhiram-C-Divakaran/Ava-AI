@@ -77,6 +77,8 @@ def rate_limit_key(request: Request) -> str:
     return f"ip:{get_remote_address(request)}"
 
 limiter = Limiter(key_func=rate_limit_key)
+if config.ENVIRONMENT != "production" and os.environ.get("DISABLE_RATE_LIMIT", "").lower() in ("true", "1"):
+    limiter.enabled = False
 
 # OAuth
 from authlib.integrations.starlette_client import OAuth, OAuthError
@@ -141,7 +143,7 @@ async def correlation_id_middleware(request: Request, call_next):
 # ─── Health & Readiness Endpoints ──────────────────────────────────────────
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "version": __version__}
 
 @app.get("/ready")
 def ready_check():
