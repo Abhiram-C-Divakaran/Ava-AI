@@ -11,8 +11,9 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from cache import prefs_cache  # assuming cache.py exists
+import config
 
-DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "neurosupport.db"))
+DB_PATH = config.DB_PATH
 
 @contextmanager
 def get_conn():
@@ -29,187 +30,316 @@ def get_conn():
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+def check_database_integrity(target_path: str | None = None) -> str:
+    """Run PRAGMA integrity_check returning 'ok' or error message."""
+    if target_path:
+        try:
+            conn = sqlite3.connect(target_path, timeout=5.0)
+            cursor = conn.execute("PRAGMA integrity_check;")
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row else "unknown"
+        except Exception as e:
+            return f"error: {str(e)}"
+    with get_conn() as conn:
+        cursor = conn.execute("PRAGMA integrity_check;")
+        row = cursor.fetchone()
+        return row[0] if row else "unknown"
+
+def backup_database(destination_path: str) -> str:
+    """Safely create an online SQLite backup of DB_PATH using SQLite's native backup API."""
+    dest_dir = os.path.dirname(os.path.abspath(destination_path)) or "."
+    os.makedirs(dest_dir, exist_ok=True)
+    with get_conn() as src_conn:
+        dest_conn = sqlite3.connect(destination_path)
+        try:
+            with dest_conn:
+                src_conn.backup(dest_conn)
+        finally:
+            dest_conn.close()
+    return destination_path
+
+def restore_database(backup_path: str, create_safety_backup: bool = True) -> dict:
+    """
+    Validate and restore an SQLite backup into DB_PATH.
+    1. Validates backup SQLite file exists and passes integrity check.
+    2. Creates timestamped safety backup of current database.
+    3. Restores backup into current database.
+    4. Runs init_db() schema migrations.
+    5. Verifies integrity.
+    """
+    if not os.path.exists(backup_path):
+        raise FileNotFoundError(f"Backup file not found: {backup_path}")
+
+    # 1. Validate backup file integrity
+    chk_conn = sqlite3.connect(backup_path)
+    try:
+        res = chk_conn.execute("PRAGMA integrity_check;").fetchone()
+        if not res or res[0] != "ok":
+            raise ValueError(f"Backup database failed integrity check: {res[0] if res else 'empty'}")
+    finally:
+        chk_conn.close()
+
+    # 2. Safety backup of current database if exists and has content
+    safety_backup_path = None
+    if create_safety_backup and os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        safety_backup_path = f"{DB_PATH}.safety_{ts}.bak"
+        backup_database(safety_backup_path)
+
+    # 3. Restore backup into DB_PATH using SQLite backup API
+    src_conn = sqlite3.connect(backup_path)
+    try:
+        with get_conn() as dest_conn:
+            with dest_conn:
+                src_conn.backup(dest_conn)
+    finally:
+        src_conn.close()
+
+    # 4. Run migrations to ensure up to date schema
+    init_db()
+
+    # 5. Verify integrity of newly restored DB
+    integrity = check_database_integrity()
+    if integrity != "ok":
+        raise RuntimeError(f"Restored database integrity check failed: {integrity}")
+
+    return {
+        "status": "restored",
+        "backup_source": backup_path,
+        "safety_backup": safety_backup_path,
+        "integrity": integrity
+    }
+
+def get_applied_migrations() -> list[dict]:
+    """Retrieve all recorded schema migrations."""
+    with get_conn() as conn:
+        try:
+            rows = conn.execute("SELECT version, description, applied_at FROM schema_migrations ORDER BY version ASC").fetchall()
+            return [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            return []
+
 def init_db():
     with get_conn() as conn:
         try:
             conn.execute("PRAGMA journal_mode = WAL")
         except sqlite3.OperationalError:
             pass
-        conn.executescript(
+
+        # Ensure schema_migrations table exists
+        conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS users (
-                user_id        TEXT PRIMARY KEY,
-                name           TEXT NOT NULL,
-                email          TEXT UNIQUE NOT NULL,
-                password_hash  TEXT NOT NULL,
-                password_salt  TEXT NOT NULL,
-                created_at     TEXT NOT NULL,
-                custom_instructions TEXT,
-                personality    TEXT DEFAULT 'friendly',
-                preferences    TEXT DEFAULT '{"theme":"light"}',
-                is_admin       INTEGER DEFAULT 0,
-                terms_accepted INTEGER DEFAULT 0,
-                terms_accepted_date TEXT
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version     INTEGER PRIMARY KEY,
+                description TEXT NOT NULL,
+                applied_at  TEXT NOT NULL
             );
-
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id   TEXT PRIMARY KEY,
-                user_id      TEXT NOT NULL,
-                title        TEXT,
-                created_at   TEXT NOT NULL,
-                last_active  TEXT NOT NULL,
-                pinned       INTEGER DEFAULT 0,
-                share_token  TEXT UNIQUE,
-                summary      TEXT,
-                summary_through_count INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
-                message_id      TEXT PRIMARY KEY,
-                session_id      TEXT NOT NULL,
-                user_id         TEXT NOT NULL,
-                user_message    TEXT NOT NULL,
-                agent_response  TEXT NOT NULL,
-                intent          TEXT,
-                sentiment_label TEXT,
-                sentiment_score REAL,
-                frustration     REAL,
-                latency_ms      INTEGER,
-                created_at      TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS feedback (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     TEXT NOT NULL,
-                session_id  TEXT NOT NULL,
-                message_id  TEXT NOT NULL,
-                helpful     INTEGER NOT NULL,
-                created_at  TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS failed_solutions (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     TEXT NOT NULL,
-                session_id  TEXT NOT NULL,
-                solution    TEXT NOT NULL,
-                created_at  TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS documents (
-                doc_id          TEXT PRIMARY KEY,
-                user_id         TEXT NOT NULL,
-                filename        TEXT NOT NULL,
-                file_path       TEXT NOT NULL,
-                extracted_text  TEXT,
-                created_at      TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS user_memory (
-                user_id         TEXT PRIMARY KEY,
-                memory_text     TEXT NOT NULL DEFAULT '',
-                updated_at      TEXT NOT NULL,
-                message_count_at_update INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS reviews (
-                review_id       TEXT PRIMARY KEY,
-                reviewer_name   TEXT NOT NULL,
-                reviewer_title  TEXT,
-                rating          INTEGER NOT NULL,
-                review_text     TEXT NOT NULL,
-                image_path      TEXT,
-                status          TEXT NOT NULL DEFAULT 'pending',
-                featured        INTEGER NOT NULL DEFAULT 0,
-                created_at      TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id);
-            CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
-            CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-            CREATE INDEX IF NOT EXISTS idx_failed_user ON failed_solutions(user_id);
-            CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
-
-            CREATE TABLE IF NOT EXISTS adaptation_profiles (
-                user_id                TEXT PRIMARY KEY,
-                profile_json           TEXT NOT NULL,
-                updated_at             TEXT NOT NULL,
-                interaction_count      INTEGER NOT NULL DEFAULT 0,
-                adapted_response_count INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
-                user_id         TEXT NOT NULL,
-                strategy        TEXT NOT NULL,
-                successes       INTEGER NOT NULL DEFAULT 0,
-                failures        INTEGER NOT NULL DEFAULT 0,
-                last_updated    TEXT,
-                last_success_at TEXT,
-                last_failure_at TEXT,
-                PRIMARY KEY (user_id, strategy)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_adaptation_stats_user ON adaptation_strategy_stats(user_id);
             """
         )
 
-        # ----- MIGRATIONS for existing databases -----
-        # Add missing columns to sessions (if they don't exist)
-        try:
-            conn.execute("ALTER TABLE sessions ADD COLUMN summary TEXT")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE sessions ADD COLUMN summary_through_count INTEGER NOT NULL DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
+        def is_applied(v: int) -> bool:
+            row = conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (v,)).fetchone()
+            return row is not None
 
-        # Add missing columns to reviews (if they don't exist)
-        try:
-            conn.execute("ALTER TABLE reviews ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE reviews ADD COLUMN featured INTEGER NOT NULL DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
+        def record_migration(v: int, desc: str):
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)",
+                (v, desc, _now())
+            )
 
-        # Add is_admin column to users if not exists
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
+        # Migration 1: Initial core schema
+        if not is_applied(1):
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id        TEXT PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    email          TEXT UNIQUE NOT NULL,
+                    password_hash  TEXT NOT NULL,
+                    password_salt  TEXT NOT NULL,
+                    created_at     TEXT NOT NULL,
+                    custom_instructions TEXT,
+                    personality    TEXT DEFAULT 'friendly',
+                    preferences    TEXT DEFAULT '{"theme":"light"}',
+                    is_admin       INTEGER DEFAULT 0,
+                    terms_accepted INTEGER DEFAULT 0,
+                    terms_accepted_date TEXT
+                );
 
-        # Add terms acceptance columns to users if not exists
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN terms_accepted_date TEXT")
-        except sqlite3.OperationalError:
-            pass
+                CREATE TABLE IF NOT EXISTS sessions (
+                    session_id   TEXT PRIMARY KEY,
+                    user_id      TEXT NOT NULL,
+                    title        TEXT,
+                    created_at   TEXT NOT NULL,
+                    last_active  TEXT NOT NULL,
+                    pinned       INTEGER DEFAULT 0,
+                    share_token  TEXT UNIQUE,
+                    summary      TEXT,
+                    summary_through_count INTEGER NOT NULL DEFAULT 0
+                );
 
-        # Add missing columns to adaptation_strategy_stats (if they don't exist)
-        try:
-            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_updated TEXT")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_success_at TEXT")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE adaptation_strategy_stats ADD COLUMN last_failure_at TEXT")
-        except sqlite3.OperationalError:
-            pass
+                CREATE TABLE IF NOT EXISTS messages (
+                    message_id      TEXT PRIMARY KEY,
+                    session_id      TEXT NOT NULL,
+                    user_id         TEXT NOT NULL,
+                    user_message    TEXT NOT NULL,
+                    agent_response  TEXT NOT NULL,
+                    intent          TEXT,
+                    sentiment_label TEXT,
+                    sentiment_score REAL,
+                    frustration     REAL,
+                    latency_ms      INTEGER,
+                    created_at      TEXT NOT NULL
+                );
 
-        # Add adapted_response_count column to adaptation_profiles (if it doesn't exist)
-        try:
-            conn.execute("ALTER TABLE adaptation_profiles ADD COLUMN adapted_response_count INTEGER NOT NULL DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id     TEXT NOT NULL,
+                    session_id  TEXT NOT NULL,
+                    message_id  TEXT NOT NULL,
+                    helpful     INTEGER NOT NULL,
+                    created_at  TEXT NOT NULL
+                );
 
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status)")
+                CREATE TABLE IF NOT EXISTS failed_solutions (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id     TEXT NOT NULL,
+                    session_id  TEXT NOT NULL,
+                    solution    TEXT NOT NULL,
+                    created_at  TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS documents (
+                    doc_id          TEXT PRIMARY KEY,
+                    user_id         TEXT NOT NULL,
+                    filename        TEXT NOT NULL,
+                    file_path       TEXT NOT NULL,
+                    extracted_text  TEXT,
+                    created_at      TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS user_memory (
+                    user_id         TEXT PRIMARY KEY,
+                    memory_text     TEXT NOT NULL DEFAULT '',
+                    updated_at      TEXT NOT NULL,
+                    message_count_at_update INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS reviews (
+                    review_id       TEXT PRIMARY KEY,
+                    reviewer_name   TEXT NOT NULL,
+                    reviewer_title  TEXT,
+                    rating          INTEGER NOT NULL,
+                    review_text     TEXT NOT NULL,
+                    image_path      TEXT,
+                    status          TEXT NOT NULL DEFAULT 'pending',
+                    featured        INTEGER NOT NULL DEFAULT 0,
+                    created_at      TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS adaptation_profiles (
+                    user_id                TEXT PRIMARY KEY,
+                    profile_json           TEXT NOT NULL,
+                    updated_at             TEXT NOT NULL,
+                    interaction_count      INTEGER NOT NULL DEFAULT 0,
+                    adapted_response_count INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
+                    user_id         TEXT NOT NULL,
+                    strategy        TEXT NOT NULL,
+                    successes       INTEGER NOT NULL DEFAULT 0,
+                    failures        INTEGER NOT NULL DEFAULT 0,
+                    last_updated    TEXT,
+                    last_success_at TEXT,
+                    last_failure_at TEXT,
+                    PRIMARY KEY (user_id, strategy)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_messages_user    ON messages(user_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+                CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
+                CREATE INDEX IF NOT EXISTS idx_failed_user      ON failed_solutions(user_id);
+                CREATE INDEX IF NOT EXISTS idx_documents_user   ON documents(user_id);
+                CREATE INDEX IF NOT EXISTS idx_adaptation_stats_user ON adaptation_strategy_stats(user_id);
+                CREATE INDEX IF NOT EXISTS idx_reviews_status   ON reviews(status);
+                """
+            )
+            # Guarded column additions for users & reviews if migrated from ancient DB
+            for sql in [
+                "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN terms_accepted_date TEXT",
+                "ALTER TABLE reviews ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'",
+                "ALTER TABLE reviews ADD COLUMN featured INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE user_memory ADD COLUMN message_count_at_update INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE messages ADD COLUMN sentiment_label TEXT",
+                "ALTER TABLE messages ADD COLUMN sentiment_score REAL",
+            ]:
+                try:
+                    conn.execute(sql)
+                except sqlite3.OperationalError:
+                    pass
+            record_migration(1, "Initial core schema")
+
+        # Migration 2: Session summaries and pins
+        if not is_applied(2):
+            for sql in [
+                "ALTER TABLE sessions ADD COLUMN summary TEXT",
+                "ALTER TABLE sessions ADD COLUMN summary_through_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE sessions ADD COLUMN pinned INTEGER DEFAULT 0",
+            ]:
+                try:
+                    conn.execute(sql)
+                except sqlite3.OperationalError:
+                    pass
+            record_migration(2, "Session summaries and pin metadata")
+
+        # Migration 3: Adaptation profiles and strategy stats
+        if not is_applied(3):
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS adaptation_profiles (
+                    user_id                TEXT PRIMARY KEY,
+                    profile_json           TEXT NOT NULL,
+                    updated_at             TEXT NOT NULL,
+                    interaction_count      INTEGER NOT NULL DEFAULT 0,
+                    adapted_response_count INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS adaptation_strategy_stats (
+                    user_id         TEXT NOT NULL,
+                    strategy        TEXT NOT NULL,
+                    successes       INTEGER NOT NULL DEFAULT 0,
+                    failures        INTEGER NOT NULL DEFAULT 0,
+                    last_updated    TEXT,
+                    last_success_at TEXT,
+                    last_failure_at TEXT,
+                    PRIMARY KEY (user_id, strategy)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_adaptation_stats_user ON adaptation_strategy_stats(user_id);
+                """
+            )
+            record_migration(3, "Behavioral adaptation profiles and strategy stats")
+
+        # Migration 4: Strategy timestamps
+        if not is_applied(4):
+            for col in ["last_updated TEXT", "last_success_at TEXT", "last_failure_at TEXT"]:
+                try:
+                    conn.execute(f"ALTER TABLE adaptation_strategy_stats ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass
+            record_migration(4, "Strategy evidence timestamps for independent decay")
+
+        # Migration 5: Adapted response count
+        if not is_applied(5):
+            try:
+                conn.execute("ALTER TABLE adaptation_profiles ADD COLUMN adapted_response_count INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            record_migration(5, "Adapted response count tracking")
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 def _hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
@@ -244,6 +374,8 @@ def get_user_by_id(user_id: str) -> dict | None:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
+
+get_user = get_user_by_id
 
 def email_exists(email: str) -> bool:
     return get_user_by_email(email) is not None
@@ -719,6 +851,8 @@ def delete_user_data(user_id: str) -> None:
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM documents WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM user_memory WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM adaptation_profiles WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM adaptation_strategy_stats WHERE user_id = ?", (user_id,))
 
 # ─── Cross-session user memory (Claude-style persistent memory) ───────────────
 def get_user_memory(user_id: str) -> dict:

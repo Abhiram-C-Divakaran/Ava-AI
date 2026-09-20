@@ -456,19 +456,26 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
     
     for attempt in range(max_retries):
         try:
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=(5.0, 30.0))
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"].strip()
-            elif response.status_code == 429:
-                wait = 2 ** attempt
+            elif response.status_code in (429, 502, 503, 504):
+                if attempt == max_retries - 1:
+                    raise ValueError(f"Groq API transient error {response.status_code}: {response.text}")
+                wait = min(2 ** attempt, 4)
                 time.sleep(wait)
                 continue
+            elif 400 <= response.status_code < 500:
+                # Do not retry non-transient client errors
+                raise ValueError(f"Groq API client error {response.status_code}: {response.text}")
             else:
-                raise ValueError(f"Groq API error {response.status_code}: {response.text}")
-        except requests.Timeout:
+                if attempt == max_retries - 1:
+                    raise ValueError(f"Groq API error {response.status_code}: {response.text}")
+                time.sleep(1)
+        except (requests.Timeout, requests.ConnectionError) as e:
             if attempt == max_retries - 1:
-                raise ValueError("Groq API timed out after 30s")
-            time.sleep(1)
+                raise ValueError(f"Groq API request failed after {max_retries} attempts: {str(e)}")
+            time.sleep(min(2 ** attempt, 2))
     
     raise ValueError("Max retries exceeded")
 
@@ -518,7 +525,10 @@ def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: 
     }
     
     try:
-        with requests.post(API_URL, headers=headers, json=payload, stream=True, timeout=60) as resp:
+        with requests.post(API_URL, headers=headers, json=payload, stream=True, timeout=(5.0, 60.0)) as resp:
+            if resp.status_code != 200:
+                yield f"I encountered an issue contacting the AI provider ({resp.status_code})."
+                return
             for line in resp.iter_lines():
                 if line:
                     line = line.decode("utf-8")
@@ -531,8 +541,8 @@ def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: 
                                 yield delta
                         except Exception:
                             continue
-    except Exception as e:
-        yield f"[Streaming error: {str(e)}]"
+    except Exception:
+        yield "I encountered an error processing your request."
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

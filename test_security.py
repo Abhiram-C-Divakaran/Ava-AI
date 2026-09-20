@@ -327,6 +327,99 @@ class TestSecurityHardened(unittest.TestCase):
         r6 = client_a.get("/api/admin/reviews")
         self.assertEqual(r6.status_code, 401)
 
+    # 21. Complete user data deletion flow
+    def test_21_complete_user_data_deletion_flow(self):
+        """Validates granular deletion controls vs full user data deletion."""
+        user_del = f"user_del_{uuid.uuid4().hex[:8]}"
+        db.create_user(user_del, name="Del User", email=f"{user_del}@example.com", password="del_password")
+
+        # Seed messages, session, memory, adaptation, strategy stats, feedback, document
+        sess_id = f"sess_{uuid.uuid4().hex[:8]}"
+        db.create_session(sess_id, user_del, title="Del Session")
+        msg_id = f"msg_{uuid.uuid4().hex[:8]}"
+        db.save_message(
+            message_id=msg_id,
+            session_id=sess_id,
+            user_id=user_del,
+            user_message="User question",
+            agent_response="Agent answer",
+            intent="general_inquiry",
+            sentiment={"label": "neutral", "score": 0.5},
+            frustration=0.0,
+            latency_ms=15,
+        )
+        db.set_user_memory(user_del, "User prefers concise python", 1)
+        db.set_adaptation_profile(user_del, {"verbosity": 0.3}, interaction_count=4)
+        db.record_strategy_feedback(user_del, "code_first", True)
+        db.save_feedback(user_del, sess_id, msg_id, True)
+        db.save_document(f"doc_{uuid.uuid4().hex[:8]}", user_del, "file.txt", "/path/file.txt", "extracted text")
+
+        # Step A: Clear factual memory only
+        db.clear_user_memory(user_del)
+        mem = db.get_user_memory(user_del)
+        self.assertEqual(mem.get("memory_text"), "")
+        # Verify adaptation and session are NOT touched
+        self.assertEqual(db.get_adaptation_profile(user_del)["interaction_count"], 4)
+        self.assertEqual(len(db.get_sessions_for_user(user_del)), 1)
+
+        # Step B: Reset adaptation profile only
+        db.clear_adaptation_profile(user_del)
+        self.assertIsNone(db.get_adaptation_profile(user_del))
+        # Verify session and document still exist
+        self.assertEqual(len(db.get_sessions_for_user(user_del)), 1)
+        self.assertEqual(len(db.get_user_documents(user_del)), 1)
+
+        # Step C: Delete session only
+        db.delete_session(user_del, sess_id)
+        self.assertEqual(len(db.get_sessions_for_user(user_del)), 0)
+        self.assertEqual(len(db.get_user_documents(user_del)), 1)
+
+        # Step D: Delete all user data
+        db.delete_user_data(user_del)
+        self.assertEqual(len(db.get_user_documents(user_del)), 0)
+        self.assertEqual(len(db.get_all_messages(user_del)), 0)
+        self.assertEqual(db.get_strategy_stats(user_del), {})
+        with db.get_conn() as conn:
+            fb_count = conn.execute("SELECT COUNT(*) FROM feedback WHERE user_id = ?", (user_del,)).fetchone()[0]
+            self.assertEqual(fb_count, 0)
+
+    # 22. Check log redaction for secret sentinels
+    def test_22_log_redaction_secrets(self):
+        """Asserts structured log_event strips password, token, and secret sentinels."""
+        import io
+        import logging
+        from main import logger, log_event
+
+        sentinel_pass = "TEST_PASSWORD_SECRET"
+        sentinel_bearer = "TEST_BEARER_SECRET"
+        sentinel_groq = "TEST_GROQ_SECRET"
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger.addHandler(handler)
+        try:
+            log_event(
+                "test_auth_event",
+                user_id="user_123",
+                password=sentinel_pass,
+                token=sentinel_bearer,
+                access_token=sentinel_bearer,
+                secret=sentinel_groq,
+                authorization=f"Bearer {sentinel_bearer}",
+                status="success"
+            )
+            handler.flush()
+            output = log_capture.getvalue()
+
+            self.assertNotIn(sentinel_pass, output)
+            self.assertNotIn(sentinel_bearer, output)
+            self.assertNotIn(sentinel_groq, output)
+            self.assertIn("test_auth_event", output)
+            self.assertIn("user_123", output)
+        finally:
+            logger.removeHandler(handler)
+
 
 if __name__ == "__main__":
     unittest.main()
+

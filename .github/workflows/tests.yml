@@ -2,13 +2,13 @@ name: CI Tests
 
 on:
   push:
-    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening ]
+    branches: [ main, phase-3-closed-loop-learning, phase-4-production-hardening, phase-5-release-readiness ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: Run Unit Tests & Static Compilation
+    name: Run Unit Tests, Reliability Suite & Static Compilation
     runs-on: ubuntu-latest
 
     env:
@@ -35,12 +35,116 @@ jobs:
 
       - name: Static compilation check
         run: |
-          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py test_adaptation.py test_security.py
+          python -m py_compile main.py database.py memory.py adaptation.py powers.py llm.py MLpipeline.py config.py version.py metrics.py test_adaptation.py test_security.py test_reliability.py evaluation/evaluate_adaptation.py scripts/smoke_test.py scripts/smoke_test_core.py scripts/load_test.py scripts/run_controlled_load_test.py scripts/backup_db.py scripts/restore_db.py scripts/verify_backup_restore.py
 
-      - name: Run adaptation test suite
+      - name: Run adaptation test suite (45 tests)
         run: |
           python -m unittest test_adaptation.py -v
 
-      - name: Run security test suite
+      - name: Run security test suite (22 tests)
         run: |
           python -m unittest test_security.py -v
+
+      - name: Run reliability test suite (19 tests)
+        run: |
+          python -m unittest test_reliability.py -v
+
+      - name: Run offline adaptation quality evaluation (8 scenarios)
+        run: |
+          python evaluation/evaluate_adaptation.py
+
+  docker-smoke:
+    name: Docker Release & Persistence Verification
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies for host test scripts
+        run: |
+          pip install requests
+
+      - name: Build Docker image
+        run: |
+          docker build -t ava-ai:rc .
+
+      - name: Create persistent volume
+        run: |
+          docker volume create ava_ci_data
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name ava-rc-test \
+            -p 8000:8000 \
+            -e ENVIRONMENT=production \
+            -e SESSION_HTTPS_ONLY=false \
+            -e SECRET_KEY=test_only_ci_secret_that_is_at_least_32_bytes_long \
+            -e ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000 \
+            -e GROQ_API_KEY=dummy_key_for_ci_offline \
+            -e ENABLE_CODE_EXECUTION=false \
+            -e DB_PATH=/app/data/neurosupport.db \
+            -e UPLOAD_DIR=/app/data/uploads \
+            -e REVIEW_IMAGE_DIR=/app/data/review_images \
+            -v ava_ci_data:/app/data \
+            ava-ai:rc
+
+      - name: Wait for container health and readiness
+        run: |
+          echo "Waiting for Ava container readiness..."
+          for i in {1..30}; do
+            if curl -fs http://127.0.0.1:8000/health >/dev/null 2>&1 && curl -fs http://127.0.0.1:8000/ready >/dev/null 2>&1; then
+              echo "Container became healthy and ready after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: Container failed to become ready after 30s"
+              docker logs ava-rc-test
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Verify health and readiness JSON structure
+        run: |
+          HEALTH_RESP=$(curl -fs http://127.0.0.1:8000/health)
+          echo "Health response: $HEALTH_RESP"
+          echo "$HEALTH_RESP" | grep -q '"status"'
+          echo "$HEALTH_RESP" | grep -q '"version"'
+
+          READY_RESP=$(curl -fs http://127.0.0.1:8000/ready)
+          echo "Ready response: $READY_RESP"
+          echo "$READY_RESP" | grep -q '"status"'
+          echo "$READY_RESP" | grep -q '"database"'
+          echo "$READY_RESP" | grep -q '"storage"'
+
+      - name: Run offline smoke test against running container
+        run: |
+          python scripts/smoke_test.py --base-url http://127.0.0.1:8000 --offline
+
+      - name: Clean up initial smoke container
+        run: |
+          docker rm -f ava-rc-test || true
+
+      - name: Run Docker volume persistence and container recreation verification
+        run: |
+          chmod +x scripts/test_docker_persistence.sh
+          bash scripts/test_docker_persistence.sh ava-ai:rc
+
+      - name: Verify backup and restore CLI inside container
+        run: |
+          docker run --rm \
+            -e ENVIRONMENT=production \
+            -e SECRET_KEY=test_only_ci_secret_that_is_at_least_32_bytes_long \
+            -e DB_PATH=/app/data/neurosupport.db \
+            -v ava_ci_data:/app/data \
+            ava-ai:rc \
+            python scripts/verify_backup_restore.py

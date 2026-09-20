@@ -1,0 +1,281 @@
+[
+  {
+    "id": "case_1_concise_coder",
+    "name": "Concise Technical Programmer",
+    "description": "User prefers brief answers centered around code snippets without conversational filler.",
+    "interactions": [
+      {
+        "user_message": "Keep your answers short and show Python code.",
+        "agent_response": "def rev(lst):\n    return lst[::-1]",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Show me another example, no fluff just code.",
+        "agent_response": "def sq(n):\n    return n * n",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Write a quick function to filter evens, brief.",
+        "agent_response": "[x for x in nums if x % 2 == 0]",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      }
+    ],
+    "test_query": "How do I read a file line by line in Python?",
+    "expected_policy": {
+      "preferred_strategy": "concise_with_code",
+      "verbosity": "concise"
+    },
+    "expected_system_prompt_contains": ["concise", "code"],
+    "expected_system_prompt_excludes": ["detailed explanation"]
+  },
+  {
+    "id": "case_2_step_by_step_student",
+    "name": "Step-by-Step Learning Student",
+    "description": "User prefers structured explanations broken down into clear steps with friendly guidance.",
+    "interactions": [
+      {
+        "user_message": "Explain this step by step, I am learning.",
+        "agent_response": "Step 1: Understand the base case...\nStep 2: Recurse...",
+        "feedback": true,
+        "strategy": "detailed_step_by_step"
+      },
+      {
+        "user_message": "Break down how recursion works step-by-step please.",
+        "agent_response": "1. Call stack creation\n2. Reaching the base case\n3. Unwinding the stack",
+        "feedback": true,
+        "strategy": "detailed_step_by_step"
+      },
+      {
+        "user_message": "Give me a structured step-by-step guide for Git branches.",
+        "agent_response": "Step 1: git checkout -b feature\nStep 2: commit changes\nStep 3: merge",
+        "feedback": true,
+        "strategy": "detailed_step_by_step"
+      }
+    ],
+    "test_query": "How do binary search trees work?",
+    "expected_policy": {
+      "preferred_strategy": "detailed_step_by_step"
+    },
+    "expected_system_prompt_contains": ["step-by-step"],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_3_detailed_analyst",
+    "name": "Detailed Technical Analyst",
+    "description": "User wants comprehensive, in-depth breakdowns with high technical depth.",
+    "interactions": [
+      {
+        "user_message": "Explain the architectural trade-offs in detail.",
+        "agent_response": "A comprehensive analysis of distributed consensus trade-offs...",
+        "feedback": true,
+        "strategy": "detailed_explanation"
+      },
+      {
+        "user_message": "Give me an in-depth explanation covering edge cases.",
+        "agent_response": "Examining failure modes under network partitions...",
+        "feedback": true,
+        "strategy": "detailed_explanation"
+      },
+      {
+        "user_message": "I need a thorough and detailed breakdown of this protocol.",
+        "agent_response": "Detailed operational timeline and state machine transitions...",
+        "feedback": true,
+        "strategy": "detailed_explanation"
+      }
+    ],
+    "test_query": "Explain how Raft election timeout prevents split votes.",
+    "expected_policy": {
+      "preferred_strategy": "detailed_explanation",
+      "verbosity": "detailed"
+    },
+    "expected_system_prompt_contains": ["thorough", "comprehensive"],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_4_direct_problem_solver",
+    "name": "Direct Minimalist Problem Solver",
+    "description": "User prefers direct concise answers with zero pleasantries or preamble.",
+    "interactions": [
+      {
+        "user_message": "Be direct. Don't say hello or cheer me on, just answer.",
+        "agent_response": "Use chmod +x script.sh",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Keep it brief and get straight to the point.",
+        "agent_response": "Run docker compose down -v",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Direct answers only, no intro.",
+        "agent_response": "The command is kill -9 <pid>",
+        "feedback": true,
+        "strategy": "concise_direct"
+      }
+    ],
+    "test_query": "How do I check my listening ports on Linux?",
+    "expected_policy": {
+      "preferred_strategy": "concise_direct",
+      "verbosity": "concise"
+    },
+    "expected_system_prompt_contains": ["concise"],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_5_preference_reversal",
+    "name": "Preference Reversal (Detailed to Concise)",
+    "description": "User previously received detailed explanations, but now repeatedly asks for concise answers.",
+    "interactions": [
+      {
+        "user_message": "Give me a detailed explanation.",
+        "agent_response": "Long response...",
+        "feedback": true,
+        "strategy": "detailed_explanation"
+      },
+      {
+        "user_message": "Too long! Keep your answers short and brief from now on.",
+        "agent_response": "Got it, will keep it brief.",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Keep it concise and short.",
+        "agent_response": "Brief answer.",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Short answers only please.",
+        "agent_response": "Concise answer.",
+        "feedback": true,
+        "strategy": "concise_direct"
+      }
+    ],
+    "test_query": "Summarize how OAuth tokens expire.",
+    "expected_policy": {
+      "verbosity": "concise"
+    },
+    "expected_system_prompt_contains": ["concise"],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_6_strategy_recovery_after_failures",
+    "name": "Strategy Recovery After Negative Feedback",
+    "description": "A strategy that encountered negative feedback in the past can recover when given recent consistent positive feedback.",
+    "interactions": [
+      {
+        "user_message": "Show me code.",
+        "agent_response": "Bad code snippet",
+        "feedback": false,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Code please.",
+        "agent_response": "Another poor snippet",
+        "feedback": false,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Write a clean python function with concise code.",
+        "agent_response": "def clean(): pass",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Nice! Show another concise code sample.",
+        "agent_response": "def helper(): return True",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Great code again, concise.",
+        "agent_response": "return [x for x in items]",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Keep giving me concise code like this.",
+        "agent_response": "x = 10",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      }
+    ],
+    "test_query": "Write a helper to parse JSON strings.",
+    "expected_policy": {
+      "preferred_strategy": "concise_with_code"
+    },
+    "expected_system_prompt_contains": ["code"],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_7_explicit_prompt_override",
+    "name": "Explicit Prompt Override Priority",
+    "description": "Current user prompt explicitly requests detailed steps, overriding learned concise preference.",
+    "interactions": [
+      {
+        "user_message": "Keep it concise.",
+        "agent_response": "Concise 1",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Short answer.",
+        "agent_response": "Concise 2",
+        "feedback": true,
+        "strategy": "concise_direct"
+      },
+      {
+        "user_message": "Be brief.",
+        "agent_response": "Concise 3",
+        "feedback": true,
+        "strategy": "concise_direct"
+      }
+    ],
+    "test_query": "Explain step by step in full detail how TCP handshake works.",
+    "expected_policy": {
+      "preferred_strategy": "concise_direct"
+    },
+    "expected_system_prompt_contains": [
+      "CURRENT explicit request in this prompt (overrides any learned preference)"
+    ],
+    "expected_system_prompt_excludes": []
+  },
+  {
+    "id": "case_8_domain_task_adaptation",
+    "name": "Domain-Specific Task Adaptation",
+    "description": "Programming request triggers code strategy, whereas high-level conceptual inquiry avoids unnecessary code.",
+    "interactions": [
+      {
+        "user_message": "Write Python code for this.",
+        "agent_response": "code...",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "More code.",
+        "agent_response": "code...",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      },
+      {
+        "user_message": "Python implementation.",
+        "agent_response": "code...",
+        "feedback": true,
+        "strategy": "concise_with_code"
+      }
+    ],
+    "test_query": "What is the philosophical difference between declarative and imperative paradigms?",
+    "expected_policy": {
+      "preferred_strategy": "concise_with_code"
+    },
+    "expected_system_prompt_contains": [
+      "concise"
+    ],
+    "expected_system_prompt_excludes": []
+  }
+]
