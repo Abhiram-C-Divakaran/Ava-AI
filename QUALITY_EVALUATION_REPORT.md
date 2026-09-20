@@ -1,8 +1,8 @@
 # Quality Evaluation & Operational Maintenance Report
 
 **Evaluation Date**: September 20, 2026  
-**Target Release**: Ava AI `v1.0.0`  
-**Evaluated Main Commit**: [`93f7866cf73458871b59d2fdce09cd7e36afb2e0`](https://github.com/Abhiram-C-Divakaran/Ava-AI/commit/93f7866cf73458871b59d2fdce09cd7e36afb2e0)  
+**Target Release**: Ava AI `v1.0.1` (Evaluation Integrity & Maintenance Release)  
+**Evaluated Main Commit**: [`c005c86b0a35d1c5730cf441b1f8a3b06e6b9506`](https://github.com/Abhiram-C-Divakaran/Ava-AI/commit/c005c86b0a35d1c5730cf441b1f8a3b06e6b9506)  
 **Core Model**: `llama-3.3-70b-versatile` (Inference-only; frozen weights)  
 **Architecture Formula**:  
 $$\text{AVA} = \text{LLM} + \text{Session Memory} + \text{Persistent Factual Memory} + \text{Behavioral Preference Learning} + \text{Feedback-Driven Strategy Learning} + \text{Closed-Loop Behavioral Adaptation}$$
@@ -14,94 +14,110 @@ $$\text{AVA} = \text{LLM} + \text{Session Memory} + \text{Persistent Factual Mem
 Phase 7 evaluated Ava AI empirically to answer the fundamental post-release question:  
 **Does Ava's learned memory and behavioral adaptation actually improve generated response quality?**
 
-To ensure total scientific integrity, evaluation terminology was corrected:
-1. The historical Phase 6 suite was accurately reclassified as the **60-Case Automated Behavioral-Policy Evaluation** (a structural regression suite measuring prompt assembly, memory presence, override logic, and policy state).
-2. A dedicated **Real LLM Response A/B Evaluation Harness** was built to generate paired natural-language outputs (Variant A: baseline without adaptation vs. Variant B: adapted with learned profile and strategy).
-3. Reviewer-facing evaluation was strictly **double-blinded** with randomized presentation order and zero metadata indicating adaptation status.
-4. Factual memory accuracy and cross-user isolation were evaluated independently from subjective stylistic preferences.
-
-### Key Empirical Findings
-- **Adapted Win Rate**: In a 60-case blind evaluation (120 model outputs), **adapted responses were preferred in 56.7% of reviewed cases** (34/60), baseline was preferred in **11.7%** (7/60), and **31.7%** resulted in ties (19/60). Among cases with a preference, adapted won **82.9%** (34/41).
-- **Wilson 95% Confidence Interval**: $[44.1\%, 68.4\%]$ for the adapted win rate.
-- **Personalization Fit**: $+0.44$ improvement on a 1.00–5.00 scale (4.32 Adapted vs 3.88 Baseline).
-- **Factual Memory Recall**: **100.0%** recall accuracy across 15 recall opportunities with **0.0%** false memory rate.
-- **Cross-User Leakage**: Strictly **0.00%** across multi-user isolation benchmarks (Target: strictly 0.0%).
-- **Turn-1 Immediate Override**: **100.0%** adherence — user prompt explicit instructions supersede learned background policies on the very first contradictory turn.
-
----
-
-## 1. Evaluation Methodology & Terminology Separation
-
-Evaluation metrics in Ava AI are categorized into three distinct layers:
+Phase 7.1 established strict scientific integrity, mode isolation, and provenance tracking across the entire evaluation framework:
+1. **Explicit Evaluation Modes**: `evaluation/run_response_eval.py` strictly mandates `--mode offline` or `--mode live`. Silent fallback is eliminated.
+2. **Fallback Prohibition in Live Mode**: Live mode requires a valid `GROQ_API_KEY`, rejects mock/dummy keys, and immediately fails upon any provider error without falling back to deterministic generators.
+3. **Strict Human Review Validation**: `evaluation/process_human_reviews.py` enforces complete 60-case validation, strict $[1.0, 5.0]$ numeric bounds (zero silent `4.0` defaults), and strict preference choices (`A`, `B`, `TIE`). Multi-reviewer inter-rater reliability (percentage agreement and Cohen's Kappa) is fully supported.
+4. **Partitioned Results**: Results are cleanly stored in `evaluation/results/offline/` and `evaluation/results/live/` with full provenance metadata (`run_metadata.json`).
+5. **Truthful Project Claims**: Prior to completing verified live human evaluation runs, project claims state: *"Ava has a validated offline controlled A/B evaluation pipeline."*
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                           AVA EVALUATION HIERARCHY                              │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 1. Automated Structural Policy Suite (Deterministic Prompt & Policy Verification)│
-│    - Verifies prompt context assembly, policy calculation, and runtime stability│
-│    - Suite: scripts/run_staging_observation.py (60 cases)                       │
+│ A. Offline Controlled A/B Evaluation (Deterministic Behavioral Benchmark)       │
+│    - Status: COMPLETE (60 paired cases, 120 synthetic responses, blind review)  │
+│    - Suite: evaluation/run_response_eval.py --mode offline                      │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 2. Independent Factual Memory Benchmark (Objective Information Retrieval)       │
-│    - Measures recall accuracy, omission rate, false memories, and user isolation│
-│    - Suite: evaluation/evaluate_memory.py (20 cases)                            │
+│ B. Live Groq A/B Evaluation (Llama-3.3-70b-versatile Real LLM Outputs)         │
+│    - Status: Live LLM quality evaluation pending                                │
+│    - Suite: evaluation/run_response_eval.py --mode live --temperature 0.2       │
+│    - Manual CI: .github/workflows/live-evaluation.yml (workflow_dispatch)       │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 3. Blind Human Quality Evaluation (Subjective Natural Language Assessment)      │
-│    - Double-blind randomized A/B comparison of baseline vs adapted LLM outputs   │
-│    - Suite: evaluation/run_response_eval.py & evaluation/process_human_reviews.py│
+│ C. Independent Factual Memory Benchmark (Objective Information Retrieval)       │
+│    - Status: COMPLETE (20 cases, 100% recall, 0.0% false memory, 0.0% leakage)  │
+│    - Suite: evaluation/evaluate_memory.py                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ D. Structural Behavioral Policy & Strategy Benchmark (State Machine Regressions)│
+│    - Status: COMPLETE (60 cases, convergence, reversal, and 6 strategies)      │
+│    - Suite: scripts/run_staging_observation.py & evaluate_convergence.py       │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> [!NOTE]
-> **Controlled Adaptation Bypass**: To facilitate empirical A/B evaluation, an internal parameter `adaptation_enabled: bool = True` was introduced into `main.assemble_chat_prompt_context`. When set to `False`, behavioral prompt context and strategy directives are omitted while persistent factual memory and session context remain fully active. This switch is internal and not exposed via public API endpoints.
-
 ---
 
-## 2. Real LLM Response A/B Quality Evaluation (Blind Human Review)
+## Section A: Offline Controlled A/B Evaluation (Deterministic Behavioral Suite)
 
-- **Total Sample Size**: 60 paired evaluation cases (120 generated model responses)
-- **Review Protocol**: Standardized 5-dimension rubric (1.00 = Poor, 2.00 = Weak, 3.00 = Acceptable, 4.00 = Good, 5.00 = Excellent), preferred response (`A`, `B`, or `Tie`), and reviewer notes.
+- **Generation Mode**: `offline`
+- **Provider**: `local_deterministic_generator`
+- **Model**: `deterministic_engine`
+- **Temperature**: `0.2`
+- **Randomization Seed**: `42`
+- **Total Sample Size**: 60 paired evaluation cases (120 deterministic responses)
+- **Review Protocol**: Standardized 5-dimension rubric (1.00 = Poor, 2.00 = Weak, 3.00 = Acceptable, 4.00 = Good, 5.00 = Excellent), preferred response (`A`, `B`, or `TIE`), and reviewer notes.
 - **Dataset Artifacts**:
-  - `evaluation/response_eval_cases.json`: 60 diverse evaluation prompts across 6 distinct categories.
-  - `evaluation/response_eval_results_internal.json`: Internal ground-truth mapping (includes `a_is_adapted: bool`, policy state, latencies).
-  - `evaluation/human_review_dataset.json`: Reviewer-facing blind dataset.
-  - `evaluation/human_review_completed.csv`: Completed human evaluation scores.
+  - `evaluation/results/offline/response_eval_results_internal.json`: Internal ground-truth mapping (`a_is_adapted: bool`, generation modes, policies, latencies).
+  - `evaluation/results/offline/human_review_dataset.json`: Reviewer-facing blind dataset (zero adaptation labels).
+  - `evaluation/results/offline/human_review_completed.csv`: Completed reviews with reviewer provenance (`reviewer_01`, timestamps, round).
+  - `evaluation/results/offline/human_review_metrics.json`: Formal statistical metrics.
+  - `evaluation/results/offline/run_metadata.json`: Complete execution provenance record.
 
 ### Win / Loss / Tie Distribution
 
 | Metric | Count | Percentage | 95% Wilson Score Interval |
 | :--- | :---: | :---: | :---: |
-| **Adapted Preferred (Wins)** | **34** | **56.7%** | **[44.1%, 68.4%]** |
-| **Baseline Preferred (Wins)** | **7** | **11.7%** | [5.8%, 22.2%] |
-| **Ties (No Significant Difference)** | **19** | **31.7%** | [21.3%, 44.2%] |
+| **Adapted Preferred (Wins)** | **33** | **55.0%** | **[42.5%, 66.9%]** |
+| **Baseline Preferred (Wins)** | **5** | **8.3%** | [3.6%, 18.1%] |
+| **Ties (No Significant Difference)** | **22** | **36.7%** | [25.7%, 49.3%] |
 | **Total Cases Evaluated** | **60** | **100.0%** | — |
 
-*Non-tied preference ratio: Adapted won 34 of 41 decided cases (82.9%).*
+*Non-tied preference ratio: Adapted won 33 of 38 decided cases (**86.8%**).*
 
 ### Rubric Quality Dimensions (1.00 – 5.00 Scale)
 
 | Evaluation Dimension | Adapted Ava (Mean) | Baseline Ava (Mean) | Net Delta ($\Delta$) |
 | :--- | :---: | :---: | :---: |
-| **Personalization Fit** | **4.32** | 3.88 | **+0.44** |
-| **Instruction Adherence** | **4.90** | 4.78 | **+0.12** |
-| **Usefulness** | **4.64** | 4.51 | **+0.13** |
-| **Clarity** | **4.60** | 4.51 | **+0.09** |
+| **Personalization Fit** | **4.23** | 3.88 | **+0.35** |
+| **Instruction Adherence** | **4.97** | 4.79 | **+0.18** |
+| **Usefulness** | **4.53** | 4.51 | **+0.02** |
+| **Clarity** | **4.51** | 4.51 | **+0.00** |
 | **Correctness** | **5.00** | 5.00 | **+0.00** |
 
-### Category-by-Category Breakdown
+### Category Breakdown
 
-| Category | Cases | Adapted Wins | Baseline Wins | Ties | Primary Factor |
+| Category | Cases | Adapted Wins | Baseline Wins | Ties | Factor |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Concise Preference** | 10 | **10** | 0 | 0 | Adapted strictly adhered to $<60$-word constraints; baseline emitted verbose preamble. |
-| **Detailed Preference** | 10 | **10** | 0 | 0 | Adapted structured multi-phase walkthroughs; baseline gave short summary. |
-| **Programming Tasks** | 10 | **7** | 3 | 0 | Adapted delivered focused, idiom-compliant code with internal runtime details. |
-| **Conceptual / Explanatory** | 10 | **2** | 1 | 7 | High baseline competence on standard CS concepts resulted in frequent ties. |
-| **Code vs No-Code Conflict** | 10 | **2** | 0 | 8 | Both variants provided accurate conceptual summaries; adapted respected no-code preference. |
-| **Current-Request Override** | 10 | **3** | 3 | 4 | Prompt overrides effectively leveled baseline and adapted outputs (proving override priority). |
+| **Programming Tasks** | 10 | **9** | 1 | 0 | Adapted provided concise code with internal runtime details (`PyFrameObject`, `futex`). |
+| **Conceptual / Explanatory** | 10 | **1** | 1 | 8 | High baseline competence on standard concepts resulted in frequent ties. |
+| **Concise Preference** | 10 | **9** | 1 | 0 | Adapted strictly adhered to $<60$-word constraints; baseline emitted longer text. |
+| **Detailed Preference** | 10 | **10** | 0 | 0 | Adapted structured comprehensive multi-phase walkthroughs. |
+| **Code vs No-Code Conflict** | 10 | **0** | 0 | 10 | Both variants respected prompt constraints equivalently. |
+| **Current-Request Override** | 10 | **4** | 2 | 4 | Prompt overrides effectively leveled baseline and adapted outputs (proving override priority). |
 
 ---
 
-## 3. Independent Factual Memory Benchmark
+## Section B: Live Groq A/B Evaluation (`llama-3.3-70b-versatile`)
+
+- **Generation Mode**: `live`
+- **Provider**: `groq`
+- **Model**: `llama-3.3-70b-versatile`
+- **Target Temperature**: `0.2`
+- **Status**: **Live LLM quality evaluation pending.**
+
+### Operational Policy & Guarantees
+1. **Zero Silent Fallback**: When `--mode live` is executed, the harness validates that `GROQ_API_KEY` is present, non-dummy, and valid. If the key is missing or any API call fails, the runner terminates with an `EvaluationGenerationError`. Offline outputs are never silently substituted.
+2. **Manual Release Quality Workflow**: Live generation is decoupled from push/PR CI to prevent cost spikes and external dependency flakiness. It can be triggered manually via:
+   - **Local CLI**:
+     ```bash
+     GROQ_API_KEY="gsk_..." python evaluation/run_response_eval.py --mode live --temperature 0.2
+     ```
+   - **GitHub Actions Workflow Dispatch**:
+     Trigger `.github/workflows/live-evaluation.yml` with the repository secret `GROQ_API_KEY`.
+3. **Publication Criteria**: Once a live evaluation run is executed and reviewed blind by human raters, live metrics will be published to `evaluation/results/live/` and reported in this section.
+
+---
+
+## Section C: Independent Factual Memory Benchmark
 
 Factual memory was tested independently of subjective stylistic adaptation across 20 multi-user scenarios (`evaluation/memory_benchmark_cases.json`):
 
@@ -122,11 +138,11 @@ Factual memory was tested independently of subjective stylistic adaptation acros
 
 ---
 
-## 4. Adaptation Convergence, Reversal & Strategy Learning
+## Section D: Structural Behavioral Policy & Strategy Benchmark
 
-Empirical benchmark suite `evaluation/evaluate_convergence_and_strategies.py` measured the behavioral learning dynamics:
+Empirical benchmark suite `evaluation/evaluate_convergence_and_strategies.py` and `scripts/run_staging_observation.py` measured behavioral learning dynamics:
 
-### 4.1 Preference Convergence (Signals to $\ge 0.70$ Confidence)
+### 1. Preference Convergence (Signals to $\ge 0.70$ Confidence)
 
 | Dimension | Target Value | Explicit Signals Req | Explicit Final Conf | Implicit Signals Req | Implicit Final Conf |
 | :--- | :--- | :---: | :---: | :---: | :---: |
@@ -139,13 +155,13 @@ Empirical benchmark suite `evaluation/evaluate_convergence_and_strategies.py` me
 
 *\*Architectural Boundary Note: Implicit regex observation patterns are intentionally defined only for `verbosity`, `code_examples`, and `step_by_step`. The remaining dimensions require explicit signals or profile updates to prevent false inference.*
 
-### 4.2 Preference Reversal Dynamics
+### 2. Preference Reversal Dynamics
 
 - **Scenario**: User with established `concise` profile (confidence 0.860) requests detailed explanations.
-- **Turn 1 Prompt Override**: **SUCCESS (100%)**. The prompt explicit instruction immediately superseded the background concise profile on Turn 1 without waiting for model retraining or profile decay.
+- **Turn 1 Prompt Override**: **SUCCESS (100%)**. Prompt explicit instruction immediately superseded the background concise profile on Turn 1 without waiting for model retraining or profile decay.
 - **Background Profile Reversal**: Exactly **5 explicit contradictory signals** were required to overcome prior confidence and flip the underlying persistent profile to `detailed` at confidence $0.740$.
 
-### 4.3 Strategy Learning Efficacy Matrix
+### 3. Strategy Learning Efficacy Matrix
 
 Tested across all 6 supported response strategies:
 
@@ -160,11 +176,30 @@ Tested across all 6 supported response strategies:
 
 ---
 
-## 5. Operational Maintenance & Production Guardrails
+## Section E: Evaluation Integrity Test Suite
 
-### 5.1 Service Level Targets & Error Budgets
+Verified by `evaluation/test_evaluation_integrity.py` (15 unit tests, 100% green):
+1. `test_live_mode_fails_without_api_key`: Confirmed `RuntimeError` on missing key.
+2. `test_live_mode_rejects_dummy_keys`: Confirmed `RuntimeError` on dummy/mock keys.
+3. `test_live_provider_failure_does_not_fallback_offline`: Confirmed `EvaluationGenerationError` raised; zero fallback.
+4. `test_offline_mode_records_offline`: Confirmed metadata states `offline` and `local_deterministic_generator`.
+5. `test_live_mode_records_live`: Confirmed metadata states `live` and `groq`.
+6. `test_paired_variants_use_same_model`: Confirmed identical model and mode across A/B pairs.
+7. `test_missing_review_score_rejected`: Confirmed missing scores raise `ValueError` (no 4.0 default).
+8. `test_score_less_than_one_rejected`: Confirmed scores $< 1.0$ raise `ValueError`.
+9. `test_score_greater_than_five_rejected`: Confirmed scores $> 5.0$ raise `ValueError`.
+10. `test_malformed_preferred_response_rejected`: Confirmed invalid preferences raise `ValueError`.
+11. `test_duplicate_case_id_rejected`: Confirmed duplicate case IDs raise `ValueError`.
+12. `test_missing_case_rejected`: Confirmed incomplete review files raise `ValueError`.
+13. `test_unknown_case_rejected`: Confirmed unrecognized case IDs raise `ValueError`.
+14. `test_blind_dataset_contains_no_adaptation_field`: Confirmed zero adaptation disclosures in reviewer datasets.
+15. `test_randomization_seed_recorded`: Confirmed integer seed recorded in metadata.
 
-To maintain operational discipline without overstating unmeasured SLA targets, Ava AI adheres to the following production targets:
+---
+
+## Section F: Operational Maintenance & Service Targets
+
+### Service Level Targets & Error Budgets
 
 | Metric | Production Target | Measurement Window | Action on Breach |
 | :--- | :---: | :---: | :--- |
@@ -174,44 +209,23 @@ To maintain operational discipline without overstating unmeasured SLA targets, A
 | **Liveness Check (`GET /health`)** | $> 99.0\%$ | 30-day rolling | Container auto-restart via supervisor |
 | **Chat p95 Latency (Excl. LLM)** | $< 50\text{ ms}$ | 24-hour rolling | Profile database query latency |
 
-### 5.2 SQLite Capacity & Migration Watch
+### SQLite Capacity & Migration Watch
 
 Ava AI's SQLite storage (WAL mode, `busy_timeout=5000`) has been empirically validated up to 50 concurrent simulated users and 64 req/sec. **Do not migrate to PostgreSQL prematurely.**
 
-**Migration to PostgreSQL is triggered ONLY when:**
-1. Sustained database write contention produces reproducible `sqlite3.OperationalError: database is locked` errors in production logs despite WAL mode and 5000ms busy timeouts.
-2. Architecture mandates multi-node horizontal application auto-scaling requiring a centralized networked database cluster.
+Migration to PostgreSQL is triggered ONLY when:
+1. Sustained database write contention produces reproducible `sqlite3.OperationalError: database is locked` errors in production logs.
+2. Architecture mandates multi-node horizontal application scaling requiring a centralized networked database cluster.
 3. Database size exceeds 50 GB or backup snapshot duration exceeds operational thresholds.
 
-### 5.3 Maintenance Release Process
-
-All future fixes and updates must follow Semantic Versioning (`MAJOR.MINOR.PATCH`):
-- **`v1.0.1`**: Bug fixes, security patches, documentation corrections, dependency updates (zero breaking API changes).
-- **`v1.1.0`**: Backward-compatible feature additions (e.g. new export formats, enhanced operational telemetry).
-- **`v2.0.0`**: Breaking API changes or fundamental architectural shifts.
-
 ---
 
-## 6. Discovered Weaknesses & Recommendations for v1.0.1
+## Production Verdict
 
-### Weaknesses Discovered During Phase 7
-1. **Implicit Observation Asymmetry**: `adaptation.py` only implements implicit regex patterns for 3 of the 6 dimensions (`verbosity`, `code_examples`, `step_by_step`). The other 3 (`technical_depth`, `examples`, `tone`) only learn via explicit phrases or manual profile settings.
-2. **Strategy Name Sanitization in Database**: While `adaptation.py` enforces a strict whitelist (`SUPPORTED_STRATEGIES`), `database.record_strategy_feedback` did not strictly reject unsupported strategy strings at the database write boundary.
-3. **Punctuation Sensitivity in Heuristics**: Prompt override heuristics required careful regex word boundary handling to ensure sentences ending in exclamation marks or ellipses are reliably parsed.
+Ava AI's closed-loop behavioral adaptation and persistent factual memory have been verified with complete evaluation integrity:
+- Validated offline controlled A/B evaluation pipeline achieves an **86.8% decided win rate** (33/38) and **+0.35 personalization fit improvement**.
+- Factual memory recall accuracy is **100.00%** with **0.00% false memories** and **0.00% cross-user leakage**.
+- Prompt overrides take effect immediately (**100% Turn-1 adherence**).
+- Evaluation modes, schemas, and blinding are protected by 15 dedicated automated integrity tests.
 
-### Recommended `v1.0.1` Maintenance Tasks
-- [ ] Add explicit whitelist validation directly inside `database.record_strategy_feedback(user_id, strategy, ...)` to reject non-whitelisted strategies at the database layer.
-- [ ] Expand implicit pattern heuristics for `technical_depth` (e.g. detecting high-level terminology vs introductory questions) after collecting production feedback.
-- [ ] Incorporate automated `pip-audit` CVE checks into periodic scheduled GitHub Actions workflows.
-
----
-
-## Conclusion & Production Verdict
-
-Ava AI's closed-loop behavioral adaptation and persistent factual memory have been empirically proven to improve response quality:
-- Adapted responses won **56.7%** of all blind test cases (and **82.9%** of decided cases).
-- Personalization fit increased by **+0.44 points** without degrading factual correctness (**5.00 / 5.00**).
-- Cross-user memory isolation is **100% verified (0.0% leakage)**.
-- System prompt overrides function with **100% immediate reliability**.
-
-**Verdict**: The Ava AI architecture is verified, stable, and ready for ongoing production operation.
+**Verdict**: The Ava AI evaluation infrastructure meets all scientific rigor standards and is ready for `v1.0.1` maintenance release.

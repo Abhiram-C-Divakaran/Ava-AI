@@ -239,19 +239,29 @@ Structural regression suite verifying prompt construction, adaptation policy sta
 python scripts/run_staging_observation.py
 ```
 
-### 6. Real Response A/B Quality Evaluation (Blind Generation)
-Generates paired outputs (Variant A: baseline without adaptation vs. Variant B: adapted with behavioral policy) with randomized presentation for blind human evaluation:
+### 6. Response A/B Quality Evaluation Pipeline
+Ava has a validated offline controlled A/B evaluation pipeline. Generates paired outputs (Variant Baseline without adaptation vs Variant Adapted with behavioral policy) with randomized presentation for blind human evaluation:
 ```bash
-python evaluation/run_response_eval.py
+# Offline controlled deterministic evaluation
+python evaluation/run_response_eval.py --mode offline
+
+# Live Groq evaluation (requires real GROQ_API_KEY)
+python evaluation/run_response_eval.py --mode live --temperature 0.2
 ```
 
-### 7. Independent Factual Memory Benchmark
+### 7. Evaluation Integrity Test Suite (15 Tests)
+Validates evaluation harness modes, strict fallback prohibition, schema validation, review completeness, and blinding:
+```bash
+python -m unittest evaluation/test_evaluation_integrity.py -v
+```
+
+### 8. Independent Factual Memory Benchmark
 Evaluates factual memory recall accuracy, omission rate, false-memory rate, and cross-user isolation:
 ```bash
 python evaluation/evaluate_memory.py
 ```
 
-### 8. Adaptation Convergence & Strategy Learning Benchmark
+### 9. Adaptation Convergence & Strategy Learning Benchmark
 Empirically measures signal thresholds required for preference convergence across all 6 dimensions, preference reversal dynamics, and the 6-strategy learning matrix:
 ```bash
 python evaluation/evaluate_convergence_and_strategies.py
@@ -282,8 +292,8 @@ python scripts/restore_db.py /backups/ava_backup.db --confirm
 ```
 
 ### Health, Readiness & Metrics Endpoints
-- **Liveness**: `GET /health` -> `{"status": "ok", "version": "1.0.0"}`
-- **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.0", "database": "connected", "storage": "writable"}`
+- **Liveness**: `GET /health` -> `{"status": "ok", "version": "1.0.1"}`
+- **Readiness**: `GET /ready` -> `{"status": "ready", "version": "1.0.1", "database": "connected", "storage": "writable"}`
 - **Operational Metrics**: `GET /api/metrics` (Admin authenticated, returns counters, latencies, and uptime)
 
 ---
@@ -293,7 +303,7 @@ python scripts/restore_db.py /backups/ava_backup.db --confirm
 A hardened multi-stage production Dockerfile is included:
 ```bash
 # Build the Docker image
-docker build -t ava-ai:1.0.0 .
+docker build -t ava-ai:1.0.1 .
 
 # Run container with persistent host volume
 docker run -d \
