@@ -1,0 +1,13 @@
+{
+  "evaluation_id": "5bcf84ce-3839-49bb-a3fe-9d680b16125f",
+  "generation_mode": "live",
+  "provider": "groq",
+  "model": "llama-3.3-70b-versatile",
+  "temperature": 0.2,
+  "case_count": 60,
+  "response_count": 120,
+  "started_at": "2026-09-20T19:43:16.825132+00:00",
+  "completed_at": "2026-09-20T19:52:26.560538+00:00",
+  "git_commit": "c4848ae5c45ca83b6ea86144fdf23713eb4ec1b7",
+  "randomization_seed": 42
+}

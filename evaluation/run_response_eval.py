@@ -35,7 +35,7 @@ import subprocess
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except Exception:
         pass
 
@@ -83,14 +83,14 @@ def validate_groq_api_key_for_live() -> str:
     return key
 
 
-def generate_live_groq_response(prompt: str, sys_prompt: str, temperature: float = 0.2) -> str:
+def generate_live_groq_response(prompt: str, sys_prompt: str, temperature: float = 0.2, model: str | None = None, max_tokens: int = 700) -> str:
     """
-    Generates response from live Groq Llama-3.3-70b-versatile.
+    Generates response from live Groq LLM.
     Fails immediately if API call fails; NEVER silently falls back to offline generator.
     """
     validate_groq_api_key_for_live()
     try:
-        response = call_llm(prompt, system_prompt_override=sys_prompt, temperature=temperature)
+        response = call_llm(prompt, system_prompt_override=sys_prompt, temperature=temperature, model=model, max_tokens=max_tokens)
         if not response or not response.strip():
             raise EvaluationGenerationError("Live Groq call returned empty response.")
         return response.strip()
@@ -266,7 +266,7 @@ def generate_offline_deterministic_response(prompt: str, sys_prompt: str, is_ada
     return "\n".join(lines)
 
 
-def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2, seed: int = 42, out_dir: str | None = None) -> int:
+def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2, seed: int = 42, out_dir: str | None = None, model: str | None = None) -> int:
     """
     Executes the response evaluation harness in the specified mode ('offline' or 'live').
     """
@@ -292,7 +292,7 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
         # Validate key up-front before doing any setup
         validate_groq_api_key_for_live()
         provider = "groq"
-        model_name = "llama-3.3-70b-versatile"
+        model_name = model if model else "llama-3.3-70b-versatile"
         print(f"  • Provider:            {provider}")
         print(f"  • Model:               {model_name}")
     else:
@@ -307,6 +307,10 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
     bench_db = os.path.join(temp_dir.name, "response_eval.db")
     orig_db_path = db.DB_PATH
 
+    target_dir = out_dir if out_dir else os.path.join(BASE_DIR, "evaluation", "results", mode)
+    os.makedirs(target_dir, exist_ok=True)
+    checkpoint_file = os.path.join(target_dir, ".eval_checkpoint.json")
+
     try:
         db.DB_PATH = bench_db
         db.init_db()
@@ -315,10 +319,29 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
         reviewer_dataset = []
         csv_rows = []
 
+        if os.path.exists(checkpoint_file):
+            try:
+                with open(checkpoint_file, "r", encoding="utf-8") as f:
+                    ckpt = json.load(f)
+                internal_records = ckpt.get("internal_records", [])
+                reviewer_dataset = ckpt.get("reviewer_dataset", [])
+                csv_rows = ckpt.get("csv_rows", [])
+                completed_ids = {r["case_id"] for r in internal_records}
+                print(f"  • Resuming from checkpoint: {len(completed_ids)}/{len(cases)} cases already completed\n")
+            except Exception:
+                internal_records = []
+                reviewer_dataset = []
+                csv_rows = []
+
+        completed_ids = {r["case_id"] for r in internal_records}
+
         for idx, case in enumerate(cases, 1):
             case_id = case["id"]
             category = case["category"]
             prompt = case["prompt"]
+            if case_id in completed_ids:
+                print(f"[{idx:02d}/{len(cases)}] {case_id:<12} | {category:<16} | Resumed from checkpoint")
+                continue
             user_profile = case.get("user_profile", {})
             stored_mem = case.get("stored_memory", "")
             constraints = case.get("constraints", {})
@@ -359,7 +382,7 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
                 adaptation_enabled=False,
             )
             if mode == "live":
-                resp_baseline = generate_live_groq_response(prompt, sys_prompt_base, temperature=temperature)
+                resp_baseline = generate_live_groq_response(prompt, sys_prompt_base, temperature=temperature, model=model_name)
             else:
                 resp_baseline = generate_offline_deterministic_response(prompt, sys_prompt_base, False, {}, constraints, category)
             latency_base_ms = int((time.time() - t0) * 1000)
@@ -373,7 +396,7 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
             )
             policy_adapt = meta_adapt.get("policy", {})
             if mode == "live":
-                resp_adapted = generate_live_groq_response(prompt, sys_prompt_adapt, temperature=temperature)
+                resp_adapted = generate_live_groq_response(prompt, sys_prompt_adapt, temperature=temperature, model=model_name)
             else:
                 resp_adapted = generate_offline_deterministic_response(prompt, sys_prompt_adapt, True, policy_adapt, constraints, category)
             latency_adapt_ms = int((time.time() - t1) * 1000)
@@ -444,6 +467,25 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
 
             print(f"[{idx:02d}/{len(cases)}] {case_id:<12} | {category:<16} | Blinded A/B ({lat_A}ms / {lat_B}ms)")
 
+            # Save progress to checkpoint after each case
+            try:
+                with open(checkpoint_file, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "internal_records": internal_records,
+                        "reviewer_dataset": reviewer_dataset,
+                        "csv_rows": csv_rows,
+                    }, f)
+            except Exception:
+                pass
+
+            if mode == "live":
+                time.sleep(2.5)
+
+        # Order results strictly by input case order
+        case_order = {c["id"]: i for i, c in enumerate(cases)}
+        internal_records.sort(key=lambda r: case_order.get(r["case_id"], 999))
+        reviewer_dataset.sort(key=lambda r: case_order.get(r["case_id"], 999))
+        csv_rows.sort(key=lambda r: case_order.get(r.get("case_id"), 999))
         completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         # Run Metadata Record
@@ -461,13 +503,16 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
             "randomization_seed": seed,
         }
 
-        # Target directories
-        target_dir = out_dir if out_dir else os.path.join(BASE_DIR, "evaluation", "results", mode)
-        os.makedirs(target_dir, exist_ok=True)
-
         internal_file = os.path.join(target_dir, "response_eval_results_internal.json")
         with open(internal_file, "w", encoding="utf-8") as f:
             json.dump(internal_records, f, indent=2)
+
+        # Remove checkpoint file upon successful completion of all cases
+        if os.path.exists(checkpoint_file):
+            try:
+                os.remove(checkpoint_file)
+            except Exception:
+                pass
 
         blind_file = os.path.join(target_dir, "human_review_dataset.json")
         with open(blind_file, "w", encoding="utf-8") as f:
@@ -536,6 +581,9 @@ if __name__ == "__main__":
                         help="Randomization seed for A/B presentation order (default: 42).")
     parser.add_argument("--out-dir", default=None,
                         help="Custom output directory for results.")
+    parser.add_argument("--model", default=None,
+                        help="Groq model ID for live mode. Overrides GROQ_MODEL env var. "
+                             "Defaults to GROQ_MODEL env or openai/gpt-oss-120b.")
     args = parser.parse_args()
     sys.exit(run_response_evaluation(
         cases_path=args.cases,
@@ -543,4 +591,5 @@ if __name__ == "__main__":
         temperature=args.temperature,
         seed=args.seed,
         out_dir=args.out_dir,
+        model=args.model,
     ))

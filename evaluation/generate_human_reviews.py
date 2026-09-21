@@ -308,18 +308,19 @@ def main():
         writer.writeheader()
         writer.writerows(completed_rows)
 
-    # Also save copy in evaluation/results/offline/human_review_completed.csv
-    offline_results_dir = os.path.join(BASE_DIR, "evaluation", "results", "offline")
-    os.makedirs(offline_results_dir, exist_ok=True)
-    offline_csv = os.path.join(offline_results_dir, "human_review_completed.csv")
-    with open(offline_csv, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(completed_rows)
+    # Only save default copy in offline directory if args.out was not specified
+    if not args.out:
+        offline_results_dir = os.path.join(BASE_DIR, "evaluation", "results", "offline")
+        os.makedirs(offline_results_dir, exist_ok=True)
+        offline_csv = os.path.join(offline_results_dir, "human_review_completed.csv")
+        with open(offline_csv, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(completed_rows)
+        print(f"Saved copy to: {offline_csv}")
 
     print(f"Completed blind review of {len(completed_rows)} cases by {args.reviewer}.")
     print(f"Saved completed reviews to: {out_csv}")
-    print(f"Saved copy to: {offline_csv}")
 
 
 if __name__ == "__main__":

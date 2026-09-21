@@ -1,0 +1,670 @@
+case_id,category,prompt,response_A,response_B,instruction_adherence_A,instruction_adherence_B,clarity_A,clarity_B,usefulness_A,usefulness_B,personalization_fit_A,personalization_fit_B,correctness_A,correctness_B,preferred_response,reviewer_notes
+prog_001,programming,How do Python generators maintain state between yield statements?,"Python generators keep a hidden frame that stores local variables, the instruction pointer, and the stack each time they hit a `yield`. When `next()` is called again, execution resumes right after the last `yield` with all locals exactly as they were.  
+
+```python
+def count():
+    i = 0               # i is stored in the generator’s frame
+    while True:
+        yield i        # pause, preserving i and the loop state
+        i += 1          # resume here on the next call
+
+g = count()
+print(next(g))  # 0
+print(next(g))  # 1
+```
+
+The generator object’s internal state (locals, stack, and current bytecode offset) is what lets it pick up where it left off.","Python generators keep their state in a hidden frame object that stores local variables, the instruction pointer, and the execution stack. When a `yield` runs, the frame is suspended and the generator object retains this snapshot; calling `next()` (or `await`‑ing an async generator) restores the frame and continues from the saved point. This way each `yield` resumes exactly where the previous one left off, preserving all intermediate values.",,,,,,,,,,,,
+prog_002,programming,Explain Rust Arc and Mutex memory overhead when sharing state across threads.,"`Arc<T>` adds a single atomic reference‑count (usually a `usize`) stored alongside the heap allocation, so each clone incurs an extra atomic increment/decrement and a pointer indirection when accessing the inner `T`. `Mutex<T>` adds a lock word (typically a `usize` or `u32` for the OS futex state) plus possible padding to align to cache‑line boundaries, and each lock/unlock performs an atomic compare‑exchange and may cause a kernel transition on contention. Together they introduce roughly 2 words of per‑allocation overhead plus the cost of atomic operations on every clone, lock, and unlock, plus potential cache‑line bouncing when multiple threads contend. In practice the overhead is modest for low‑contention workloads but can dominate performance if locks are heavily contested. 
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+let data = Arc::new(Mutex::new(0usize));
+let mut handles = Vec::new();
+
+for _ in 0..4 {
+    let d = Arc::clone(&data);
+    handles.push(thread::spawn(move || {
+        let mut guard = d.lock().unwrap(); // atomic lock
+        *guard += 1;                       // read‑modify‑write
+    }));
+}
+for h in handles { h.join().unwrap(); }
+println!(""Result: {}"", *data.lock().unwrap());
+```","`Arc<T>` stores a pointer to a heap‑allocated control block that holds the reference count (an atomic usize) and the `T` value; each clone increments the atomic count, so the overhead is one extra pointer per handle plus the atomic increment/decrement on every clone or drop. `Mutex<T>` wraps the data with a lock flag (usually a `pthread_mutex_t` or a platform‑specific atomic flag) and may add padding to align to cache lines, so each protected value incurs at least a few extra bytes and the cost of acquiring/releasing the lock (an atomic compare‑exchange and possible kernel fallback). Together, an `Arc<Mutex<T>>` adds the pointer, the atomic ref‑count, the mutex state, and any alignment padding, plus runtime overhead from atomic operations and potential contention when multiple threads contend for the lock. In practice the memory overhead is modest (typically 2–3 words per shared value), while the performance impact depends on lock contention and the frequency of cloning the `Arc`.",,,,,,,,,,,,
+prog_003,programming,Explain TypeScript conditional types and distributive behavior over naked type parameters.,"TypeScript conditional types have the form `T extends U ? X : Y`, returning `X` if `T` is assignable to `U`, otherwise `Y`. When the checked type `T` is a *naked* type parameter (used directly, not wrapped), the conditional is applied to each member of a union individually, producing a union of the results—this is the distributive property. For example, `type Foo<T> = T extends string ? number : boolean;` yields `Foo<""a"" | 42>` → `number | boolean`. Wrapping `T` (e.g., `[T]`) disables distribution, treating the whole union as a single type. This lets you control whether you want per‑union‑member logic or a single check.","TypeScript conditional types use the syntax `T extends U ? X : Y` to select one of two types based on whether a type `T` is assignable to `U`. When the checked type `T` is a *naked* type parameter (i.e., not wrapped in a tuple or other container), the conditional distributes over each member of a union, producing a union of the results. For example, `type ToArray<T> = T extends any ? T[] : never;` applied to `string | number` yields `string[] | number[]` because the conditional is evaluated separately for `string` and `number`.",,,,,,,,,,,,
+prog_004,programming,How do buffered vs unbuffered channels differ during deadlocks in Go?,"Buffered channels have a finite queue, so a send only blocks when the buffer is full; this lets a goroutine continue past the send even if no receiver is ready yet. Unbuffered channels have no queue, so every send blocks until another goroutine receives, making mismatched send/receive patterns more likely to deadlock. A deadlock occurs when all goroutines are blocked on channel operations with no one able to proceed—unbuffered channels hit this instantly, while buffered ones can mask it until the buffer empties.  
+
+```go
+package main
+
+import (
+	""fmt""
+	""time""
+)
+
+func main() {
+	// Unbuffered deadlock
+	// ch := make(chan int) // uncomment for deadlock
+	// Buffered version avoids immediate deadlock
+	ch := make(chan int, 2)
+
+	go func() {
+		ch <- 1 // non‑blocking until two values are queued
+		ch <- 2
+		ch <- 3 // blocks here if buffer is full
+		fmt.Println(""sent 3"")
+	}()
+
+	time.Sleep(time.Second) // give sender time to block
+	fmt.Println(<-ch, <-ch) // receive two values, unblocks sender
+}
+```  
+
+With the unbuffered channel (`make(chan int)`) the first send would block forever because no receiver exists, causing a deadlock; the buffered channel (`make(chan int, 2)`) lets the first two sends proceed before blocking.","Unbuffered channels block the sender until a receiver is ready (and vice‑versa), so if no goroutine is receiving the send will stall and the runtime will report a deadlock as soon as all goroutines are blocked. Buffered channels let a send proceed until the buffer’s capacity is reached; deadlock only occurs when the buffer is full and no goroutine is receiving, or when all goroutines are otherwise blocked. In short, buffering adds slack that can prevent immediate deadlocks, but once the buffer is exhausted the same deadlock condition applies.",,,,,,,,,,,,
+prog_005,programming,Write a PostgreSQL window function query calculating 7-day rolling revenue.,"Use a windowed `SUM()` that looks back six days plus the current day:  
+
+```sql
+SELECT
+    sale_date,
+    revenue,
+    SUM(revenue) OVER (
+        ORDER BY sale_date
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS revenue_7day_rolling
+FROM sales
+ORDER BY sale_date;
+```  
+
+This returns each day’s revenue and the total revenue for that day and the previous six days.","Use a window sum over the last seven days:
+
+```sql
+SELECT
+    sale_date,
+    revenue,
+    SUM(revenue) OVER (
+        ORDER BY sale_date
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS revenue_7day_rolling
+FROM sales
+ORDER BY sale_date;
+```
+
+This sums each day’s revenue with the previous six days, giving a 7‑day rolling total. Adjust the table/column names as needed.",,,,,,,,,,,,
+prog_006,programming,Implement an LRU cache decorator using collections.OrderedDict.,"Here’s a compact LRU‑cache decorator built on `collections.OrderedDict` that limits the cache to a given `maxsize` and evicts the least‑recently‑used entry when the limit is exceeded:
+
+```python
+from collections import OrderedDict
+from functools import wraps
+
+def lru_cache(maxsize=128):
+    def decorator(func):
+        cache = OrderedDict()
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            if key in cache:
+                cache.move_to_end(key)          # mark as recently used
+                return cache[key]
+            result = func(*args, **kwargs)
+            cache[key] = result
+            if len(cache) > maxsize:
+                cache.popitem(last=False)       # discard LRU entry
+            return result
+        return wrapper
+    return decorator
+```
+
+**Usage**
+
+```python
+@lru_cache(maxsize=3)
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+
+print([fib(i) for i in range(6)])   # cached calls after the first few
+```
+
+The decorator stores call arguments as a hashable key, moves a hit to the end of the `OrderedDict`, and removes the oldest entry once `maxsize` is exceeded.","Here’s a compact LRU‑cache decorator built on `collections.OrderedDict`:
+
+```python
+from collections import OrderedDict
+from functools import wraps
+
+def lru_cache(maxsize=128):
+    def decorator(func):
+        cache = OrderedDict()
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # key must be hashable; combine args and sorted kwargs
+            key = args + tuple(sorted(kwargs.items()))
+            if key in cache:
+                cache.move_to_end(key)          # mark as most‑recent
+                return cache[key]
+            result = func(*args, **kwargs)
+            cache[key] = result
+            if len(cache) > maxsize:            # evict least‑recent
+                cache.popitem(last=False)
+            return result
+        return wrapper
+    return decorator
+```
+
+The decorator stores results in an `OrderedDict`, moves accessed entries to the end to denote recent use, and discards the oldest entry when the cache exceeds `maxsize`. Use it like `@lru_cache(64)` above any pure function.",,,,,,,,,,,,
+prog_007,programming,Show how to structure a multi-stage Dockerfile for a production Node.js application.,"A multi‑stage Dockerfile lets you compile your Node.js app in a builder image, then copy only the runtime artifacts into a minimal production image.  
+
+In the **builder** stage you use a full Node image, set `WORKDIR`, copy `package*.json`, run `npm ci` (or `npm install`), copy the source, and run the build script (e.g., `npm run build`).  
+
+In the **final** stage you start from a lightweight Node (or `alpine`) image, copy the compiled output and only the production `node_modules`, set `NODE_ENV=production`, expose the port, and define `CMD [""node"", ""dist/index.js""]`.  
+
+```Dockerfile
+# ---------- Builder ----------
+FROM node:20 AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build   # produces ./dist
+
+# ---------- Production ----------
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+EXPOSE 3000
+CMD [""node"", ""dist/index.js""]
+```","```Dockerfile
+# ---------- Builder stage ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci               # install all deps
+COPY . .
+RUN npm run build        # compile TypeScript / bundle assets
+
+# ---------- Production stage ----------
+FROM node:20-alpine AS runtime
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev    # only production deps
+COPY --from=builder /app/dist ./dist   # copy built output
+EXPOSE 3000
+CMD [""node"", ""dist/index.js""]
+```  
+
+The first stage installs full dependencies, builds the app, and the second stage pulls only the compiled code and production‑only packages, keeping the final image small and secure.",,,,,,,,,,,,
+prog_008,programming,How do C++20 coroutine promises and awaitable handles operate?,"C++20 coroutines separate the *promise* (which builds the return object and controls suspension) from the *awaitable* (which defines how `co_await` interacts with the coroutine), and the runtime uses a `std::coroutine_handle<promise_type>` to resume, destroy, or query the coroutine’s state. The promise type must provide `get_return_object()`, `initial_suspend()`, `final_suspend()`, `return_void()`/`return_value()`, and optionally `await_transform()` to customize awaiting, while any type used with `co_await` must supply `await_ready()`, `await_suspend(handle)`, and `await_resume()`. The handle is the bridge: `handle.resume()` continues execution, `handle.done()` checks completion, and `handle.destroy()` frees resources.
+
+```cpp
+#include <coroutine>
+#include <iostream>
+
+struct Generator {
+    struct promise_type {
+        int current;
+        std::suspend_always initial_suspend() noexcept { return {}; }
+        std::suspend_always final_suspend() noexcept   { return {}; }
+        auto get_return_object() noexcept {
+            return Generator{ std::coroutine_handle<promise_type>::from_promise(*this) };
+        }
+        std::suspend_always yield_value(int v) noexcept {
+            current = v;
+            return {};
+        }
+        void return_void() noexcept {}
+        void unhandled_exception() noexcept { std::terminate(); }
+    };
+
+    std::coroutine_handle<promise_type> h;
+    explicit Generator(std::coroutine_handle<promise_type> h) : h(h) {}
+    ~Generator() { if (h) h.destroy(); }
+
+    bool next() {
+        h.resume();
+        return !h.done();
+    }
+    int value() const { return h.promise().current; }
+};
+
+Generator count_to_three() {
+    co_yield 1;
+    co_yield 2;
+    co_yield 3;
+}
+
+int main() {
+    auto gen = count_to_three();
+    while (gen.next())
+        std::cout << gen.value() << ' ';
+}
+```
+
+The `promise_type` builds the `Generator` object, `co_yield` uses `yield_value` to provide an awaitable that suspends, and the `std::coroutine_handle` lets `main` drive the coroutine step‑by‑step.","In C++20 a coroutine’s **promise type** supplies the interface between the coroutine frame and the caller: it defines `get_return_object()` (the value the caller receives), `initial_suspend()` and `final_suspend()` (which control when the coroutine first suspends and when it yields control at the end), and `unhandled_exception()` (how exceptions are propagated). The **coroutine handle** (`std::coroutine_handle<promise_type>`) is a lightweight, type‑erased pointer to the coroutine’s frame; it lets the caller `resume()` the coroutine, `destroy()` its resources, and query its state (`done()`). An **awaitable** object implements `await_ready()`, `await_suspend(handle)`, and `await_resume()`; when co_awaited, the compiler generates code that uses the handle to suspend the current coroutine and resume the awaited one according to those three functions. In practice, the promise creates the handle, the handle drives execution, and awaitables decide when and how that execution is paused and resumed.",,,,,,,,,,,,
+prog_009,programming,Write a bash script with robust error handling (set -euo pipefail) to backup a directory.,"```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: backup.sh SOURCE_DIR DEST_DIR
+if [[ $# -ne 2 ]]; then
+  echo ""Usage: $0 <source_dir> <dest_dir>"" >&2
+  exit 1
+fi
+
+src=""${1%/}""
+dst=""${2%/}""
+timestamp=$(date +%Y%m%d_%H%M%S)
+archive=""${dst}/backup_${timestamp}.tar.gz""
+
+# Verify source exists and is readable
+if [[ ! -d ""$src"" || ! -r ""$src"" ]]; then
+  echo ""Error: source directory '$src' does not exist or is not readable."" >&2
+  exit 2
+fi
+
+# Create destination if missing
+mkdir -p ""$dst""
+
+# Create compressed tarball
+tar -czf ""$archive"" -C ""$(dirname ""$src"")"" ""$(basename ""$src"")""
+
+# Verify archive was created
+if [[ ! -f ""$archive"" ]]; then
+  echo ""Error: backup failed, archive not created."" >&2
+  exit 3
+fi
+
+echo ""Backup of '$src' completed successfully: $archive""
+```","Here’s a concise, robust backup script using `set -euo pipefail`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SRC_DIR=""${1:-/path/to/source}""
+DEST_DIR=""${2:-/path/to/backup}""
+TIMESTAMP=$(date +""%Y%m%d_%H%M%S"")
+ARCHIVE=""${DEST_DIR}/backup_${TIMESTAMP}.tar.gz""
+
+mkdir -p ""$DEST_DIR""
+if [[ ! -d ""$SRC_DIR"" ]]; then
+  echo ""Source directory '$SRC_DIR' does not exist."" >&2
+  exit 1
+fi
+
+tar -czf ""$ARCHIVE"" -C ""$(dirname ""$SRC_DIR"")"" ""$(basename ""$SRC_DIR"")""
+echo ""Backup of '$SRC_DIR' completed: $ARCHIVE""
+```
+
+Run it as `./backup.sh /my/data /my/backups`; it validates inputs, creates a timestamped tar.gz, and aborts on any error.",,,,,,,,,,,,
+prog_0010,programming,Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet.,"The GIL lets only one thread execute Python bytecode at a time, so CPU‑bound threads on multi‑core machines get little or no speedup. IO‑bound threads usually release the GIL while waiting for system calls (e.g., sleep, socket I/O), letting other threads run and often scaling close to the number of cores. Below is a short benchmark that runs a CPU‑heavy loop and an IO‑heavy sleep in four threads each:
+
+```python
+import time, threading
+from concurrent.futures import ThreadPoolExecutor
+
+def cpu_task():
+    # simple CPU‑bound work: sum of a large range
+    return sum(range(10_000_000))
+
+def io_task():
+    # IO‑bound work: sleep releases the GIL
+    time.sleep(0.5)
+    return ""done""
+
+def run_benchmark(func, label):
+    start = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(func, range(4)))  # launch 4 threads
+    elapsed = time.perf_counter() - start
+    print(f""{label}: {elapsed:.3f}s, results={results}"")
+
+run_benchmark(cpu_task, ""CPU‑bound"")
+run_benchmark(io_task, ""IO‑bound"")
+```","The GIL lets only one thread execute Python bytecode at a time, so CPU‑bound threads contend for it and see little speedup, while I/O‑bound threads often release the GIL during system calls and can run concurrently. In practice, a CPU‑heavy loop in multiple threads runs almost as fast as a single thread, whereas many network or file reads scale with thread count.  
+
+```python
+import threading, time, urllib.request
+
+def cpu_task():
+    x = 0
+    for _ in range(10_000_000):
+        x += 1
+
+def io_task():
+    urllib.request.urlopen('https://httpbin.org/delay/1').read()
+
+def run(fn, n):
+    start = time.time()
+    threads = [threading.Thread(target=fn) for _ in range(n)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+    print(f'{fn.__name__} x{n}: {time.time()-start:.2f}s')
+
+run(cpu_task, 4)   # little improvement over 1 thread
+run(io_task, 4)    # roughly 1 s instead of 4 s
+```",,,,,,,,,,,,
+concept_001,conceptual,Explain the CAP theorem tradeoffs between Consistency and Partition Tolerance in distributed databases.,"In the CAP theorem, a system that must tolerate network partitions (P) cannot guarantee both strong consistency (C) and full availability (A) simultaneously. When a partition occurs, choosing consistency means rejecting or delaying requests on some nodes so all responses reflect the same state; choosing availability means serving requests locally, potentially returning divergent data. Thus the trade‑off is between preserving a single, up‑to‑date view of data versus keeping the system responsive despite the partition. In practice, designers pick the side that best matches their application’s correctness and latency requirements.","The CAP theorem states that a distributed system can guarantee at most two of Consistency, Availability, and Partition tolerance simultaneously. When a network partition occurs, a system must choose between keeping data **consistent** (all nodes see the same value) or remaining **available** (serving reads/writes despite the split). Prioritizing consistency means rejecting or delaying operations on the isolated side until the partition heals; prioritizing partition tolerance (and thus availability) allows operations to continue, potentially creating divergent replicas that are reconciled later. In practice, many databases adopt “eventual consistency” to stay partition‑tolerant while offering high availability.",,,,,,,,,,,,
+concept_002,conceptual,What is Dependency Injection and how does it decouple unit testing?,"Dependency Injection (DI) is a design pattern where an object’s required collaborators are supplied from the outside rather than created internally. By receiving dependencies through constructors, setters, or interfaces, the object no longer hard‑codes concrete implementations, making it easy to swap in test doubles (mocks or stubs). This separation lets unit tests isolate the class under test, injecting lightweight substitutes that control behavior and avoid side effects. In short, DI removes tight coupling to concrete services, enabling straightforward, deterministic testing.","Dependency Injection (DI) is a design pattern where an object receives its required collaborators (services, repositories, etc.) from external code rather than creating them itself. By supplying those collaborators at construction or via setters, you can replace real implementations with lightweight test doubles (mocks or stubs) during unit tests, isolating the class under test. This separation removes hard‑coded dependencies, making tests faster, more reliable, and easier to write.",,,,,,,,,,,,
+concept_003,conceptual,Explain the ACID properties of relational databases with concrete concurrency anomalies.,"ACID guarantees that transactions are **Atomic** (all‑or‑nothing), **Consistent** (preserve database rules), **Isolated** (appear to run alone), and **Durable** (changes survive crashes). Isolation is enforced by preventing concurrency anomalies such as **dirty reads** (reading uncommitted data), **non‑repeatable reads** (seeing different values on re‑query within the same transaction), **phantom reads** (new rows appearing in a range query), and **write‑skew** (two concurrent updates that together violate a constraint). These anomalies arise when isolation levels like Read Uncommitted or Read Committed are used instead of stricter levels (Repeatable Read or Serializable). Strong isolation (Serializable) eliminates them by ensuring transactions execute as if serialized.","ACID guarantees that a transaction is **Atomic** (all-or-nothing), **Consistent** (leaves the database in a valid state), **Isolated** (appears to run alone), and **Durable** (its effects survive crashes). Isolation prevents concurrency anomalies such as **dirty reads** (reading uncommitted data), **non‑repeatable reads** (seeing different values on re‑query), **phantom reads** (new rows appearing in a range query), and **lost updates** (two transactions overwriting each other’s changes). Strong isolation levels like SERIALIZABLE eliminate all these anomalies, while weaker levels (READ COMMITTED, REPEATABLE READ) allow some of them for higher performance. Choosing the right level balances correctness against throughput.",,,,,,,,,,,,
+concept_004,conceptual,What are the core tradeoffs between microservices and a modular monolith?,"A modular monolith keeps the whole system in one deployable unit, giving you simpler testing, easier transactions, and lower operational overhead, while still letting you organize code into clear, independent modules. Microservices split functionality into separate services, offering independent scaling, technology heterogeneity, and fault isolation, but they introduce network latency, distributed‑system complexity, and higher DevOps costs. The trade‑off is essentially simplicity and cohesion versus flexibility and scalability; choose the monolith when you value rapid iteration and low ops burden, and microservices when you need granular scaling or strict isolation. In practice many teams start with a modular monolith and extract services only as clear boundaries and scaling needs emerge.","A modular monolith keeps the whole system in one deployable unit, giving you simpler deployment, easier end‑to‑end testing, and tighter data consistency, while still letting you organize code into clear, independent modules. Microservices split functionality into separate services, offering independent scaling, technology heterogeneity, and team autonomy, but they add operational overhead, network latency, and complexity around distributed transactions and monitoring. Choose a modular monolith when you value low operational cost and strong consistency, and move to microservices when you need granular scaling or isolated failure domains. The trade‑off is essentially simplicity versus flexibility and scalability.",,,,,,,,,,,,
+concept_005,conceptual,Compare REST API over-fetching with GraphQL query resolution tradeoffs.,"REST endpoints return static representations, so clients often receive more data than needed (over‑fetching) or must make multiple calls for related resources, leading to inefficiency. GraphQL lets clients request exactly the fields they need, eliminating over‑fetching, but requires a resolver layer that must assemble data per query, which can introduce N+1 query problems, higher CPU usage, and more complex caching. The trade‑off is between REST’s simpler, cache‑friendly responses and GraphQL’s flexible, bandwidth‑efficient queries that demand careful resolver design and performance monitoring.","REST endpoints often return fixed payloads, so clients may receive more fields than needed (over‑fetching) or must make multiple calls to gather related data. GraphQL lets clients specify exactly the fields they want, eliminating over‑fetching, but the server must parse, validate, and resolve each field, which can increase CPU load and complicate caching. The trade‑off is simpler, cache‑friendly REST at the cost of bandwidth versus flexible, bandwidth‑efficient GraphQL with higher query‑execution overhead. Use REST when predictable responses and CDN caching dominate; use GraphQL when clients need varied data shapes and you can manage resolver complexity.",,,,,,,,,,,,
+concept_006,conceptual,Walk through recursive DNS resolution from root servers to authoritative records.,"A recursive resolver first queries a root name server, which returns the NS records for the TLD (e.g., `.com`). The resolver then contacts one of those TLD servers, receiving the NS records for the domain’s authoritative zone (e.g., `example.com`). It finally queries an authoritative server for that zone, which returns the requested record (A, AAAA, MX, etc.) and often includes a TTL for caching. The resolver caches each response along the way so future lookups can skip the earlier steps.","A recursive resolver receives your domain query, then asks a root server for the “.com” (TLD) name‑server referral. It contacts that TLD server, which points it to the domain’s authoritative name server, and finally queries that server for the exact record (A, AAAA, MX, etc.). The authoritative server returns the answer, which the resolver caches and sends back to the client. Each step is cached to speed up future lookups.",,,,,,,,,,,,
+concept_007,conceptual,Explain the generational garbage collection hypothesis and how it optimizes heap scanning.,"The generational garbage‑collection hypothesis observes that most objects die young, so the heap is divided into a short‑lived “young” generation and a longer‑lived “old” generation. By scanning only the young generation most frequently, the collector examines a small, densely populated region where most garbage resides, reducing overall heap‑scanning work. Objects that survive several young‑generation collections are promoted to the old generation, which is scanned less often because its objects tend to be long‑lived. This separation lets the GC focus effort where it’s most effective, improving throughput and pause times.","The generational garbage‑collection hypothesis observes that most objects die young, so the heap is divided into a young generation (where new objects are allocated) and an older generation (for survivors). By collecting the young generation frequently and only scanning the old generation when necessary, the collector reduces the amount of memory it must examine, because most live objects are found in the young space and the old space is scanned less often. This selective scanning cuts overall heap‑traversal cost and improves pause times while still eventually reclaiming long‑lived objects.",,,,,,,,,,,,
+concept_008,conceptual,What is the difference between symmetric and asymmetric encryption in TLS key exchanges?,"Symmetric encryption uses a single shared secret key to both encrypt and decrypt data, offering fast performance for bulk data transfer; asymmetric encryption uses a public‑private key pair, allowing parties to establish that shared secret securely without prior exchange. In TLS, asymmetric algorithms (e.g., RSA, ECDHE) negotiate or exchange the symmetric session key, after which all application data is protected with symmetric encryption. This combination leverages the speed of symmetric ciphers and the secure key agreement of asymmetric cryptography.","Symmetric encryption uses a single shared secret key for both encrypting and decrypting data, offering high speed for bulk traffic. Asymmetric encryption employs a public‑private key pair; the public key encrypts (or verifies) and the private key decrypts (or signs), providing authentication and secure key exchange but at lower performance. In TLS, the asymmetric step secures the exchange of a pre‑master secret, after which both parties derive symmetric keys for the actual data transfer. (Language pair: auto‑detect → TLS terminology)",,,,,,,,,,,,
+concept_009,conceptual,Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.,"1. The client generates a high‑entropy code verifier, derives a code challenge (e.g., SHA‑256 base64‑url‑encoded), and redirects the user’s browser to the authorization endpoint with client_id, redirect_uri, response_type=code, code_challenge, code_challenge_method, and requested scopes.  
+2. The user authenticates and consents; the authorization server redirects back to redirect_uri with an authorization code and the original state value.  
+3. The client sends a POST to the token endpoint containing grant_type=authorization_code, code, redirect_uri, client_id, code_verifier, and (if applicable) client authentication.  
+4. The server verifies that the code_verifier matches the previously received code_challenge; upon success it returns an access token (and optionally a refresh token) to the client.","1. The client (e.g., a mobile app) generates a high‑entropy **code verifier** and derives a **code challenge** (usually a SHA‑256 hash) from it, then starts the flow by sending the user to the authorization endpoint with the challenge, client ID, redirect URI, and requested scopes.  
+2. The user authenticates with the authorization server and, if needed, grants consent; the server then redirects the user back to the client’s redirect URI, appending an **authorization code**.  
+3. The client receives this code and makes a back‑channel POST to the token endpoint, sending the code, its client ID, redirect URI, and the original **code verifier**.  
+4. The authorization server hashes the verifier, compares it to the original challenge, and if they match, issues an **access token** (and optionally a refresh token and ID token).  
+5. The client can now use the access token to call protected APIs; the PKCE step ensures that a leaked authorization code cannot be exchanged without the verifier, protecting public clients.",,,,,,,,,,,,
+concept_010,conceptual,Explain Event-Driven Architecture event sourcing vs change data capture.,"Event‑Driven Architecture (EDA) uses immutable events as the primary means of communication between services, allowing decoupled, reactive processing. Event sourcing stores every state‑changing action as an event in an append‑only log, making the log the source of truth for rebuilding any aggregate’s state. Change Data Capture (CDC) instead reads the data‑store’s transaction log or triggers to emit events that reflect row‑level changes, without treating those events as the authoritative state source. In short, event sourcing models business events as the canonical data, while CDC captures low‑level data mutations to synchronize downstream systems.","Event‑Driven Architecture (EDA) builds systems around immutable events that represent something that happened, letting services react to those events asynchronously. Event sourcing stores every state‑changing action as an event in an append‑only log, so the current state is rebuilt by replaying those events. Change Data Capture (CDC) instead monitors a database’s transaction log or tables and emits events that reflect the *result* of a change (insert, update, delete) without preserving the original intent or full history. Thus, event sourcing is a design pattern for modeling state, while CDC is a technique for extracting change events from existing data stores.",,,,,,,,,,,,
+concise_001,concise_pref,What does HTTP status code 429 signify?,"HTTP 429 means “Too Many Requests.” It indicates the client has sent more requests than the server allows within a defined time window, typically as part of rate‑limiting. The response may include a Retry‑After header telling the client when to try again.","HTTP 429 means “Too Many Requests.” It indicates the client has sent more requests than the server allows within a given time window, typically as part of rate‑limiting. The response usually includes a Retry‑After header telling the client when to try again.",,,,,,,,,,,,
+concise_002,concise_pref,Git rebase vs git merge: what is the key difference?,"Git merge combines two branches by creating a new merge commit that preserves the original branch histories. Git rebase moves (rewrites) the commits from one branch onto the tip of another, producing a linear, “as‑if‑you‑had‑worked‑on‑the‑target‑branch” history. Use merge to keep full history; use rebase for a cleaner, linear timeline.","Git merge combines two branches by creating a new merge commit that preserves the original branch histories, resulting in a graph with a fork‑and‑join shape. Git rebase moves (rewrites) the commits from one branch onto the tip of another, producing a straight‑line history without a merge commit. Use merge when you want to keep the true chronological context; use rebase when you prefer a clean, linear log.",,,,,,,,,,,,
+concise_003,concise_pref,Explain the TCP 3-way handshake.,"The TCP 3‑way handshake establishes a reliable connection between a client and server. 1) The client sends a SYN packet to the server, indicating the initial sequence number. 2) The server replies with a SYN‑ACK, acknowledging the client’s SYN and providing its own sequence number. 3) The client sends an ACK to confirm the server’s sequence number, after which the connection is open and data transfer can begin.","The TCP 3‑way handshake sets up a reliable connection between two hosts.  
+1. The client sends a **SYN** packet to the server, indicating it wants to connect.  
+2. The server replies with a **SYN‑ACK**, acknowledging the client’s SYN and sending its own SYN.  
+3. The client finishes with an **ACK**, acknowledging the server’s SYN.  
+After this exchange both sides agree on initial sequence numbers and the connection is established.",,,,,,,,,,,,
+concise_004,concise_pref,Docker volume vs bind mount difference.,"A Docker **volume** is a managed storage area stored in Docker’s internal directory (e.g., `/var/lib/docker/volumes`). It’s created, backed up, and shared across containers by Docker, and its data persists even if the container is removed. A **bind mount** maps a specific host directory or file into the container’s filesystem; it uses the host’s path directly, so changes on the host are immediately visible inside the container and vice versa. Volumes are preferred for persistent, Docker‑managed data, while bind mounts are useful for development or when you need to expose a host directory to the container.","A Docker volume is a managed storage area that Docker creates and owns, stored under `/var/lib/docker/volumes/`. A bind mount uses a host directory or file directly, specified by an absolute path. Volumes are easier to back up, share between containers, and are removed with `docker volume rm`; bind mounts give you direct access to host files and can expose host data to the container. Use volumes for persistent, container‑managed data; use bind mounts for development, configuration files, or when you need to edit files on the host.",,,,,,,,,,,,
+concise_005,concise_pref,What are Redis allkeys-lru vs volatile-lru eviction policies?,"Redis eviction policies decide which keys to remove when memory is full.  
+**allkeys-lru** evicts the least‑recently‑used key from the entire keyspace, regardless of expiration.  
+**volatile-lru** evicts only keys that have an expiration set (TTL), again using the least‑recently‑used heuristic.  
+Both use an LRU approximation, not a perfect LRU.","Redis eviction policies decide which keys to remove when memory is full.  
+**allkeys-lru** evicts the least‑used key from the entire dataset, regardless of expiration.  
+**volatile-lru** evicts only keys that have an expiration set, again using least‑used order.  
+So, allkeys‑lru can delete any key, while volatile‑lru is limited to expiring keys.",,,,,,,,,,,,
+concise_006,concise_pref,What does API idempotency mean for HTTP POST and PUT?,"Idempotency means that making the same HTTP request multiple times has the same effect as making it once.  
+For **PUT**, the operation is naturally idempotent: each identical request replaces the resource with the same data, so repeated calls leave the resource unchanged.  
+For **POST**, idempotency is not guaranteed by default; you must design the server (e.g., using a client‑supplied idempotency key) so that repeated POSTs create the same resource or return the same result instead of duplicating it.","Idempotency means that making the same request repeatedly produces the same result as making it once.  
+For a **PUT** request, the operation is naturally idempotent: each identical PUT updates the resource to the same state.  
+For a **POST**, idempotency is optional; if the server assigns a unique identifier (e.g., via an Idempotency-Key header) and ignores duplicate POSTs, it can behave idempotently, otherwise each POST may create a new resource.",,,,,,,,,,,,
+concise_007,concise_pref,What are the rules of Semantic Versioning MAJOR.MINOR.PATCH?,"Semantic Versioning (SemVer) uses the format MAJOR.MINOR.PATCH.  
+- Increment MAJOR when you make incompatible API changes.  
+- Increment MINOR when you add functionality in a backward‑compatible way.  
+- Increment PATCH for backward‑compatible bug fixes.  
+Pre‑release and build metadata can be appended after a hyphen or plus sign, but they don’t affect version precedence.","Semantic Versioning (MAJOR.MINOR.PATCH) follows these rules:
+
+1. **MAJOR** version increments when you make incompatible API changes.  
+2. **MINOR** version increments when you add functionality in a backward‑compatible manner.  
+3. **PATCH** version increments when you make backward‑compatible bug fixes.  
+
+Pre‑release and build metadata can be appended after a `-` or `+`, but they don’t affect the version precedence rules.",,,,,,,,,,,,
+concise_008,concise_pref,Why do browsers enforce Cross-Origin Resource Sharing (CORS)?,"Browsers enforce CORS to enforce the same‑origin policy, which protects users from malicious sites reading data they shouldn’t see.  
+When a script from one origin requests a resource from another, the server must explicitly allow it; otherwise the browser blocks the response.  
+This prevents cross‑site request forgery, data leaks, and other attacks that could exploit a user’s authenticated session or sensitive data.","Browsers enforce CORS to uphold the same‑origin policy, which prevents a web page from freely accessing resources on another domain. This protects users from malicious sites that could read sensitive data or perform unwanted actions on behalf of the user. CORS works by having the server send specific headers that explicitly allow or deny cross‑origin requests, giving developers control over which origins can interact with their APIs.",,,,,,,,,,,,
+concise_009,concise_pref,What four conditions are necessary for deadlock to occur?,"Deadlock requires four conditions:  
+1. **Mutual exclusion** – at least one resource is non‑shareable.  
+2. **Hold and wait** – a process holds resources while requesting more.  
+3. **No preemption** – resources cannot be forcibly taken away.  
+4. **Circular wait** – a cycle of processes each waiting for a resource held by the next.","Deadlock requires four conditions:  
+1. **Mutual exclusion** – at least one resource is non‑shareable.  
+2. **Hold and wait** – a process holds resources while requesting more.  
+3. **No preemption** – resources cannot be forcibly taken away.  
+4. **Circular wait** – a cycle of processes each waiting for a resource held by the next.",,,,,,,,,,,,
+concise_010,concise_pref,What is the difference between a process and a thread in Linux?,"A process is an isolated execution context with its own memory space, file descriptors, and scheduling priority, while a thread shares the process’s address space and resources but has its own stack and program counter. Processes are heavier, requiring context switches that copy more state; threads are lighter, enabling faster communication and lower overhead. In Linux, the kernel treats threads as special kinds of processes (tasks) that share the same PID namespace but have distinct TIDs. This sharing allows threads to communicate via shared memory without IPC mechanisms, whereas processes must use pipes, sockets, or shared memory explicitly.","A process in Linux is an independent program instance with its own memory space, file descriptors, and scheduling priority. A thread is a lightweight execution unit that shares the same memory space and resources of its parent process but has its own stack and program counter. Threads can communicate faster and switch context more cheaply than processes, but a crash in one thread can bring down the entire process.",,,,,,,,,,,,
+detail_001,detailed_pref,How do you plan and execute a zero-downtime database schema migration?,"Plan the migration in three phases: (1) **prepare** by adding nullable columns, creating new tables, and writing backward‑compatible code; (2) **deploy** the new schema changes with a rolling update or blue‑green deployment, keeping the old schema live; (3) **switch** by updating application routing to the new schema, then drop the old objects after a safe period. Use feature flags, database replication, and automated rollback scripts to ensure any failure can be reversed instantly, guaranteeing zero downtime.","Plan by making only backward‑compatible changes: add new columns, tables, or indexes first, then drop old ones later. Execute in phases—run the “add” migration in a maintenance window, test reads/writes, then enable feature toggles to switch to the new schema, and finally run the “remove” migration after confirming no live traffic uses the old objects. Use a blue‑green or canary deployment, monitor latency and error rates, and keep a rollback script ready. This staged, reversible approach keeps the database online and avoids downtime.",,,,,,,,,,,,
+detail_002,detailed_pref,Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.,"Micro‑Frontends with Module Federation split a monorepo or repo‑per‑team into independently deployable bundles that expose components or routes via a shared `webpack.config.js`. Each host app consumes remote modules by declaring a `remotes` entry and a `shared` map to dedupe common libraries, enabling runtime loading of the latest remote code. Deployment is typically container‑based: each micro‑frontend is built, versioned, and pushed to a CDN or artifact store; the host pulls the remote manifest at runtime, allowing zero‑downtime updates. To keep consistency, use a shared versioning policy (e.g., semantic tags) and a central registry that tracks remote URLs, so the host can resolve the correct remote version without redeploying.","Micro‑Frontends with Module Federation split a large app into independently deployable “remote” bundles that expose components, while a “host” app stitches them together at runtime. Each remote is built with Webpack 5, declares shared libraries (React, Redux, etc.) in its `moduleFederationPlugin`, and is published to a CDN or artifact store. The host imports those exposed modules via dynamic imports, allowing hot updates without redeploying the whole app. Deployment is typically CI‑driven: each remote is built, versioned, and pushed to a CDN; the host pulls the latest remote manifests, caches them, and falls back to a local bundle if a remote is unavailable. This strategy gives teams autonomy, reduces build times, and keeps runtime bundle sizes small.",,,,,,,,,,,,
+detail_003,detailed_pref,Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.,"Token‑bucket allows bursts: tokens accumulate at a fixed rate up to a bucket size; each request consumes a token, and if none are available the request is delayed or rejected. Leaky‑bucket smooths traffic: it drains at a constant rate, so requests are queued and served at a steady pace regardless of burstiness. Implementation tradeoffs: token‑bucket is simpler to code and supports bursty traffic, but requires careful token‑refill logic; leaky‑bucket guarantees strict pacing and is easier to enforce with a single timer, but it can waste capacity if traffic is uneven. In practice, token‑bucket is preferred for API rate limits, while leaky‑bucket suits traffic shaping on network interfaces.","Token‑bucket allows bursts: tokens accumulate up to a bucket size, and each request consumes a token; if the bucket is empty the request is throttled. Leaky‑bucket smooths traffic by draining the bucket at a constant rate, so requests are served at a steady pace regardless of bursts. In practice, token‑bucket is simpler to implement with a counter and timestamp, and it gives more flexibility for bursty traffic. Leaky‑bucket requires a queue or timer to enforce the constant leak, which can add latency but guarantees a perfectly regular output rate. Thus, choose token‑bucket for burst tolerance and leaky‑bucket when you need strict, smooth traffic shaping.",,,,,,,,,,,,
+detail_004,detailed_pref,How should an enterprise securely implement JWT authentication with token rotation and revocation?,"Use short‑lived access tokens (e.g., 5–15 min) signed with a strong algorithm (RS256 or ES256) and embed a unique `jti` and `exp`. Issue a long‑lived refresh token (e.g., 30 days) stored in an HTTP‑Only, Secure cookie or encrypted storage, and rotate it on every use: when a client presents a refresh token, the server issues a new access token **and** a new refresh token, then invalidates the old one. Keep a revocation store (e.g., Redis or a database table) keyed by `jti` or a token‑version field; check this store on each request to block revoked tokens. Enforce HTTPS everywhere, validate audience, issuer, and signature, and consider short‑lived refresh tokens with a “token version” claim that the server increments on logout or credential changes. This pattern gives you stateless access tokens, secure rotation, and a simple revocation mechanism.","1. Issue a short‑lived access JWT (e.g., 15 min) and a long‑lived refresh JWT (e.g., 30 days) signed with a secure algorithm (RS256 or HS256 with a strong key).  
+2. Store the refresh token in an HTTP‑Only, Secure cookie or a dedicated token store; when the access token expires, the client sends the refresh token to a protected `/refresh` endpoint that validates the token, checks a revocation list, and issues a new access token plus a new refresh token (rotating the old one).  
+3. Maintain a server‑side revocation list (e.g., Redis or a database table keyed by token ID or jti) and mark a refresh token as revoked when the user logs out, changes password, or the token is detected as compromised; reject any subsequent refresh attempts with that token.  
+4. Optionally, embed a `jti` claim in each JWT, enforce short token lifetimes, and use a secure, tamper‑evident storage for revocation data to ensure that revoked tokens cannot be reused.",,,,,,,,,,,,
+detail_005,detailed_pref,Walk through Raft consensus leader election and log replication failure recovery.,"**Raft Leader Election (step‑by‑step)**  
+
+1. **Initial state** – All servers start as *followers* with a current term = 0.  
+2. **Election timeout** – If a follower receives no heartbeats within its randomized timeout, it becomes a *candidate*, increments its term, votes for itself, and sends `RequestVote` RPCs to all peers.  
+3. **Vote collection** – A server grants its vote if the candidate’s term ≥ its own term and it has not voted in this term.  
+4. **Majority check** – When a candidate receives votes from a majority of servers, it transitions to *leader*, resets its heartbeat timer, and starts sending periodic `AppendEntries` heartbeats.  
+5. **Term out‑of‑sync** – If a server receives an RPC with a higher term, it updates its term, reverts to follower, and records the new leader’s ID.  
+
+**Log Replication & Failure Recovery (step‑by‑step)**  
+
+1. **AppendEntries from leader** – The leader sends `AppendEntries` RPCs containing the next log index, previous log term, and a batch of new entries.  
+2. **Consistency check** – Each follower verifies that its log contains an entry at `prevLogIndex` with term `prevLogTerm`. If not, it rejects the RPC and returns the index of the conflict.  
+3. **Conflict resolution** – The follower truncates its log from the conflicting index onward and appends the new entries.  
+4. **Commit index update** – The leader updates its `commitIndex` when it knows that a majority of followers have stored an entry at a given index.  
+5. **State machine apply** – Followers apply committed entries to their state machines in order.  
+
+**Failure scenarios & recovery**  
+
+- **Leader crash** – Followers detect missing heartbeats, start a new election, and a new leader is elected. The new leader may have a different log; it will use `AppendEntries` to bring followers up‑to‑date.  
+- **Network partition** – If a majority of nodes remain connected, they elect a leader and continue replication. Nodes in minority partitions will stay followers; once connectivity returns, they catch up via `AppendEntries` and may be forced to roll back to the majority’s log.  
+- **Stale follower","In Raft, a follower that hasn’t heard from a leader for a timeout becomes a candidate, increments its term, votes for itself, and requests votes from all peers. If it receives a majority of votes, it becomes leader, sends initial heartbeats (AppendEntries with no entries) to assert authority, and starts replicating new log entries to followers. Followers append received entries to their logs and reply success; the leader waits for a majority of acknowledgments before committing the entry and applying it to the state machine. If a leader fails, followers time out, start a new election, and the new leader will catch up any out‑of‑sync followers by sending missing entries via AppendEntries until all logs are consistent.",,,,,,,,,,,,
+detail_006,detailed_pref,Detail the Linux process lifecycle from fork/exec through zombie and termination.,"**Linux Process Lifecycle – Step‑by‑Step**
+
+1. **`fork()`**  
+   - The kernel creates a new task descriptor (task_struct) for the child.  
+   - The child inherits the parent’s memory space via copy‑on‑write, file descriptors, signal dispositions, and other attributes.  
+   - `fork()` returns `0` in the child and the child’s PID in the parent.
+
+2. **`exec()`**  
+   - The child replaces its memory image with a new program: the kernel loads the executable’s ELF headers, sets up a new stack, and maps the program’s segments.  
+   - The process’s PID remains unchanged; only the address space, registers, and auxiliary vectors are updated.  
+   - After a successful `exec()`, the child’s previous code and data are discarded.
+
+3. **Execution Phase**  
+   - The process runs until it either exits normally (`exit()`/`_exit()`), is terminated by a signal, or is killed by the kernel.  
+   - While running, it may spawn more children, open files, create threads, etc.
+
+4. **Termination**  
+   - **Normal exit**: The process calls `exit()` or returns from `main()`. The kernel cleans up resources (file descriptors, memory mappings, etc.) but keeps the task_struct alive until the parent reads its status.  
+   - **Signal termination**: If a fatal signal (e.g., SIGKILL, SIGTERM) is delivered, the kernel performs the same cleanup but may also perform signal‑specific actions (e.g., core dump).  
+   - **Kernel‑initiated exit**: For example, a process that exceeds its resource limits may be killed by the kernel.
+
+5. **Zombie State**  
+   - After termination, the process enters the *zombie* state: its task_struct remains to hold exit status and PID until the parent calls `wait()`/`waitpid()`.  
+   - The zombie holds minimal resources (no memory, no open files) but retains the PID and exit code.
+
+6. **Reaping**  
+   - The parent performs `wait()`/`waitpid()` (or receives `SIGCHLD`) to collect the child’s exit status.  
+   - The kernel then frees the task_struct, releasing the PID back to the pool.  
+   - If the parent dies before reaping, the init process (PID 1) adopts the zombie and reaps it automatically.
+
+7. **Edge Cases**  
+   - **Orphaned","When a process calls **fork()**, the kernel creates a child process that is an exact copy of the parent, including its address space and file descriptors. The child then typically calls **exec()**, which replaces its memory image with a new program while preserving the PID and open files. When the child finishes, it calls **exit()**; the kernel marks it as a **zombie**—its exit status is stored, but its resources aren’t fully released until the parent calls **wait()** or **waitpid()**. Once the parent reaps the child, the zombie is removed and the process’s resources are freed.",,,,,,,,,,,,
+detail_007,detailed_pref,How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?,"Use a dependency graph to run only the affected projects, enable parallel jobs, and cache build artifacts per package. Leverage a remote cache (e.g., Bazel, Gradle, or a custom artifact store) so that identical outputs are reused across runs. Enable incremental builds and artifact promotion to avoid full rebuilds after each commit. Configure the pipeline to trigger only on changed directories and use matrix jobs for language‑specific builds. Monitor cache hit rates and adjust cache TTLs or storage tiers to keep the cache fresh and efficient.","Use a dependency graph to run only the affected projects in parallel, and split the pipeline into stages that can be cached independently. Store build artifacts and test results in a remote cache keyed by commit hash and dependency hash, so repeated runs reuse the same outputs. Leverage incremental build tools (e.g., Bazel, Pants, Nx) that detect file changes and rebuild only what’s necessary. Finally, run selective test suites (unit, integration, smoke) based on the changed modules, and use a shared artifact registry to avoid re‑downloading dependencies.",,,,,,,,,,,,
+detail_008,detailed_pref,"Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.","Virtual memory paging in x86‑64 maps 48‑bit virtual addresses to 52‑bit physical frames using a four‑level page‑table hierarchy: PML4 → PDPT → PD → PT. Each page‑table entry contains the physical frame number plus permission and status bits (present, writable, user, etc.). The CPU translates a virtual address by walking these tables, combining the frame numbers with the page offset to form a physical address. A Translation Lookaside Buffer (TLB) caches recent virtual‑to‑physical mappings; on a TLB miss, the hardware walks the page tables, loads the entry into the TLB, and then performs the translation.","Virtual memory paging lets the CPU treat physical RAM as a set of fixed‑size pages, mapping virtual addresses to physical ones so programs can use more memory than physically available. The OS builds multi‑level page tables (PML4, PDPT, PD, PT in x86‑64) that translate each virtual page number into a physical frame number. When a virtual address is accessed, the CPU walks these tables, but to avoid repeated table walks it first checks the Translation Lookaside Buffer (TLB), a small cache of recent virtual‑to‑physical mappings. If the TLB contains the entry, the CPU uses it directly; otherwise it performs the table walk, loads the mapping into the TLB, and then proceeds.",,,,,,,,,,,,
+detail_009,detailed_pref,Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.,"B‑trees keep data sorted on disk, so each write updates a single leaf node and may cause a cascade of page splits, leading to high write amplification when many updates target the same region. LSM‑trees batch writes in memory, flush them to sorted runs on disk, and merge runs lazily, so each write touches only the in‑memory buffer and a few merge passes, reducing write amplification but increasing read amplification. The trade‑off is that B‑trees offer lower read latency and simpler consistency, while LSM‑trees excel at high write throughput and lower write amplification at the cost of more complex compaction and higher read costs.","B‑tree indexes keep data sorted on disk, so every insert or update rewrites the leaf page and may cause a cascade of page splits, leading to high write amplification—often 2–3× the logical write size. LSM‑tree engines buffer writes in memory, flush them as large sorted runs, and merge runs lazily, so each logical write is written once to the new run and later merged, giving lower write amplification (≈1×) but higher read amplification due to multiple runs. The trade‑off is that B‑trees offer lower read latency and simpler range queries, while LSM‑trees excel in write‑heavy workloads with lower write amplification at the cost of more complex compaction and potentially higher read costs.",,,,,,,,,,,,
+detail_010,detailed_pref,Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.,"**TLS 1.3 1‑RTT Handshake – Cryptographic Negotiation (Step‑by‑Step)**  
+
+1. **ClientHello (1st round‑trip)**  
+   - Client sends `ClientHello` with:  
+     - TLS version 1.3, random, session ID, cipher‑suite list (e.g., `TLS_AES_128_GCM_SHA256`), key‑share entry (client’s X25519 public key), supported groups, and extensions (`supported_versions`, `supported_groups`, `key_share`, `pre_shared_key`, `early_data`, etc.).  
+   - No server authentication or key exchange data is sent yet.
+
+2. **ServerHello (1st round‑trip)**  
+   - Server replies with `ServerHello` containing:  
+     - Selected cipher‑suite, server’s random, selected key‑share (server’s X25519 public key), and any extensions (`supported_versions`, `key_share`, `pre_shared_key`, `supported_groups`).  
+   - Server may also send `EncryptedExtensions` immediately after, which include server‑chosen parameters (e.g., `supported_groups`, `signature_algorithms`, `supported_versions`).
+
+3. **Server Authentication & Certificate**  
+   - Server sends `Certificate` (X.509 chain) and `CertificateVerify` (signature over the transcript up to this point).  
+   - Server may also send `CertificateRequest` if client authentication is required.
+
+4. **Server Finished**  
+   - Server sends `Finished` containing the hash of the entire handshake transcript so far, encrypted with the handshake traffic secret derived from the shared key.
+
+5. **Client Finished**  
+   - Client receives all server messages, verifies the server’s `Finished` using the handshake traffic secret.  
+   - Client then sends its own `Finished` message, encrypted with the same handshake traffic secret.
+
+6. **Key","1. **ClientHello** – The client sends a ClientHello containing supported cipher suites, a random nonce, and its own key share (DH or ECDHE).  
+2. **ServerHello + ServerKeyShare** – The server replies with a ServerHello, its own key share, and a Certificate chain; it then signs the handshake transcript with its private key (CertificateVerify).  
+3. **Finished** – The server sends a Finished message that includes a hash of all previous handshake messages, proving integrity.  
+4. **ClientKeyShare + Finished** – The client responds with its key share (if not already sent) and a Finished message; both sides derive the shared secret, compute traffic keys, and the 1‑RTT handshake is complete.",,,,,,,,,,,,
+conflict_001,code_conflict,Explain the Observer design pattern and its advantages.,"The Observer pattern lets an object (the subject) maintain a list of dependents (observers) and automatically notify them of state changes, usually via a callback or event. It decouples the subject from its observers, so each can evolve independently. Advantages include easier maintenance, dynamic subscription, and a single source of truth that keeps all observers in sync without tight coupling. This makes systems more modular, testable, and scalable.","The Observer pattern defines a one‑to‑many dependency between objects so that when one object (the subject) changes state, all its dependents (observers) are automatically notified and updated. It decouples the subject from its observers, allowing each to evolve independently. Advantages include easier maintenance, dynamic subscription of observers, and support for broadcast communication without tight coupling. This makes systems more modular, testable, and adaptable to change.",,,,,,,,,,,,
+conflict_002,code_conflict,Explain the Observer design pattern and its advantages.,"The Observer pattern lets an object (the **subject**) maintain a list of dependents (**observers**) and automatically notify them of state changes, usually via a `notify()` method.  
+**Advantages:** it promotes loose coupling—observers can be added or removed at runtime without altering the subject; it supports one‑to‑many relationships, enabling multiple components to react to a single event; and it centralizes change‑propagation logic, simplifying maintenance.  
+
+```python
+class Subject:
+    def __init__(self):
+        self._observers = []
+
+    def register(self, obs):
+        self._observers.append(obs)
+
+    def notify(self, data):
+        for obs in self._observers:
+            obs.update(data)
+
+class Observer:
+    def update(self, data):
+        print(f""Received: {data}"")
+
+# Usage
+sub = Subject()
+sub.register(Observer())
+sub.notify(""Hello"")
+```
+This snippet shows a subject notifying all registered observers when new data arrives.","The Observer pattern lets an object (the **subject**) maintain a list of dependents (**observers**) and automatically notify them of state changes, usually via a callback or event method.  
+When the subject’s state changes, it loops through its observers and calls their update method, keeping the subject and observers loosely coupled.  
+Advantages include: **decoupling** (subjects don’t need to know observer details), **dynamic subscription** (observers can join or leave at runtime), and **broadcast communication** (one change can inform many observers).  
+
+```python
+class Subject:
+    def __init__(self):
+        self._observers = []
+
+    def register(self, obs):
+        self._observers.append(obs)
+
+    def notify(self, data):
+        for obs in self._observers:
+            obs.update(data)
+
+class Observer:
+    def update(self, data):
+        print(f""Observer received: {data}"")
+
+# Usage
+sub = Subject()
+sub.register(Observer())
+sub.notify(""Hello, observers!"")
+```",,,,,,,,,,,,
+conflict_003,code_conflict,How does binary search work over sorted arrays?,"Binary search repeatedly splits a sorted array in half. It compares the target value to the middle element; if they match, the search ends. If the target is smaller, the algorithm discards the upper half; if larger, it discards the lower half. This halving continues until the element is found or the subarray size becomes zero, giving a logarithmic time complexity of O(log n).","Binary search works on a sorted array by repeatedly halving the search interval.  
+Start with the whole array, find the middle element, and compare it to the target.  
+If the middle equals the target, you’re done; if the target is smaller, discard the upper half; if larger, discard the lower half.  
+Repeat this process on the remaining half until the target is found or the interval is empty.  
+The algorithm runs in \(O(\log n)\) time because the array size is halved each step.",,,,,,,,,,,,
+conflict_004,code_conflict,How does binary search work over sorted arrays?,"Binary search works on a sorted array by repeatedly dividing the search interval in half.  
+Start with the whole array, compare the target to the middle element, and keep only the half that could contain the target.  
+Repeat this halving until the target is found or the interval becomes empty.  
+The algorithm runs in O(log n) time, making it very efficient for large sorted lists.","Binary search repeatedly splits a sorted array in half, comparing the target value to the middle element.  
+If the target equals the middle, the search ends.  
+If the target is smaller, the algorithm discards the upper half; if larger, it discards the lower half.  
+This halving continues until the target is found or the subarray becomes empty, giving \(O(\log n)\) time.  
+
+```python
+def binary_search(arr, target):
+    lo, hi = 0, len(arr) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+```",,,,,,,,,,,,
+conflict_005,code_conflict,Explain the Circuit Breaker pattern for distributed microservices.,"The Circuit Breaker pattern prevents a failing service from repeatedly being called, which would waste resources and cascade failures. It tracks failures and, after a threshold, trips to an “open” state where calls fail immediately for a cooldown period. Once the period ends, it allows a limited number of test calls; if they succeed, the breaker closes, otherwise it stays open. This protects downstream services and improves overall system resilience.","The Circuit Breaker pattern prevents a failing service from repeatedly trying to contact a downstream microservice, which would otherwise exacerbate latency and resource exhaustion. It monitors call success/failure rates and, when failures exceed a threshold, trips to an “open” state where calls fail fast for a cooldown period. After the cooldown, it allows a limited number of “half‑open” test calls; if they succeed, the breaker closes, otherwise it reopens. This protects the system from cascading failures and gives services time to recover.",,,,,,,,,,,,
+conflict_006,code_conflict,Explain the Circuit Breaker pattern for distributed microservices.,"The Circuit Breaker pattern prevents a failing service from repeatedly trying to execute a call that is likely to fail, protecting the system from cascading failures. It tracks failures and, after a threshold, opens the circuit so subsequent calls return immediately or fallback logic, then periodically tries to close it once the service appears healthy.  
+
+In a Spring Boot microservice you can use Resilience4j:
+
+```java
+@CircuitBreaker(name = ""myService"", fallbackMethod = ""fallback"")
+public String callRemote() {
+    return restTemplate.getForObject(""http://remote/api"", String.class);
+}
+
+private String fallback(Throwable t) {
+    return ""Service unavailable – fallback response"";
+}
+```
+
+This opens the circuit after a set number of failures, then retries after a cooldown period.","The Circuit Breaker pattern protects microservices from cascading failures by monitoring call success/failure rates. When failures exceed a threshold, the circuit “opens,” immediately returning an error without attempting the remote call. After a timeout, it “closes” or goes to a half‑open state to test if the service has recovered. If the test succeeds, the circuit closes; if it fails, it reopens. This keeps the system responsive and prevents overload of failing services.",,,,,,,,,,,,
+conflict_007,code_conflict,How does exponential backoff with jitter prevent thundering herds?,"Exponential backoff with jitter spreads retry attempts over time by first increasing the wait period exponentially and then adding a random offset. This prevents many clients from retrying simultaneously, which would otherwise create a “thundering herd” that overloads the server. The random jitter ensures that even if the base backoff times are the same, each client’s retry schedule differs, smoothing traffic and reducing peak load.","Exponential backoff spreads retries by increasing the wait time after each failure, so not all clients retry at the same instant. Adding jitter randomizes that wait time, preventing synchronized retries that would otherwise create a “thundering herd.” Together, they reduce peak load spikes and improve overall system stability. This approach is common in distributed systems and API rate‑limiting.",,,,,,,,,,,,
+conflict_008,code_conflict,How does exponential backoff with jitter prevent thundering herds?,"Exponential backoff spreads retry attempts over increasing time intervals, so a single request isn’t retried immediately after a failure. Adding jitter randomizes each interval, preventing many clients from retrying at the same moment. Together, they break the synchronized burst of traffic that would otherwise overwhelm the server, thus avoiding a thundering herd.","Exponential backoff spreads retries over time by doubling the wait interval after each failure, so not all clients retry simultaneously. Adding jitter randomizes each client’s wait within that interval, preventing them from lining up on the same retry tick. Together, they break the synchronized burst of traffic that would otherwise overwhelm a server—this is the “thundering herd” problem. The result is a smoother, more predictable load on the system.",,,,,,,,,,,,
+conflict_009,code_conflict,Explain how pagination works using offset-based vs cursor-based strategies.,"Offset‑based pagination uses a numeric offset and a page size, e.g. `SELECT … LIMIT 20 OFFSET 40`, which skips the first 40 rows and returns the next 20. It’s simple but can return duplicate or missing rows if the underlying data changes between requests.  
+
+Cursor‑based pagination returns a cursor (often the last row’s unique key) and the next query uses `WHERE id > cursor LIMIT 20`. This approach is stable against inserts/deletes and scales better for large datasets, but requires a unique, monotonically increasing key.","Offset‑based pagination uses a numeric offset (e.g., `?page=3&size=20`) to skip a set number of rows, which is simple but can become slow and inconsistent when the underlying data changes. Cursor‑based pagination passes a token (often the last seen record’s ID or a composite key) to fetch the next set, ensuring stable ordering and better performance on large datasets. The cursor approach avoids duplicate or missing rows during inserts/deletes, but requires a stable sort key and can be slightly more complex to implement. In practice, cursor pagination is preferred for high‑traffic APIs, while offset works fine for small, static lists.",,,,,,,,,,,,
+conflict_010,code_conflict,Explain how pagination works using offset-based vs cursor-based strategies.,"Offset‑based pagination uses a page number or offset value to skip rows, e.g. `SELECT … LIMIT 20 OFFSET 40`. It’s simple but can return duplicate or missing rows if the underlying data changes between requests. Cursor‑based pagination returns a token (often the last row’s key) and the next query uses `WHERE key > cursor LIMIT 20`. This approach is more stable with inserts/deletes and scales better for large datasets.","Offset‑based pagination uses a numeric offset and limit: `SELECT * FROM table ORDER BY id LIMIT 20 OFFSET 40;` It’s simple but can double‑count or miss rows if data changes between requests. Cursor‑based pagination stores the last seen key (e.g., `id > 123`) and fetches the next set: `SELECT * FROM table WHERE id > 123 ORDER BY id LIMIT 20;` This approach is stable under inserts/deletes and scales better for large datasets. Cursor queries can be written in SQL or using ORM methods, e.g., `db.query('SELECT * FROM table WHERE id > ?', [lastId], { limit: 20 })`. Both methods return the same number of rows, but cursor pagination avoids the performance hit of large offsets.",,,,,,,,,,,,
+override_001,override,Explain Kubernetes architecture in deep detail with a comprehensive overview.,"Kubernetes is a container‑orchestration platform built around a master‑node/worker‑node architecture. The **control plane** (master) runs the API server, scheduler, controller manager, and etcd. The API server exposes a RESTful interface; all cluster state is stored in etcd, a distributed key‑value store. The scheduler watches for unscheduled pods and assigns them to nodes based on resource requests, taints, and affinity rules. The controller manager runs controllers (e.g., replication, endpoint, node, job, cronjob) that reconcile desired state with actual state by watching API objects and issuing commands to the kubelet.
+
+Each **worker node** runs a kubelet, kube-proxy, and container runtime (Docker, containerd, CRI‑O). The kubelet registers the node with the API server, pulls images, starts containers, and reports pod status. Kube-proxy implements cluster networking via iptables or IPVS, creating virtual IPs (ClusterIP) and load‑balancing services across pods. The node also runs the pod sandbox and manages local storage volumes.
+
+**Networking**: Pods receive unique IPs from a CIDR block; the CNI plugin (Calico, Flannel, Weave, etc.) configures networking and network policies. Services expose pods via stable IPs and DNS names; external traffic can be routed through Ingress controllers (NGINX, Traefik) or load balancers. Network policies enforce traffic rules between pods.
+
+**Storage**: Persistent volumes (PVs) and persistent volume claims (PVCs) abstract storage. Dynamic provisioning uses StorageClasses to provision PVs on demand from cloud providers or local storage. CSI drivers plug into the kubelet to attach/detach volumes.
+
+**Deployment model**: Deployments, StatefulSets, DaemonSets, and Jobs manage pod replicas, rolling updates, and scaling. ReplicaSets ensure the desired number of pod replicas. Horizontal Pod Autoscaler (HPA) scales replicas based on metrics (CPU, custom). Cluster Autoscaler adjusts node count in cloud environments.
+
+**Security**: RBAC controls API access; PodSecurityPolicies or OPA Gatekeeper enforce","Kubernetes is a container orchestration system built around a master‑node cluster that runs a control plane (API server, scheduler, controller manager, etcd) and worker nodes that run kubelet, kube-proxy, and container runtime. The control plane manages cluster state, scheduling pods to nodes, and maintaining desired configurations, while kubelet on each node ensures containers match the spec and reports status back to the API server. Networking is handled by a flat IP space and a CNI plugin, allowing pods to communicate across nodes, and services expose stable endpoints via load balancers or DNS. Storage is abstracted through persistent volumes and dynamic provisioning, letting pods attach durable storage regardless of node location. This architecture enables declarative, scalable, and self‑healing deployments across heterogeneous environments.",,,,,,,,,,,,
+override_002,override,"What is WebAssembly? Give me a quick, concise one-paragraph answer.","WebAssembly (Wasm) is a low‑level binary instruction format designed for fast, efficient execution in web browsers and other environments. It compiles high‑level languages like C, C++, Rust, and JavaScript into a compact, stack‑based bytecode that runs at near‑native speed. Wasm enables performance‑critical applications—such as games, video editing, and scientific simulations—to run securely and portably across browsers and servers.","WebAssembly (Wasm) is a low‑level binary format designed for fast, efficient execution in web browsers and other environments. It compiles high‑level languages like C, C++, Rust, and JavaScript into a compact, platform‑independent representation that runs at near‑native speed. Wasm enables developers to build performance‑critical web applications, games, and even server‑side services that load quickly and execute securely.",,,,,,,,,,,,
+override_003,override,"Explain monads in functional programming. Do not give me code, concept only.","Monads are a design pattern that encapsulate values together with a computational context—such as possible failure, state, or I/O—so that functions can be composed without exposing that context. They provide two core operations: `return` (or `unit`) to inject a plain value into the context, and `bind` (or `flatMap`) to chain operations while preserving the context. By obeying the monad laws—left identity, right identity, and associativity—monads guarantee predictable composition. This abstraction lets programmers write pure, modular code while still handling effects like errors, state changes, or asynchronous operations.","A monad is a design pattern that encapsulates values and a context, providing a way to chain operations while preserving that context. It defines two main functions: `bind` (often written as `>>=`) to apply a function to the wrapped value and `return` (or `pure`) to wrap a plain value. Monads enforce a uniform interface, so different contexts—like lists, options, or IO—can be composed with the same syntax. This abstraction lets you write modular, composable code without leaking the underlying mechanics of each context.",,,,,,,,,,,,
+override_004,override,Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.,"```python
+from bs4 import BeautifulSoup
+
+html = """"""<html><body><a href=""https://example.com"">Example</a>
+<a href=""/local"">Local</a></body></html>""""""
+
+soup = BeautifulSoup(html, ""html.parser"")
+links = [a.get(""href"") for a in soup.find_all(""a"") if a.get(""href"")]
+print(links)  # ['https://example.com', '/local']
+```
+
+This script parses the HTML, extracts all `<a>` tags, pulls their `href` attributes, and prints the list of hyperlinks.","Here’s a minimal script that extracts all `<a>` tag URLs from an HTML string:
+
+```python
+from bs4 import BeautifulSoup
+
+html = """"""<html><body>
+<a href=""https://example.com"">Example</a>
+<a href=""/local/page"">Local</a>
+</body></html>""""""
+
+soup = BeautifulSoup(html, ""html.parser"")
+links = [a.get(""href"") for a in soup.find_all(""a"") if a.get(""href"")]
+print(links)  # ['https://example.com', '/local/page']
+```
+
+The script parses the HTML, finds every `<a>` tag, pulls its `href` attribute, and prints a list of URLs.",,,,,,,,,,,,
+override_005,override,What is the capital of Australia? Just give me the final answer all at once.,Canberra is the capital of Australia.,Canberra is the capital of Australia.,,,,,,,,,,,,
+override_006,override,"Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.","TLS certificates are validated by the client by first receiving the server’s certificate chain, then verifying each certificate’s signature against the next‑higher certificate, ending with a root certificate that must match a trusted root in the client’s root store. The client checks each certificate’s validity period, ensures the domain matches the subject or SAN, and consults revocation lists (CRL or OCSP) to confirm the cert hasn’t been revoked. If all signatures chain to a trusted root and no revocation or expiration issues exist, the chain is accepted and the connection proceeds. This process guarantees that the server’s identity is authenticated by a trusted authority.","TLS certificates are validated by checking the certificate chain: the server’s leaf certificate is verified against its issuer’s certificate, and this process repeats until a root certificate is reached. Each certificate’s signature is verified using the issuer’s public key, and the certificate’s validity period, revocation status (via CRL or OCSP), and key usage extensions are checked. The root certificate must be present in the client’s trusted root store and must be self‑signed; its trust anchor is assumed trustworthy. If any step fails—invalid signature, expired date, revoked status, or missing root—the chain is rejected and the connection is aborted. This chain‑of‑trust model ensures that only certificates issued by trusted authorities are accepted.",,,,,,,,,,,,
+override_007,override,What port does standard HTTPS use? Keep it short and brief.,HTTPS uses port 443 by default.,HTTPS uses port 443 by default.,,,,,,,,,,,,
+override_008,override,What are the security principles behind Zero Trust architecture? No programming code please.,"Zero Trust architecture is built on the idea that no user or device is trusted by default, even inside the network. Its core principles are: **verify every request** (continuous authentication and authorization), **apply least privilege** (users and services only get the minimum access they need), **segment the network** into micro‑segments to limit lateral movement, and **assume breach** (design for detection and rapid response). Continuous monitoring and real‑time analytics are also essential to detect anomalies and enforce policies automatically.","Zero Trust architecture is built on the idea that no user or device is trusted by default, even if inside the network. The core principles are: **verify every request** (continuous authentication and authorization), **assume breach** (minimize trust boundaries), **least privilege** (grant only the minimum access needed), **micro‑segmentation** (isolate workloads to limit lateral movement), and **continuous monitoring** (log, analyze, and respond to anomalies). These principles collectively reduce attack surface and limit damage if a breach occurs.",,,,,,,,,,,,
+override_009,override,Show me the exact Python code to compute Fibonacci numbers with memoization.,"Here’s a concise Python implementation using `functools.lru_cache` for memoization:
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n: int) -> int:
+    """"""Return the nth Fibonacci number.""""""
+    return n if n <= 1 else fib(n-1) + fib(n-2)
+
+# Example usage:
+print([fib(i) for i in range(10)])  # 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
+```
+
+The decorator caches each computed value, so subsequent calls are O(1).","Here’s a minimal Python implementation using `functools.lru_cache` for memoization:
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n: int) -> int:
+    """"""Return the nth Fibonacci number.""""""
+    return n if n <= 1 else fib(n - 1) + fib(n - 2)
+```
+
+Call `fib(10)` to get the 10th Fibonacci number, and the cache automatically stores intermediate results.",,,,,,,,,,,,
+override_010,override,"What is the boiling point of water at sea level? Skip the steps, just the answer.",The boiling point of water at sea level is 100 °C (212 °F). This is the temperature at which water vapor pressure equals atmospheric pressure.,The boiling point of water at sea level is 100 °C (212 °F).,,,,,,,,,,,,

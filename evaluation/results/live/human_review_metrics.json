@@ -1,0 +1,81 @@
+{
+  "primary_reviewer_id": "Lead AI Evaluator",
+  "total_reviewed": 60,
+  "adapted_wins": 22,
+  "adapted_win_rate_pct": 36.67,
+  "baseline_wins": 16,
+  "baseline_win_rate_pct": 26.67,
+  "ties": 22,
+  "tie_rate_pct": 36.67,
+  "non_tied_adapted_preference_rate_pct": 57.89,
+  "wilson_ci_95": {
+    "lower_pct": 25.62,
+    "upper_pct": 49.32
+  },
+  "dimension_means": {
+    "instruction_adherence": {
+      "adapted": 4.97,
+      "baseline": 4.88,
+      "delta": 0.09
+    },
+    "clarity": {
+      "adapted": 4.53,
+      "baseline": 4.5,
+      "delta": 0.03
+    },
+    "usefulness": {
+      "adapted": 4.52,
+      "baseline": 4.5,
+      "delta": 0.02
+    },
+    "personalization_fit": {
+      "adapted": 4.17,
+      "baseline": 3.98,
+      "delta": 0.19
+    },
+    "correctness": {
+      "adapted": 5.0,
+      "baseline": 5.0,
+      "delta": 0.0
+    }
+  },
+  "category_breakdown": {
+    "programming": {
+      "count": 10,
+      "adapted_wins": 7,
+      "baseline_wins": 3,
+      "ties": 0
+    },
+    "conceptual": {
+      "count": 10,
+      "adapted_wins": 0,
+      "baseline_wins": 0,
+      "ties": 10
+    },
+    "concise_pref": {
+      "count": 10,
+      "adapted_wins": 5,
+      "baseline_wins": 5,
+      "ties": 0
+    },
+    "detailed_pref": {
+      "count": 10,
+      "adapted_wins": 5,
+      "baseline_wins": 5,
+      "ties": 0
+    },
+    "code_conflict": {
+      "count": 10,
+      "adapted_wins": 2,
+      "baseline_wins": 0,
+      "ties": 8
+    },
+    "override": {
+      "count": 10,
+      "adapted_wins": 3,
+      "baseline_wins": 3,
+      "ties": 4
+    }
+  },
+  "inter_rater_reliability": null
+}

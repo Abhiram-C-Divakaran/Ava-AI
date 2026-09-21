@@ -12,6 +12,13 @@ API_KEY = os.getenv("GROQ_API_KEY", "")
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+# Upstream Groq compatibility mapping for decommissioned models
+GROQ_MODEL_COMPAT_MAP = {
+    "llama-3.3-70b-versatile": "openai/gpt-oss-20b",
+    "llama-3.3-70b-specdec": "openai/gpt-oss-20b",
+    "llama-3.1-70b-versatile": "openai/gpt-oss-20b",
+}
+
 BASE_SYSTEM_PROMPT = """You are Ava — a capable, honest, and friendly AI assistant.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -311,8 +318,9 @@ def handle_repetition_request(message: str) -> str | None:
     # Extract the number - look for patterns like "100 times", "10 times", "5x"
     number_match = re.search(r'\b(\d+)\s*(?:times?|x)\b', msg, re.IGNORECASE)
     if not number_match:
-        # Try to find any number
-        number_match = re.search(r'\b(\d+)\b', msg)
+        # Only fallback to bare number if the verb is specifically 'repeat'
+        if re.search(r'\brepeat\b', msg):
+            number_match = re.search(r'\brepeat\b.*?\b(\d+)\b', msg)
         if not number_match:
             return None
     
@@ -410,10 +418,10 @@ def build_system_prompt(custom_instructions: str = "", personality: str = "frien
 # ─── LLM CALL FUNCTIONS ───────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
+def call_llm(prompt: str, max_retries: int = 8, temperature: float = 0.65,
              custom_instructions: str = "", personality: str = "friendly",
              max_tokens: int = 2000, system_prompt_override: str | None = None,
-             mode: str = "flash") -> str:
+             mode: str = "flash", model: str | None = None) -> str:
     """
     Call the LLM with the given prompt.
     
@@ -441,8 +449,10 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
     else:
         system_prompt = base_prompt
     
+    req_model = model or os.getenv("GROQ_MODEL", MODEL)
+    actual_model = GROQ_MODEL_COMPAT_MAP.get(req_model, req_model)
     payload = {
-        "model": MODEL,
+        "model": actual_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -462,7 +472,16 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
             elif response.status_code in (429, 502, 503, 504):
                 if attempt == max_retries - 1:
                     raise ValueError(f"Groq API transient error {response.status_code}: {response.text}")
-                wait = min(2 ** attempt, 4)
+                # Check for explicit retry wait time from Groq
+                wait_match = re.search(r"try again in (?:(\d+)m)?([0-9.]+)(ms|s)", response.text)
+                if wait_match:
+                    mins = float(wait_match.group(1)) if wait_match.group(1) else 0.0
+                    val = float(wait_match.group(2))
+                    unit = wait_match.group(3)
+                    secs = (val / 1000.0) if unit == "ms" else val
+                    wait = min((mins * 60.0) + secs + 0.5, 10.0)
+                else:
+                    wait = min(2 ** attempt, 4)
                 time.sleep(wait)
                 continue
             elif 400 <= response.status_code < 500:
@@ -481,7 +500,8 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
 
 
 def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: str = "friendly",
-                       system_prompt_override: str | None = None, mode: str = "flash") -> Generator[str, None, None]:
+                       system_prompt_override: str | None = None, mode: str = "flash",
+                       model: str | None = None) -> Generator[str, None, None]:
     """
     Streaming version of LLM call.
     
@@ -513,8 +533,10 @@ def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: 
     else:
         system_prompt = base_prompt
     
+    req_model = model or os.getenv("GROQ_MODEL", MODEL)
+    actual_model = GROQ_MODEL_COMPAT_MAP.get(req_model, req_model)
     payload = {
-        "model": MODEL,
+        "model": actual_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
