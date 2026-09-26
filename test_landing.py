@@ -32,6 +32,8 @@ class TestLandingPage(unittest.TestCase):
         cls.css_path = os.path.join(BASE_DIR, "assets", "landing", "landing.css")
         cls.js_path = os.path.join(BASE_DIR, "assets", "landing", "landing.js")
         cls.favicon_path = os.path.join(BASE_DIR, "assets", "landing", "favicon.svg")
+        cls.privacy_path = os.path.join(BASE_DIR, "privacy.html")
+        cls.terms_path = os.path.join(BASE_DIR, "terms.html")
 
         with open(cls.index_path, "r", encoding="utf-8") as f:
             cls.index_html = f.read()
@@ -41,6 +43,12 @@ class TestLandingPage(unittest.TestCase):
 
         with open(cls.css_path, "r", encoding="utf-8") as f:
             cls.landing_css = f.read()
+
+        with open(cls.privacy_path, "r", encoding="utf-8") as f:
+            cls.privacy_html = f.read()
+
+        with open(cls.terms_path, "r", encoding="utf-8") as f:
+            cls.terms_html = f.read()
 
         cls.parser = SimpleDOMParser()
         cls.parser.feed(cls.index_html)
@@ -204,6 +212,123 @@ class TestLandingPage(unittest.TestCase):
         self.assertIn("--landing-shadow", self.landing_css)
         self.assertIn("--landing-container", self.landing_css)
         self.assertIn("prefers-reduced-motion", self.landing_css)
+
+    def test_13_persona_cards_section_heading_and_subtitle(self):
+        """Verify section heading and subtitle reflect truthful personas rather than fake stories."""
+        self.assertIn("Built for Different Ways of Working", self.index_html)
+        self.assertIn(
+            "AvaAI adapts to different workflows, preferences, and levels of technical depth.",
+            self.index_html
+        )
+        self.assertNotIn("Real stories from people who do more with AvaAI", self.index_html)
+        self.assertNotIn("Real stories from people who do more with AvaAI", self.landing_js)
+        self.assertNotIn("Loved by Individuals and Teams", self.index_html)
+
+    def test_14_no_fictional_testimonial_endorsements(self):
+        """Verify fictional demo names are removed and truthful persona cards are used."""
+        fictional_names = ["Sarah Chen", "Marcus Rivera", "Emily Carter"]
+        for name in fictional_names:
+            self.assertNotIn(name, self.index_html)
+            self.assertNotIn(name, self.landing_js)
+
+        persona_roles = ["Designer", "Developer", "Builder"]
+        for role in persona_roles:
+            self.assertIn(role, self.landing_js)
+
+        persona_descriptions = [
+            "Keep ideas organized, explore alternatives, and get concise creative support without repeating context.",
+            "Move between focused code assistance and deeper technical explanations based on how you prefer to work.",
+            "Turn goals into actionable plans while Ava remembers useful context across sessions."
+        ]
+        for desc in persona_descriptions:
+            self.assertIn(desc, self.landing_js)
+
+    def test_15_exact_behavioral_dimensions_documented(self):
+        """Verify the 6 exact behavioral dimensions from adaptation.py are documented without fake dimensions."""
+        real_dimensions = [
+            "verbosity",
+            "technical_depth",
+            "code_examples",
+            "step_by_step",
+            "examples",
+            "tone"
+        ]
+        for dim in real_dimensions:
+            self.assertIn(dim, self.landing_js)
+
+        # Ensure fake dimension names are not documented
+        fake_dimensions = ["Persona (adaptation.py)", "Autonomy (adaptation.py)", "Reasoning (adaptation.py)"]
+        for fake in fake_dimensions:
+            self.assertNotIn(fake, self.landing_js)
+
+    def test_16_exact_response_strategies_documented(self):
+        """Verify the 6 exact response strategies from adaptation.py are documented without fake strategies."""
+        real_strategies = [
+            "concise_direct",
+            "concise_with_code",
+            "detailed_step_by_step",
+            "step_by_step_code",
+            "code_first",
+            "detailed_explanation"
+        ]
+        for strat in real_strategies:
+            self.assertIn(strat, self.landing_js)
+
+        # Ensure obsolete/invented strategy names are absent
+        fake_strategies = [
+            "Socratic Questioning",
+            "Guided Reasoning",
+            "Structured Framework",
+            "Expressive Storytelling",
+            "Minimal Confirmation"
+        ]
+        for fake in fake_strategies:
+            self.assertNotIn(fake, self.landing_js)
+
+    def test_17_truthful_automated_test_metric(self):
+        """Verify automated test count is updated to 140+ reflecting all PR CI tests."""
+        self.assertIn("140+", self.landing_js)
+        self.assertIn("Automated Tests", self.landing_js)
+        self.assertNotIn("128+", self.landing_js)
+        self.assertNotIn("128+", self.index_html)
+
+    def test_18_truthful_free_use_faq_copy(self):
+        """Verify free-use copy is accurate for stable v1.0.1 without claiming release preview or free forever."""
+        expected_free_faq = "AvaAI is currently free to use. You can create an account without a credit card and start chatting."
+        self.assertIn(expected_free_faq, self.landing_js)
+        self.assertNotIn("release preview", self.landing_js)
+        self.assertNotIn("release preview", self.index_html)
+        self.assertNotIn("free forever", self.landing_js)
+        self.assertNotIn("free forever", self.index_html)
+
+    def test_19_truthful_contact_channel(self):
+        """Verify contact link points to GitHub issues and no fake support email is published."""
+        self.assertIn("https://github.com/Abhiram-C-Divakaran/Ava-AI/issues", self.index_html)
+        self.assertNotIn("mailto:support@ava.ai", self.index_html)
+        self.assertNotIn("mailto:support@ava.ai", self.terms_html)
+
+    def test_20_model_claim_openai_gpt_oss_120b(self):
+        """Verify FAQ model claim accurately specifies openai/gpt-oss-120b via Groq."""
+        self.assertIn("openai/gpt-oss-120b via Groq", self.landing_js)
+        self.assertNotIn("llama-3.3-70b-versatile", self.index_html)
+        self.assertNotIn("llama-3.3-70b-versatile", self.landing_js)
+
+    def test_21_no_v3_branding_in_any_page(self):
+        """Verify v3.0 branding is absent across index.html, privacy.html, and terms.html."""
+        self.assertNotIn("v3.0", self.index_html)
+        self.assertNotIn("v3.0", self.privacy_html)
+        self.assertNotIn("v3.0", self.terms_html)
+        self.assertIn("v1.0.1", self.index_html)
+
+    def test_22_auth_and_session_validation_architecture(self):
+        """Verify auth flow requires server session validation and rejects stale local state."""
+        self.assertIn("fetch(`/api/sessions/${encodeURIComponent(user.user_id)}`", self.landing_js)
+        self.assertIn("credentials: 'same-origin'", self.landing_js)
+        self.assertIn("response.status === 401 || response.status === 403", self.landing_js)
+        self.assertIn("signedOut()", self.landing_js)
+        # Ensure anonymous user generation does not exist
+        self.assertNotIn("generateAnonymousUser", self.landing_js)
+        self.assertNotIn("anon-", self.landing_js)
 
 
 if __name__ == "__main__":

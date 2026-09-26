@@ -4,38 +4,33 @@
  * AvaAI Landing Page Application Logic
  *
  * Technical Trust Metrics:
- * - 6 Behavior Dimensions: Formality, Verbosity, Tone, Reasoning, Persona, Autonomy (adaptation.py)
- * - 6 Response Strategies: Direct Answer, Guided Reasoning, Socratic Questioning,
- *   Structured Framework, Expressive Storytelling, Minimal Confirmation
- * - 128+ Automated Tests: Verified backend regression, reliability, security, LLM & adaptation suite
+ * - 6 Behavioral Dimensions: verbosity, technical_depth, code_examples, step_by_step, examples, tone (adaptation.py)
+ * - 6 Response Strategies: concise_direct, concise_with_code, detailed_step_by_step, step_by_step_code, code_first, detailed_explanation
+ * - 140+ Automated Tests: Verified backend regression, reliability, security, LLM & adaptation suite
  * - 0 Vector Databases: Ava uses pure structured persistent factual memory without vector DBs or RAG
  */
 const trustContent = {
   stats: [
     ['brain', '6', 'Behavior Dimensions'],
     ['sparkles', '6', 'Response Strategies'],
-    ['check', '128+', 'Automated Tests'],
+    ['check', '140+', 'Automated Tests'],
     ['database', '0', 'Vector Databases']
   ],
-  // Replace with verified user testimonials before public marketing use.
-  testimonials: [
+  personas: [
     {
-      name: 'Sarah Chen',
-      role: 'Product Designer',
-      initials: 'SC',
-      quote: 'AvaAI remembers the little things that matter across sessions. It feels like an assistant that genuinely understands context.'
+      role: 'Designer',
+      icon: 'bulb',
+      desc: 'Keep ideas organized, explore alternatives, and get concise creative support without repeating context.'
     },
     {
-      name: 'Marcus Rivera',
-      role: 'Software Engineer',
-      initials: 'MR',
-      quote: 'The behavioral adaptation is incredible — Ava matches my preferred explanation depth without me having to repeat instructions.'
+      role: 'Developer',
+      icon: 'bolt',
+      desc: 'Move between focused code assistance and deeper technical explanations based on how you prefer to work.'
     },
     {
-      name: 'Emily Carter',
-      role: 'Startup Founder',
-      initials: 'EC',
-      quote: 'Clean, fast, and remarkably helpful. Having persistent memory without heavyweight setup has made our workflow seamless.'
+      role: 'Builder',
+      icon: 'check',
+      desc: 'Turn goals into actionable plans while Ava remembers useful context across sessions.'
     }
   ],
   socials: [
@@ -58,7 +53,7 @@ const features = [
 const faqs = [
   [
     'Is AvaAI free to use?',
-    'AvaAI is currently free to use during our release preview. You can create an account in seconds without a credit card to start chatting.'
+    'AvaAI is currently free to use. You can create an account without a credit card and start chatting.'
   ],
   [
     'Does Ava remember my conversations?',
@@ -132,8 +127,8 @@ const demos = [
     question: 'How do you adapt to my working style?',
     intro: "Ava continuously refines its response policies based on your feedback:",
     items: [
-      'Calibrates verbosity and formality to your style',
-      'Selects optimal reasoning and structure strategies',
+      'Calibrates verbosity, tone, and technical depth to your style',
+      'Selects optimal response strategies based on feedback',
       'Preserves verified domain facts across conversations',
       'Reinforces winning response tactics automatically'
     ],
@@ -194,14 +189,14 @@ $('#stats').innerHTML = trustContent.stats
   )
   .join('');
 
-// Render Testimonials with data-demo-content="true"
+// Render Persona / Use-Case Cards
 let reviewOffset = 0;
 function renderReviews() {
-  const entries = trustContent.testimonials;
+  const entries = trustContent.personas;
   $('#testimonials').innerHTML = entries
     .map((_, i) => {
       const r = entries[(i + reviewOffset) % entries.length];
-      return `<article class="testimonial glass" data-demo-content="true"><div class="avatar" aria-hidden="true">${r.initials}</div><div><blockquote>“${r.quote}”</blockquote><strong>${r.name}</strong><small>${r.role}</small></div></article>`;
+      return `<article class="testimonial glass"><div class="avatar" aria-hidden="true">${icon(r.icon)}</div><div><h3>${r.role}</h3><p>${r.desc}</p></div></article>`;
     })
     .join('');
 }
