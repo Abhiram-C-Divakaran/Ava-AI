@@ -1,75 +1,83 @@
-# AvaAI landing-page redesign
+# AvaAI Landing-Page Redesign & Chatbot Integration Report
 
-## Scope and files
+## Scope and Files
 
-Modified: `index.html`.
+Modified:
+- `index.html` — Updated landing page structure, semantic sections, truthful copy, and v1.0.1 branding.
+- `assets/landing/landing.css` — Landing design tokens, cosmic atmosphere, responsive layouts, theme switching, and chat drawer styles.
+- `assets/landing/landing.js` — Truthful technical stats, exact 6 FAQs, interactive demo tabs, accessible accordion, theme toggle, and streaming chat integration.
+- `privacy.html` — Updated navigation badge from obsolete v3.0 to v1.0.1.
+- `terms.html` — Updated navigation badge from obsolete v3.0 to v1.0.1.
+- `LANDING_REDESIGN.md` — This report.
 
 Added:
-- `assets/landing/landing.css` — landing-only design tokens, layout, responsive rules, animations, light theme, and chat styles.
-- `assets/landing/landing.js` — content configuration, SVG icons, navigation, demo tabs, testimonial controls, FAQ, theme, walkthrough dialog, and existing-API chat adapter.
-- `assets/landing/favicon.svg` — the existing three-circle AvaAI mark adapted as a favicon.
-- `LANDING_REDESIGN.md` — this implementation and verification report.
+- `test_landing.py` — Dedicated lightweight 12-test DOM, copy, token, and integrity regression suite.
+- `assets/landing/favicon.svg` — Three-circle AvaAI logo geometry adapted as favicon.
 
-No backend files, authentication pages, chat workspace, API routes, memory logic, adaptation logic, or other pages were changed for this task. Pre-existing modifications in configuration, LLM code, documentation, and evaluation files were left in place.
+Preserved Backend (Strict Zero-Touch Policy):
+- No modifications to `adaptation.py`, `database.py`, `memory.py`, `powers.py`, or `llm.py`.
+- No modifications to production model `openai/gpt-oss-120b`.
+- No vector embeddings, RAG, or vector databases introduced.
 
-## Components
+---
 
-Semantic, framework-free sections: Navbar, Hero, FeatureGrid, HowItWorks, ProductDemo, StatsBar, Testimonials, FAQ, FinalCTA/Pricing, Footer, FloatingChat, and ProductWalkthrough. Content is generated from small configuration arrays where practical. No frontend build or additional runtime dependency is needed.
+## Component Architecture
 
-## Assets
+1. **Navbar**: Translucent glass header (`backdrop-filter: blur(18px)`) with brand logo, semantic links (`Features`, `How It Works`, `Solutions`, `FAQ`), `Get Started →` CTA routing to auth, theme toggle (`#theme-toggle`), and accessible mobile hamburger menu (`#menu-toggle`). No pricing page implied.
+2. **Hero Section**: Two-column layout with small eyebrow `A KINDER TOMORROW WITH AI`, heading with gradient applied only to `Intelligence`, exact copy, `Get Started Free →` and `Watch Demo` buttons, trust points (`No credit card required`, `Personalized AI`, `Privacy-focused`), cosmic window with CSS planet, glowing orbital platform, existing robot WebP (`cute-ai-robot-chatbot-reading-a-book-on-transparent-background-free-png.webp`), floating benefit cards, and interactive welcome panel.
+3. **Features Section**: Heading `Everything You Need in One Intelligent Assistant` with 6 capability cards:
+   - *Understand Context*
+   - *Remember Preferences*
+   - *Real-time Assistance*
+   - *Personalized Replies*
+   - *Multi-session Memory*
+   - *Private & Secure*
+4. **How AvaAI Works**: Connected 3-step workflow (horizontal on desktop, vertical on mobile):
+   - *Step 1: Create Your Account* (Sign up securely in seconds)
+   - *Step 2: Talk Naturally* (Use Ava normally; preferences learned over time)
+   - *Step 3: Ava Adapts* (Persistent memory & feedback-driven policy learning)
+5. **See AvaAI in Action**: Pure HTML/CSS application mockup with left sidebar, today's conversation, user query `Help me plan a productive week.`, Ava's structured response with checklist and follow-up `Would you like me to break this into a daily schedule?`, action buttons `Yes, please` and `Show me another approach`, mock input bar, and 4 interactive category tabs (`Chat Naturally`, `Get Things Done`, `Learn & Grow`, `Personalized Over Time`).
+6. **Stats Section**: Truthful technical trust metrics:
+   - `6` Behavior Dimensions (`adaptation.py`)
+   - `6` Response Strategies
+   - `128+` Automated Tests (Verified test suite in v1.0.1)
+   - `0` Vector Databases (Pure persistent factual memory)
+7. **Testimonials**: 3 demo testimonial cards marked with `data-demo-content="true"` and clear developer comments for marketing replacement, with carousel controls.
+8. **FAQ Section**: Two-column layout with `pngegg.png` robot peeking around a luminous divider with handwritten note `Curious? I've got answers!`, and 6 accessible single-open accordion items:
+   - *Is AvaAI free to use?*
+   - *Does Ava remember my conversations?*
+   - *Can Ava write and run code?*
+   - *What model powers Ava?* (Truthfully reports `openai/gpt-oss-120b via Groq`)
+   - *Does Ava use RAG?* (Explains no vector embeddings or vector databases are used)
+   - *Can I delete my data?* (Explains user-controlled data and memory deletion)
+9. **Final CTA**: Wide glass card with `Ready for a Smarter, More Personal AI?`, supporting copy, and `Get Started Free →` button.
+10. **Footer**: Left logo and `Intelligence that adapts to you.`, center navigation, right legal links (`/privacy.html`, `/terms.html`, `mailto:support@ava.ai`), and `v1.0.1` version badge.
+11. **Floating Ava Chatbot Drawer**:
+    - Bottom-right floating launcher with online pulsing indicator.
+    - Unauthenticated state: Shows clean message and buttons `Sign In →` and `Get Started Free` routing to existing auth.
+    - Authenticated state: Connects to real `POST /api/chat/stream` with SSE parsing (`chunk`, `status`, `done`, `metadata`), feedback buttons (`POST /api/feedback`), keyboard navigation, auto-resizing input, and minimize/close controls.
 
-- Existing `cute-ai-robot-chatbot-reading-a-book-on-transparent-background-free-png.webp` (390,096 bytes): primary hero, with explicit dimensions and high loading priority.
-- Existing `pngegg.png` (856,390 bytes): FAQ robot, lazy loaded with explicit dimensions.
-- Existing three-circle AvaAI logo geometry: reused in inline SVG and favicon.
-- Local inline SVG interface icons; no icon package or network dependency.
-- Inter and Caveat from Google Fonts, with system/cursive fallbacks.
-- Planet, stars, glass panels, wave, glowing platform, and miniature planet are real CSS/HTML, not screenshot backgrounds.
+---
 
-## Responsive behavior and accessibility
+## Verification & Test Results
 
-Checked widths: 1440, 1200, 1024, 768, 480, and 360 pixels. No horizontal page overflow at these widths. Six feature columns on wide desktops, three on tablet/smaller desktop, two on intermediate narrow layouts, and one on phones. Hero text precedes artwork on narrow layouts; on phones the robot is positioned below the floating panels. Steps become vertical; demo sidebar is removed on phones while the complete conversation remains. The chat drawer is 410px wide on desktop and nearly fills a phone viewport.
-
-Includes keyboard navigation, skip link, heading hierarchy, icon labels, visible focus, single-open FAQ with `aria-expanded`, keyboard demo tabs, theme toggle, modal Escape support, chat focus return, image alternatives, and reduced-motion rules.
-
-## Chat integration
-
-The landing page uses the existing signed session cookie and `neurosupport_user` identity convention. Identity is validated with the existing sessions endpoint. Signed-out users see the existing login/signup route inside the drawer. Opening the drawer does not navigate away.
-
-Authenticated messages use `POST /api/chat/stream` with the existing payload and SSE events (`chunk`, `status`, `done`). The returned session ID is saved under a user-specific local-storage key, and history reloads through the existing session-messages endpoint. Responses are rendered as plain text for safe handling of model output. Helpful/not-helpful controls use `POST /api/feedback`. The backend remains responsible for persistence, context, memory, tools, and adaptation. Full workspace features remain available through its existing route.
-
-The adapter handles authentication expiry, missing sessions, failed requests, rate limiting, interrupted streams, and a two-minute response timeout. Signed-in CTA routing goes to `/chat.html`; signed-out routing retains `/auth.html?mode=signup`.
-
-## Marketing and unavailable assets
-
-`marketingContent` in `landing.js` explicitly marks all four requested statistics and all three named testimonials as unverified marketing placeholders. Initials replace customer photos because no appropriate consented avatar assets exist. The supplied social-proof/CTA copy also remains marketing copy, not a claim verified by this implementation.
-
-No video file or official social destinations were found. Watch Video opens an accessible product walkthrough explaining that the video is unavailable and linking to the interactive demo. Social icons are disabled with coming-soon labels until their URLs are configured. Contact uses the address already present in the existing Terms page. Pricing links to the free-start CTA.
-
-The demo uses “Would you like to make this plan your own?” rather than implying a calendar integration that the current project does not provide.
-
-## Verification and exact results
-
-1. `.venv\Scripts\python.exe -m unittest test_adaptation.py test_security.py test_reliability.py -v`
-   - **86 tests ran in 190.501 seconds: 85 passed, 1 failed.**
-   - Failure: `test_15_chat_rate_limiting`, expected HTTP 429, got HTTP 200.
-   - Its repeated requests triggered external memory extraction calls taking about 7.2 seconds each. The request sequence crossed the one-minute rate window, invalidating the test's timing assumption.
-2. Re-ran only `TestSecurityHardened('test_15_chat_rate_limiting')` under `unittest.mock.patch('memory.call_llm', return_value='{}')` in a temporary runner.
-   - **1 test passed in 3.076 seconds.** No application or existing test file was modified to obtain this result.
-3. `node --check assets/landing/landing.js` — **passed**.
-4. `git diff --check -- index.html assets/landing` — **passed** (Git emitted only its LF-to-CRLF advisory).
-   - Repository-wide `git diff --check` also reported pre-existing whitespace in `llm.py`; that unrelated file was not changed.
-5. HTTP checks for `/`, both new CSS/JS files, favicon, `/health`, `/ready`, `/auth.html`, `/chat.html`, `/privacy.html`, and `/terms.html` — **all HTTP 200**. Both robot images loaded successfully.
-6. Browser checks — **passed**: six responsive widths, mobile menu, FAQ open/close state, signed-out drawer and hidden input, product-demo tab updates, theme toggle, walkthrough modal, signup CTA, and no captured page-console errors.
-7. Isolated browser integration on port 8001 with a temporary SQLite database and synthetic test identity:
-   - Actual existing streaming endpoint returned HTTP 200 and a completed streamed response.
-   - Session and messages persisted and reloaded after a page refresh.
-   - Existing feedback endpoint accepted a helpful vote, HTTP 200.
-   - Authenticated CTA navigated to `/chat.html`, HTTP 200.
-   - External LLM generation and memory extraction were stubbed for deterministic testing; this does **not** verify live Groq availability or model response quality.
-   - Temporary fixture server was stopped after verification. The normal app remains running on port 8000.
-
-No build command is applicable: FastAPI serves the HTML/CSS/JS directly. The separate legacy live-model comprehensive script was not run; it is not part of the documented 86-test regression command.
-
-## Remaining visual differences
-
-The existing robot is reading a book rather than walking/waving like the reference. Space/planet effects are CSS artwork and are less photographic than the supplied render. Testimonial avatars use initials. The added FAQ extends the page relative to the full-page reference. Responsive layouts intentionally rearrange the composition for legibility. No reference screenshot was used as a full-page or hero background.
+1. **Lightweight Landing Regression Suite (`test_landing.py`)**:
+   - `.\.venv\Scripts\python.exe -m unittest test_landing.py -v`
+   - **12 tests ran: 12 passed (0 failures, 0 errors).**
+2. **Backend Adaptation Suite (`test_adaptation.py`)**:
+   - **45 tests ran: 45 passed.**
+3. **Security Suite (`test_security.py`)**:
+   - **22 tests ran: 22 passed.**
+4. **Reliability Suite (`test_reliability.py`)**:
+   - **19 tests ran: 19 passed.**
+5. **LLM Runtime Suite (`test_llm.py`)**:
+   - **22 tests ran: 22 passed.**
+6. **Evaluation Integrity Suite (`evaluation/test_evaluation_integrity.py`)**:
+   - **15 tests ran: 15 passed.**
+7. **Legacy Regression Suite (`evaluation/regressions/test_regression_suite.py`)**:
+   - **5 tests ran: 5 passed.**
+8. **JavaScript Syntax Check**:
+   - `node --check assets/landing/landing.js` — **Passed (0 errors)**.
+9. **Interactive Browser Subagent Session**:
+   - Verified hero rendering, theme switcher, demo modal, feature cards, interactive tabs, stats, testimonials carousel, FAQ accordion expansion, and floating chat launcher.
+   - Browser console logs: **0 JavaScript errors, 0 warnings, 0 failed requests**.

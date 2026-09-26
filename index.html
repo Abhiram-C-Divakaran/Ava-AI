@@ -1,36 +1,340 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Meet AvaAI: a personal AI assistant that understands context, remembers your preferences, and grows with you.">
-<link rel="icon" type="image/svg+xml" href="/assets/landing/favicon.svg"><meta name="theme-color" content="#050a1e"><title>AvaAI — Your Personal Intelligence Platform</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="AvaAI is your personal intelligence platform that understands context, remembers your preferences, and adapts to how you work over time.">
+<link rel="icon" type="image/svg+xml" href="/assets/landing/favicon.svg">
+<meta name="theme-color" content="#050a1e">
+<title>AvaAI — Your Personal Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/landing/landing.css"><script src="/assets/landing/landing.js" defer></script>
+<link rel="stylesheet" href="/assets/landing/landing.css">
+<script src="/assets/landing/landing.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
-<svg class="svg-defs" aria-hidden="true"><defs><linearGradient id="logo-gradient" x2="1" y2="1"><stop stop-color="#37e7ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient><symbol id="ava-logo" viewBox="0 0 60 60"><circle cx="30" cy="15" r="14" fill="url(#logo-gradient)"/><circle cx="45" cy="40" r="14" fill="#54e6f2"/><circle cx="15" cy="40" r="14" fill="#8d91ff"/></symbol></defs></svg>
-<header class="navbar"><nav class="container nav-inner" aria-label="Main navigation"><a href="/" class="brand"><svg aria-hidden="true"><use href="#ava-logo"/></svg>AvaAI</a><div class="nav-links" id="nav-links"><a href="#features">Features</a><a href="#how-it-works">How It Works</a><a href="#solutions">Solutions</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></div><div class="nav-actions"><a class="button primary compact" data-start href="/auth.html?mode=signup">Get Started <span aria-hidden="true">→</span></a><button class="icon-button" id="theme-toggle" aria-label="Switch to light theme" aria-pressed="false"><span data-icon="moon"></span></button><button class="icon-button menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="nav-links"><span data-icon="menu"></span></button></div></nav></header>
+
+<svg class="svg-defs" aria-hidden="true">
+  <defs>
+    <linearGradient id="logo-gradient" x2="1" y2="1">
+      <stop stop-color="#37e7ff"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <symbol id="ava-logo" viewBox="0 0 60 60">
+      <circle cx="30" cy="15" r="14" fill="url(#logo-gradient)"/>
+      <circle cx="45" cy="40" r="14" fill="#54e6f2"/>
+      <circle cx="15" cy="40" r="14" fill="#8d91ff"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="navbar">
+  <nav class="container nav-inner" aria-label="Main navigation">
+    <a href="/" class="brand">
+      <svg aria-hidden="true"><use href="#ava-logo"/></svg>
+      AvaAI
+    </a>
+    <div class="nav-links" id="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#solutions">Solutions</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-actions">
+      <a class="button primary compact" data-start href="/auth.html?mode=signup">Get Started <span aria-hidden="true">→</span></a>
+      <button class="icon-button" id="theme-toggle" aria-label="Switch to light theme" aria-pressed="false">
+        <span data-icon="moon"></span>
+      </button>
+      <button class="icon-button menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-expanded="false" aria-controls="nav-links">
+        <span data-icon="menu"></span>
+      </button>
+    </div>
+  </nav>
+</header>
+
 <main id="main">
-<section class="hero container" aria-labelledby="hero-heading">
-<div class="hero-copy"><p class="eyebrow">A KINDER TOMORROW WITH AI</p><h1 id="hero-heading">Your Personal<br><span class="gradient-text">Intelligence</span><br>Platform</h1><p class="hero-description">Ava reads tone, remembers your preferences, and understands context — so you get personalized responses and never have to repeat yourself.</p><div class="hero-buttons"><a class="button primary" data-start href="/auth.html?mode=signup">Get Started Free <span aria-hidden="true">→</span></a><button class="button secondary" id="watch-video"><span data-icon="play"></span>Watch Video</button></div><div class="trust-points"><span><i data-icon="card"></i>No credit card required</span><span><i data-icon="users"></i>Used by teams worldwide</span><span><i data-icon="bolt"></i>Instant setup</span></div></div>
-<div class="hero-art" aria-label="Ava robot surrounded by helpful AI features">
-<div class="cosmic-window" aria-hidden="true"><div class="planet"></div></div><div class="orbital-platform" aria-hidden="true"></div>
-<div class="welcome-panel glass"><div class="brand"><svg aria-hidden="true"><use href="#ava-logo"/></svg><span class="gradient-text">AvaAI</span></div><p>Hello!<br>How can I help you<br>today? <span class="sparkle">✦</span></p><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="quick-actions"><button data-prompt="Summarize this for me"><i data-icon="file"></i>Summarize this for me</button><button data-prompt="Remember my preferences"><i data-icon="heart"></i>Remember my preferences</button><button data-prompt="Help me brainstorm"><i data-icon="bulb"></i>Help me brainstorm</button><button data-prompt="Create a plan"><i data-icon="check"></i>Create a plan</button></div></div>
-<img class="hero-robot" src="/cute-ai-robot-chatbot-reading-a-book-on-transparent-background-free-png.webp" width="980" height="980" alt="Ava, a friendly white and blue robot, reading a book" fetchpriority="high">
-<div class="floating-benefits"><div class="glass"><i data-icon="brain"></i><span>Understands<br>your context</span></div><div class="glass"><i data-icon="heart"></i><span>Remembers<br>what matters</span></div><div class="glass"><i data-icon="chart"></i><span>Grows with you</span></div></div><p class="handwritten hero-note">“More than AI.<br>A companion for<br>a brighter you.”</p>
-</div></section>
-<section class="section container" id="features"><div class="section-heading"><h2>Everything You Need in One Intelligent Assistant</h2><p>AvaAI combines advanced AI with a personal touch, designed to understand you, support you,<br class="desktop-only"> and help you achieve more every day.</p></div><div class="feature-grid" id="feature-grid"></div></section>
-<section class="section container how-section" id="how-it-works"><div class="section-heading"><h2>How AvaAI Works</h2><p>Get started in minutes and experience a more personal, intelligent way to work, learn, and create.</p></div><div class="steps"><article><div class="step-icon"><b>1</b><i data-icon="user"></i></div><h3>Create Your Account</h3><p>Sign up in seconds —<br>no credit card required.</p></article><article><div class="step-icon"><b>2</b><i data-icon="brain"></i></div><h3>Share Your Preferences</h3><p>Tell AvaAI about your goals,<br>interests, and working style.</p></article><article><div class="step-icon"><b>3</b><i data-icon="sparkles"></i></div><h3>Start Chatting</h3><p>Get personalized, context-aware<br>responses and see the difference.</p></article></div></section>
-<section class="demo-section" id="solutions"><div class="container"><div class="section-heading"><h2>See AvaAI in Action</h2><p>A more natural, helpful, and personal AI experience.</p></div><div class="demo-layout"><div class="demo-tabs" role="tablist" aria-label="Explore AvaAI" aria-orientation="vertical"></div><div class="app-demo glass" id="demo-panel" role="tabpanel" aria-label="Chat Naturally example"><aside class="demo-sidebar"><div class="brand"><svg aria-hidden="true"><use href="#ava-logo"/></svg>AvaAI</div><button class="demo-new" data-open-chat>New Chat <span>+</span></button><span><i data-icon="chat"></i>Chats</span><span><i data-icon="file"></i>Library</span><span><i data-icon="settings"></i>Settings</span><div class="sidebar-planet">Your AI companion<br>for a brighter tomorrow.<div class="mini-planet"></div></div></aside><div class="demo-chat"><span class="demo-day">Today · Interactive preview</span><div class="demo-user" id="demo-question">Help me plan a productive week</div><div class="demo-response"><span class="bot-avatar"><svg aria-hidden="true"><use href="#ava-logo"/></svg></span><div><div class="demo-bubble"><p id="demo-intro">Here's a personalized plan based on your goals and past conversations:</p><ul id="demo-checklist"></ul></div><p class="demo-followup" id="demo-followup">Would you like to make this plan your own?</p><div class="demo-replies"><button class="button primary" data-open-chat>Yes, please!</button><button class="button secondary" id="demo-more">Show me more options</button></div></div></div><button class="demo-input" data-open-chat><i data-icon="clip"></i><span>Ask AvaAI anything...</span><i data-icon="send"></i></button></div></div><p class="handwritten demo-note">Same<br>conversation.<br>A smarter you.<span></span></p></div></div></section>
-<section class="stats-section" aria-label="AvaAI in numbers"><div class="container stats" id="stats"></div></section>
-<section class="section container testimonials"><div class="testimonial-heading"><div><h2>Loved by Individuals and Teams</h2><p>Real stories from people who do more with AvaAI.</p></div><div class="carousel-controls"><button class="icon-button" id="reviews-prev" aria-label="Previous testimonials">‹</button><button class="icon-button" id="reviews-next" aria-label="Next testimonials">›</button></div></div><div class="testimonial-grid" id="testimonials" aria-live="polite"></div></section>
-<section class="section container faq-section" id="faq"><div class="faq-art"><p class="handwritten">Curious?<br>I've got answers!</p><div class="faq-divider"></div><img src="/pngegg.png" width="850" height="981" alt="Ava robot peeking around a glass divider" loading="lazy"></div><div><p class="eyebrow">SUPPORT</p><h2>Frequently Asked<br><span class="gradient-text">Questions</span></h2><p class="faq-subtitle">Quick answers to common questions</p><div id="faq-list"></div></div></section>
-<section class="container final-section" id="pricing"><div class="final-cta glass"><div><h2>Ready for a Smarter, Kinder Tomorrow?</h2><p>Join thousands who are already creating, learning, and achieving more with AvaAI.</p></div><div><a class="button primary" data-start href="/auth.html?mode=signup">Get Started Free <span aria-hidden="true">→</span></a><small>No credit card required · Free to use</small></div></div></section>
+  <!-- Hero Section -->
+  <section class="hero container" aria-labelledby="hero-heading">
+    <div class="hero-copy">
+      <p class="eyebrow">A KINDER TOMORROW WITH AI</p>
+      <h1 id="hero-heading">
+        Your Personal<br>
+        <span class="gradient-text">Intelligence</span><br>
+        Platform
+      </h1>
+      <p class="hero-description">Ava understands context, remembers your preferences, and adapts to how you work — giving you more personal, useful responses over time.</p>
+      <div class="hero-buttons">
+        <a class="button primary" data-start href="/auth.html?mode=signup">Get Started Free <span aria-hidden="true">→</span></a>
+        <button class="button secondary" id="watch-demo">
+          <span data-icon="play"></span>Watch Demo
+        </button>
+      </div>
+      <div class="trust-points">
+        <span><i data-icon="card"></i>No credit card required</span>
+        <span><i data-icon="brain"></i>Personalized AI</span>
+        <span><i data-icon="shield"></i>Privacy-focused</span>
+      </div>
+    </div>
+
+    <div class="hero-art" aria-label="Ava robot surrounded by helpful AI features">
+      <div class="cosmic-window" aria-hidden="true">
+        <div class="planet"></div>
+      </div>
+      <div class="orbital-platform" aria-hidden="true"></div>
+
+      <!-- Welcome panel -->
+      <div class="welcome-panel glass">
+        <div class="brand">
+          <svg aria-hidden="true"><use href="#ava-logo"/></svg>
+          <span class="gradient-text">AvaAI</span>
+        </div>
+        <p>Hello!<br>How can I help you<br>today? <span class="sparkle">✨</span></p>
+        <div class="wave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="quick-actions">
+          <button data-prompt="Summarize this for me"><i data-icon="file"></i>Summarize this for me</button>
+          <button data-prompt="Remember my preference"><i data-icon="heart"></i>Remember my preference</button>
+          <button data-prompt="Help me brainstorm"><i data-icon="bulb"></i>Help me brainstorm</button>
+          <button data-prompt="Create a plan"><i data-icon="check"></i>Create a plan</button>
+        </div>
+      </div>
+
+      <img class="hero-robot" src="/cute-ai-robot-chatbot-reading-a-book-on-transparent-background-free-png.webp" width="980" height="980" alt="Ava, a friendly white and blue robot, reading a book" fetchpriority="high">
+
+      <!-- Floating benefits -->
+      <div class="floating-benefits">
+        <div class="glass"><i data-icon="brain"></i><span>Understands<br>your context</span></div>
+        <div class="glass"><i data-icon="heart"></i><span>Remembers<br>what matters</span></div>
+        <div class="glass"><i data-icon="chart"></i><span>Grows with you</span></div>
+      </div>
+
+      <p class="handwritten hero-note">“More than AI.<br>A companion for<br>a brighter you.”</p>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="section container" id="features">
+    <div class="section-heading">
+      <h2>Everything You Need in One Intelligent Assistant</h2>
+      <p>AvaAI combines powerful AI with persistent memory and behavioral adaptation to make conversations more useful over time.</p>
+    </div>
+    <div class="feature-grid" id="feature-grid"></div>
+  </section>
+
+  <!-- How AvaAI Works Section -->
+  <section class="section container how-section" id="how-it-works">
+    <div class="section-heading">
+      <h2>How AvaAI Works</h2>
+      <p>Get started in minutes and experience a more personal, intelligent way to work, learn, and create.</p>
+    </div>
+    <div class="steps">
+      <article>
+        <div class="step-icon"><b>1</b><i data-icon="user"></i></div>
+        <h3>Create Your Account</h3>
+        <p>Sign up securely in seconds.</p>
+      </article>
+      <article>
+        <div class="step-icon"><b>2</b><i data-icon="chat"></i></div>
+        <h3>Talk Naturally</h3>
+        <p>Use Ava normally. Explicit preferences and useful factual memory can be learned over time.</p>
+      </article>
+      <article>
+        <div class="step-icon"><b>3</b><i data-icon="sparkles"></i></div>
+        <h3>Ava Adapts</h3>
+        <p>Ava uses persistent memory and feedback-driven behavioral policies to improve how it responds.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- See AvaAI in Action Section -->
+  <section class="demo-section" id="solutions">
+    <div class="container">
+      <div class="section-heading">
+        <h2>See AvaAI in Action</h2>
+        <p>A more natural, useful, and personal AI experience.</p>
+      </div>
+      <div class="demo-layout">
+        <div class="demo-tabs" role="tablist" aria-label="Explore AvaAI" aria-orientation="vertical"></div>
+        <div class="app-demo glass" id="demo-panel" role="tabpanel" aria-label="Chat Naturally example">
+          <aside class="demo-sidebar">
+            <div class="brand">
+              <svg aria-hidden="true"><use href="#ava-logo"/></svg>
+              AvaAI
+            </div>
+            <button class="demo-new" data-open-chat>New Chat <span>+</span></button>
+            <span><i data-icon="chat"></i>Chats</span>
+            <span><i data-icon="file"></i>Library</span>
+            <span><i data-icon="settings"></i>Settings</span>
+            <div class="sidebar-planet">
+              Your AI companion<br>for a brighter tomorrow.
+              <div class="mini-planet"></div>
+            </div>
+          </aside>
+          <div class="demo-chat">
+            <span class="demo-day">Today · Interactive preview</span>
+            <div class="demo-user" id="demo-question">Help me plan a productive week.</div>
+            <div class="demo-response">
+              <span class="bot-avatar"><svg aria-hidden="true"><use href="#ava-logo"/></svg></span>
+              <div>
+                <div class="demo-bubble">
+                  <p id="demo-intro">Here's a personalized plan based on your goals and preferences:</p>
+                  <ul id="demo-checklist"></ul>
+                </div>
+                <p class="demo-followup" id="demo-followup">Would you like me to break this into a daily schedule?</p>
+                <div class="demo-replies">
+                  <button class="button primary" data-open-chat>Yes, please</button>
+                  <button class="button secondary" id="demo-more">Show me another approach</button>
+                </div>
+              </div>
+            </div>
+            <button class="demo-input" data-open-chat aria-label="Open chat to ask anything">
+              <i data-icon="clip"></i>
+              <span>Ask AvaAI anything...</span>
+              <i data-icon="send"></i>
+            </button>
+          </div>
+        </div>
+        <p class="handwritten demo-note">Same<br>conversation.<br>A smarter you.<span></span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats-section" aria-label="AvaAI verified trust metrics">
+    <div class="container stats" id="stats"></div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="section container testimonials">
+    <div class="testimonial-heading">
+      <div>
+        <h2>Loved by Individuals and Teams</h2>
+        <p>Real stories from people who do more with AvaAI.</p>
+      </div>
+      <div class="carousel-controls">
+        <button class="icon-button" id="reviews-prev" aria-label="Previous testimonials">‹</button>
+        <button class="icon-button" id="reviews-next" aria-label="Next testimonials">›</button>
+      </div>
+    </div>
+    <!-- Replace with verified user testimonials before public marketing use. -->
+    <div class="testimonial-grid" id="testimonials" aria-live="polite"></div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="section container faq-section" id="faq">
+    <div class="faq-art">
+      <p class="handwritten">Curious?<br>I've got answers!</p>
+      <div class="faq-divider"></div>
+      <img src="/pngegg.png" width="850" height="981" alt="Ava robot peeking around a glass divider" loading="lazy">
+    </div>
+    <div>
+      <p class="eyebrow">SUPPORT</p>
+      <h2>Frequently Asked<br><span class="gradient-text">Questions</span></h2>
+      <p class="faq-subtitle">Quick answers to common questions</p>
+      <div id="faq-list"></div>
+    </div>
+  </section>
+
+  <!-- Final CTA Section -->
+  <section class="container final-section" id="get-started">
+    <div class="final-cta glass">
+      <div>
+        <h2>Ready for a Smarter, More Personal AI?</h2>
+        <p>Start using AvaAI and experience an assistant that remembers useful context and adapts to how you prefer to work.</p>
+      </div>
+      <div>
+        <a class="button primary" data-start href="/auth.html?mode=signup">Get Started Free <span aria-hidden="true">→</span></a>
+        <small>No credit card required · Free to use</small>
+      </div>
+    </div>
+  </section>
 </main>
-<footer><div class="container footer-main"><div><a class="brand" href="/"><svg aria-hidden="true"><use href="#ava-logo"/></svg>AvaAI</a><p>Intelligence for a kinder tomorrow.</p></div><nav aria-label="Footer navigation"><a href="#features">Features</a><a href="#how-it-works">How It Works</a><a href="#solutions">Solutions</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav><div class="footer-right"><div class="socials" id="socials"></div><small>© 2026 AvaAI. All rights reserved.</small></div></div><div class="container footer-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="mailto:support@ava.ai">Contact</a></div></footer>
-<button class="chat-launcher" id="chat-launcher" aria-label="Open AvaAI chat" aria-expanded="false" aria-controls="chat-drawer"><i data-icon="chat"></i><span class="online-dot"></span></button>
-<section class="chat-drawer glass" id="chat-drawer" role="dialog" aria-label="Chat with AvaAI" hidden><header><div class="brand"><svg aria-hidden="true"><use href="#ava-logo"/></svg><div>AvaAI<small id="chat-status">Online</small></div></div><button class="icon-button" id="chat-close" aria-label="Minimize chat">×</button></header><div class="chat-history" id="chat-history" role="log" aria-label="Conversation" aria-live="polite"></div><div class="chat-auth" id="chat-auth" hidden><p>Sign in to chat with Ava and keep your conversations together.</p><a class="button primary" href="/auth.html">Sign in / Create account →</a></div><form id="chat-form"><label class="sr-only" for="chat-input">Message AvaAI</label><textarea id="chat-input" placeholder="Ask AvaAI anything..." rows="1" maxlength="20000" required></textarea><button class="icon-button" id="chat-send" aria-label="Send message"><i data-icon="send"></i></button></form><a class="full-chat-link" href="/chat.html">Open full workspace ↗</a></section>
-<dialog id="video-dialog"><button class="icon-button modal-close" aria-label="Close product walkthrough">×</button><p class="eyebrow">MEET YOUR PERSONAL AI</p><h2>A little context.<br><span class="gradient-text">A lot more possibility.</span></h2><div class="walkthrough"><span data-icon="brain"></span><p>Share what matters to you.</p><span data-icon="heart"></span><p>Ava remembers your preferences.</p><span data-icon="sparkles"></span><p>Make your next conversation more personal.</p></div><p>No video is available yet. Explore the interactive product preview below.</p><button class="button primary" id="explore-demo">Explore the demo →</button></dialog>
-</body></html>
+
+<footer>
+  <div class="container footer-main">
+    <div>
+      <a class="brand" href="/">
+        <svg aria-hidden="true"><use href="#ava-logo"/></svg>
+        AvaAI
+      </a>
+      <p>Intelligence that adapts to you.</p>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="footer-right">
+      <div class="socials" id="socials"></div>
+      <div class="footer-meta">
+        <span class="version-tag">v1.0.1</span>
+        <small>© 2026 AvaAI. All rights reserved.</small>
+      </div>
+    </div>
+  </div>
+  <div class="container footer-legal">
+    <a href="/privacy.html">Privacy</a>
+    <a href="/terms.html">Terms</a>
+    <a href="mailto:support@ava.ai">Contact</a>
+  </div>
+</footer>
+
+<!-- Floating Ava Chatbot -->
+<button class="chat-launcher" id="chat-launcher" aria-label="Open AvaAI chat" aria-expanded="false" aria-controls="chat-drawer">
+  <i data-icon="chat"></i>
+  <span class="online-dot" aria-hidden="true"></span>
+</button>
+
+<section class="chat-drawer glass" id="chat-drawer" role="dialog" aria-label="Chat with AvaAI" hidden>
+  <header>
+    <div class="brand">
+      <svg aria-hidden="true"><use href="#ava-logo"/></svg>
+      <div>
+        AvaAI
+        <small id="chat-status">Online</small>
+      </div>
+    </div>
+    <div class="drawer-header-actions">
+      <button class="icon-button" id="chat-minimize" aria-label="Minimize chat">_</button>
+      <button class="icon-button" id="chat-close" aria-label="Close chat">×</button>
+    </div>
+  </header>
+  <div class="chat-history" id="chat-history" role="log" aria-label="Conversation" aria-live="polite"></div>
+  <div class="chat-auth" id="chat-auth" hidden>
+    <p>Sign in to chat with Ava and keep your conversations together.</p>
+    <div class="chat-auth-buttons">
+      <a class="button primary" href="/auth.html?mode=login">Sign In →</a>
+      <a class="button secondary" href="/auth.html?mode=signup">Get Started Free</a>
+    </div>
+  </div>
+  <form id="chat-form">
+    <label class="sr-only" for="chat-input">Message AvaAI</label>
+    <textarea id="chat-input" placeholder="Ask AvaAI anything..." rows="1" maxlength="20000" required></textarea>
+    <button class="icon-button" id="chat-send" aria-label="Send message">
+      <i data-icon="send"></i>
+    </button>
+  </form>
+  <a class="full-chat-link" href="/chat.html">Open full workspace ↗</a>
+</section>
+
+<!-- Demo Walkthrough Dialog -->
+<dialog id="demo-dialog">
+  <button class="icon-button modal-close" aria-label="Close product walkthrough">×</button>
+  <p class="eyebrow">MEET YOUR PERSONAL AI</p>
+  <h2>A little context.<br><span class="gradient-text">A lot more possibility.</span></h2>
+  <div class="walkthrough">
+    <span data-icon="brain"></span>
+    <p>Share what matters to you.</p>
+    <span data-icon="heart"></span>
+    <p>Ava remembers your preferences.</p>
+    <span data-icon="sparkles"></span>
+    <p>Make your next conversation more personal.</p>
+  </div>
+  <p>Explore how Ava combines persistent factual memory with adaptive response strategies in the interactive preview below.</p>
+  <button class="button primary" id="explore-demo">Explore the demo →</button>
+</dialog>
+</body>
+</html>
