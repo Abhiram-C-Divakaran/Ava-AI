@@ -12,6 +12,7 @@ import aiohttp
 import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -105,6 +106,13 @@ async def lifespan(app: FastAPI):
             raise RuntimeError(f"Invalid production configuration: {val['errors']}")
     config.ensure_directories()
     db.init_db()
+    # Daily retention cleanup: purge product_events older than 90 days.
+    try:
+        purged = db.delete_product_events_older_than(90)
+        if purged:
+            logger.info(f"Startup retention cleanup: purged {purged} product_events older than 90 days.")
+    except Exception as _e:
+        logger.warning(f"Retention cleanup failed on startup: {_e}")
     yield
 
 app = FastAPI(title="Ava AI", version=__version__, lifespan=lifespan)
@@ -416,6 +424,39 @@ ALLOWED_EVENT_METADATA = {
 FORBIDDEN_METADATA_SUBSTRINGS = (
     "password", "email", "secret", "token", "prompt", "message", "cookie", "api_key", "bearer", "auth"
 )
+
+# ─── Analytics Helpers ──────────────────────────────────────────────────────
+_ANON_ID_RE = re.compile(r'^[a-zA-Z0-9_\-]{1,64}$')
+
+def normalize_anonymous_session_id(raw: str | None) -> str | None:
+    """
+    Validate and normalize an anonymous session ID.
+    Accepts only 1-64 characters of alphanumeric, hyphen, or underscore.
+    Returns None on failure (caller must reject the request).
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s or len(s) > 64:
+        return None
+    if not _ANON_ID_RE.match(s):
+        return None
+    return s
+
+def _strip_page(raw: str | None) -> str:
+    """
+    Strip query string and fragment from a page value to prevent sensitive data leakage.
+    Returns path-only, max 128 chars, defaulting to '/'.
+    """
+    if not raw:
+        return "/"
+    try:
+        parsed = urlsplit(raw.strip())
+        # Use only the path component; discard query and fragment
+        path = parsed.path or "/"
+    except Exception:
+        path = "/"
+    return path[:128] or "/"
 
 # ─── Auth ──────────────────────────────────────────────────────────────
 @app.post("/api/auth/signup")
@@ -1974,9 +2015,9 @@ def ingest_event(req: ProductEventRequest, request: Request):
     if event_name not in ALLOWED_PRODUCT_EVENTS:
         raise HTTPException(status_code=400, detail=f"Invalid or unrecognized event '{event_name}'")
 
-    page = req.page.strip()[:128] if req.page else "/"
-    anon_id = req.anonymous_session_id.strip() if req.anonymous_session_id else ""
-    if not anon_id or len(anon_id) > 64:
+    page = _strip_page(req.page)
+    anon_id = normalize_anonymous_session_id(req.anonymous_session_id)
+    if not anon_id:
         raise HTTPException(status_code=400, detail="Invalid anonymous_session_id")
 
     raw_meta = req.metadata
@@ -2118,6 +2159,20 @@ def patch_beta_feedback_status_endpoint(
     if not updated:
         raise HTTPException(status_code=404, detail="Feedback item not found")
     return {"status": "updated", "id": feedback_id, "new_status": new_status}
+
+@app.delete("/api/admin/beta-feedback/{feedback_id}")
+def delete_beta_feedback_endpoint(
+    feedback_id: int,
+    request: Request
+):
+    """
+    Authenticated admin endpoint to hard-delete a specific beta feedback entry.
+    """
+    require_admin_beta(request)
+    deleted = db.delete_beta_feedback(feedback_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Feedback item not found")
+    return {"status": "deleted", "id": feedback_id}
 
 # ─── Static Files & Admin Page ───────────────────────────────────────
 STATIC_DIR = (

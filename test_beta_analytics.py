@@ -478,5 +478,300 @@ class TestBetaAnalytics(unittest.TestCase):
                 self.assertNotIn(unique_pass, meta, "Password leaked into product_events metadata!")
 
 
+    # ── NEW TESTS (16-32) ───────────────────────────────────────────────────
+
+    # 16. normalize_anonymous_session_id — valid IDs accepted
+    def test_16_normalize_anon_id_accepts_valid_ids(self):
+        """Valid alphanumeric/hyphen/underscore IDs of 1-64 chars are accepted."""
+        from main import normalize_anonymous_session_id
+        self.assertEqual(normalize_anonymous_session_id("abc123"), "abc123")
+        self.assertEqual(normalize_anonymous_session_id("anon-session_01"), "anon-session_01")
+        self.assertEqual(normalize_anonymous_session_id("A" * 64), "A" * 64)
+        # Leading/trailing whitespace is stripped
+        self.assertEqual(normalize_anonymous_session_id("  abc  "), "abc")
+
+    # 17. normalize_anonymous_session_id — invalid IDs rejected
+    def test_17_normalize_anon_id_rejects_invalid(self):
+        """Invalid anon session IDs (empty, too long, special chars) return None."""
+        from main import normalize_anonymous_session_id
+        self.assertIsNone(normalize_anonymous_session_id(None))
+        self.assertIsNone(normalize_anonymous_session_id(""))
+        self.assertIsNone(normalize_anonymous_session_id("   "))
+        self.assertIsNone(normalize_anonymous_session_id("A" * 65))  # too long
+        self.assertIsNone(normalize_anonymous_session_id("bad!@#chars"))  # special chars
+        self.assertIsNone(normalize_anonymous_session_id("spaces not ok"))  # spaces
+
+    # 18. /api/events rejects anon IDs with special characters via endpoint
+    def test_18_anon_id_with_special_chars_rejected_by_endpoint(self):
+        """POST /api/events returns 400 if anonymous_session_id contains invalid chars."""
+        client = TestClient(app)
+        resp = client.post("/api/events", json={
+            "event": "landing_view",
+            "page": "/",
+            "anonymous_session_id": "bad!<script>id</script>",
+            "metadata": {}
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("anonymous_session_id", resp.json()["detail"])
+
+    # 19. Page query string stripped
+    def test_19_page_query_string_stripped(self):
+        """Query strings and fragments are stripped from page values before storage."""
+        from main import _strip_page
+        self.assertEqual(_strip_page("/auth.html?token=SECRET"), "/auth.html")
+        self.assertEqual(_strip_page("/chat.html#section"), "/chat.html")
+        self.assertEqual(_strip_page("/path?a=1&b=2#frag"), "/path")
+        self.assertEqual(_strip_page(None), "/")
+        self.assertEqual(_strip_page(""), "/")
+
+    # 20. Events stored with clean page (no query/fragment)
+    def test_20_events_stored_with_clean_page(self):
+        """Pages with query strings are stored clean (path only) in product_events."""
+        client = TestClient(app)
+        anon_id = f"anon_{uuid.uuid4().hex[:12]}"
+        resp = client.post("/api/events", json={
+            "event": "landing_view",
+            "page": "/index.html?ref=newsletter&campaign=summer",
+            "anonymous_session_id": anon_id,
+        })
+        self.assertEqual(resp.status_code, 200)
+
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT page FROM product_events WHERE anonymous_session_id = ? "
+                "AND event_name = 'landing_view' ORDER BY created_at DESC LIMIT 1",
+                (anon_id,)
+            ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row["page"], "/index.html")
+            self.assertNotIn("newsletter", row["page"])
+
+    # 21. delete_user_data clears product_events
+    def test_21_delete_user_data_clears_product_events(self):
+        """delete_user_data removes all product_events attributed to that user."""
+        user_id = f"del_pe_user_{uuid.uuid4().hex[:8]}"
+        db.create_user(user_id, name="Del PE User",
+                       email=f"{user_id}@example.com", password="Password123!")
+        db.record_product_event("chat_message_sent", "anon_del1", "/chat.html", user_id=user_id)
+        db.record_product_event("feedback_positive", "anon_del1", "/chat.html", user_id=user_id)
+
+        with db.get_conn() as conn:
+            before = conn.execute(
+                "SELECT COUNT(*) AS c FROM product_events WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()["c"]
+        self.assertGreater(before, 0)
+
+        db.delete_user_data(user_id)
+
+        with db.get_conn() as conn:
+            after = conn.execute(
+                "SELECT COUNT(*) AS c FROM product_events WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()["c"]
+        self.assertEqual(after, 0, "product_events not cleared by delete_user_data!")
+
+    # 22. delete_user_data clears beta_feedback
+    def test_22_delete_user_data_clears_beta_feedback(self):
+        """delete_user_data removes all beta_feedback attributed to that user."""
+        user_id = f"del_fb_user_{uuid.uuid4().hex[:8]}"
+        db.create_user(user_id, name="Del FB User",
+                       email=f"{user_id}@example.com", password="Password123!")
+        db.record_beta_feedback("Bug", "My feedback entry", user_id=user_id)
+
+        with db.get_conn() as conn:
+            before = conn.execute(
+                "SELECT COUNT(*) AS c FROM beta_feedback WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()["c"]
+        self.assertGreater(before, 0)
+
+        db.delete_user_data(user_id)
+
+        with db.get_conn() as conn:
+            after = conn.execute(
+                "SELECT COUNT(*) AS c FROM beta_feedback WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()["c"]
+        self.assertEqual(after, 0, "beta_feedback not cleared by delete_user_data!")
+
+    # 23. DELETE /api/admin/beta-feedback/{id} requires admin
+    def test_23_delete_feedback_requires_admin(self):
+        """DELETE /api/admin/beta-feedback/{id} returns 401 for unauth and 403 for non-admin."""
+        r_unauth = self.unauth_client.delete("/api/admin/beta-feedback/1")
+        self.assertEqual(r_unauth.status_code, 401)
+
+        user_client = self._get_user_client(self.user_a_email, self.user_a_pass)
+        r_user = user_client.delete("/api/admin/beta-feedback/1")
+        self.assertEqual(r_user.status_code, 403)
+
+    # 24. DELETE /api/admin/beta-feedback/{id} deletes the entry for admin
+    def test_24_delete_feedback_admin_success(self):
+        """Admin can hard-delete a beta feedback entry; 404 returned for already-deleted id."""
+        user_id = f"del_test_user_{uuid.uuid4().hex[:8]}"
+        db.create_user(user_id, name="Del Test",
+                       email=f"{user_id}@example.com", password="Password123!")
+        feedback_id = db.record_beta_feedback("Bug", "Feedback to delete", user_id=user_id)
+
+        admin_client = self._get_admin_client()
+        with patch("main.ADMIN_PASSWORD", self.admin_pass):
+            r = admin_client.delete(f"/api/admin/beta-feedback/{feedback_id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["id"], feedback_id)
+
+        # Second delete returns 404
+        with patch("main.ADMIN_PASSWORD", self.admin_pass):
+            r2 = admin_client.delete(f"/api/admin/beta-feedback/{feedback_id}")
+        self.assertEqual(r2.status_code, 404)
+
+    # 25. Adaptation is not double-counted
+    def test_25_adaptation_not_double_counted(self):
+        """get_beta_metrics counts adaptation_used events once; chat_response_completed with adaptation_used=True is NOT also counted."""
+        # Reset by inserting into a clean user slice
+        user_id = f"adapt_count_user_{uuid.uuid4().hex[:8]}"
+        db.create_user(user_id, name="Adapt Counter",
+                       email=f"{user_id}@example.com", password="Password123!")
+
+        # Record exactly 2 adaptation_used events
+        db.record_product_event("adaptation_used", "anon_adapt", "/chat.html",
+                                user_id=user_id, metadata={"strategy": "nurturing"})
+        db.record_product_event("adaptation_used", "anon_adapt", "/chat.html",
+                                user_id=user_id, metadata={"strategy": "concise"})
+        # Also record a chat_response_completed with adaptation_used=True in metadata
+        db.record_product_event("chat_response_completed", "anon_adapt", "/chat.html",
+                                user_id=user_id, metadata={"adaptation_used": True})
+
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM product_events "
+                "WHERE user_id = ? AND event_name = 'adaptation_used'",
+                (user_id,)
+            ).fetchone()
+        # Direct DB count: exactly 2 adaptation_used events
+        self.assertEqual(row["c"], 2)
+
+        # get_beta_metrics should NOT count the chat_response_completed event
+        metrics = db.get_beta_metrics(period_days=90)
+        # The total adaptation_used_responses should be at least 2 (could be higher from
+        # other tests). The important invariant: it equals count of adaptation_used events only.
+        with db.get_conn() as conn:
+            direct_count = conn.execute(
+                "SELECT COUNT(*) AS c FROM product_events WHERE event_name = 'adaptation_used'"
+            ).fetchone()["c"]
+        self.assertEqual(metrics["adaptation_used_responses"], direct_count,
+                         "adaptation_used_responses in metrics must equal COUNT(adaptation_used) exactly")
+
+    # 26. All conversion rates are in [0, 1]
+    def test_26_all_rates_bounded_zero_to_one(self):
+        """All rate fields in get_beta_metrics are in [0.0, 1.0]."""
+        # Insert more chat_users than signup_completed to create a potential >1 scenario
+        for i in range(10):
+            db.record_product_event(
+                "chat_message_sent", f"anon_rate_{i}", "/chat.html",
+                user_id=f"user_rate_{i}"
+            )
+        # Only 1 signup_completed
+        db.record_product_event("signup_completed", "anon_rate_s", "/auth.html",
+                                user_id="user_rate_signup")
+
+        metrics = db.get_beta_metrics(period_days=90)
+        rate_fields = [
+            "landing_to_signup_rate", "signup_completion_rate",
+            "signup_to_chat_rate", "positive_feedback_rate", "adaptation_usage_rate"
+        ]
+        for field in rate_fields:
+            val = metrics[field]
+            self.assertGreaterEqual(val, 0.0, f"{field} is below 0")
+            self.assertLessEqual(val, 1.0, f"{field} exceeds 1.0 (value={val})")
+
+    # 27. signup_started event is accepted and stored
+    def test_27_signup_started_event_stored(self):
+        """signup_started event is accepted via /api/events and stored correctly."""
+        client = TestClient(app)
+        anon_id = f"anon_{uuid.uuid4().hex[:12]}"
+        resp = client.post("/api/events", json={
+            "event": "signup_started",
+            "page": "/auth.html",
+            "anonymous_session_id": anon_id,
+            "metadata": {"source": "hero_cta"}
+        })
+        self.assertEqual(resp.status_code, 200)
+
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM product_events WHERE event_name = 'signup_started' AND anonymous_session_id = ?",
+                (anon_id,)
+            ).fetchone()
+        self.assertIsNotNone(row)
+        meta = json.loads(row["metadata_json"])
+        self.assertEqual(meta.get("source"), "hero_cta")
+
+    # 28. signup_started appears in beta_metrics funnel
+    def test_28_signup_started_in_metrics_funnel(self):
+        """signup_started count is surfaced in get_beta_metrics."""
+        before = db.get_beta_metrics(90)["signup_started"]
+        db.record_product_event("signup_started", "anon_funnel_test", "/auth.html")
+        after = db.get_beta_metrics(90)["signup_started"]
+        self.assertEqual(after, before + 1)
+
+    # 29. Admin metrics period_days is clamped to [1, 90]
+    def test_29_admin_metrics_period_clamped(self):
+        """period_days is clamped server-side: 0 becomes 1, 999 becomes 90."""
+        admin_client = self._get_admin_client()
+
+        r_low = admin_client.get("/api/admin/beta-metrics?period_days=0")
+        self.assertEqual(r_low.status_code, 200)
+        self.assertEqual(r_low.json()["period_days"], 1)
+
+        r_high = admin_client.get("/api/admin/beta-metrics?period_days=999")
+        self.assertEqual(r_high.status_code, 200)
+        self.assertEqual(r_high.json()["period_days"], 90)
+
+    # 30. Retention: delete_product_events_older_than refuses 0 days
+    def test_30_retention_rejects_zero_days(self):
+        """delete_product_events_older_than(0) raises ValueError."""
+        with self.assertRaises(ValueError):
+            db.delete_product_events_older_than(0)
+
+    # 31. delete_beta_feedback helper removes the entry
+    def test_31_delete_beta_feedback_removes_entry(self):
+        """db.delete_beta_feedback(id) returns True on success and False for missing id."""
+        fid = db.record_beta_feedback("Feature request", "Please add dark mode")
+        result = db.delete_beta_feedback(fid)
+        self.assertTrue(result)
+
+        # Verify gone from DB
+        with db.get_conn() as conn:
+            row = conn.execute("SELECT * FROM beta_feedback WHERE id = ?", (fid,)).fetchone()
+        self.assertIsNone(row)
+
+        # Second call returns False
+        result2 = db.delete_beta_feedback(fid)
+        self.assertFalse(result2)
+
+    # 32. Anonymous events have no user_id in product_events
+    def test_32_anonymous_events_have_no_user_id(self):
+        """Events sent without a session (anonymous visitors) store NULL user_id."""
+        client = TestClient(app)  # no login session
+        anon_id = f"anon_{uuid.uuid4().hex[:12]}"
+        resp = client.post("/api/events", json={
+            "event": "feature_section_view",
+            "page": "/",
+            "anonymous_session_id": anon_id,
+            "metadata": {"section_id": "memory"}
+        })
+        self.assertEqual(resp.status_code, 200)
+
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT user_id FROM product_events "
+                "WHERE event_name = 'feature_section_view' AND anonymous_session_id = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (anon_id,)
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertIsNone(row["user_id"], "Anonymous event should have NULL user_id!")
+
+
 if __name__ == "__main__":
     unittest.main()

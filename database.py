@@ -889,6 +889,9 @@ def delete_user_data(user_id: str) -> None:
         conn.execute("DELETE FROM user_memory WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM adaptation_profiles WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM adaptation_strategy_stats WHERE user_id = ?", (user_id,))
+        # Clear analytics and beta feedback attributed to this user
+        conn.execute("DELETE FROM product_events WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM beta_feedback WHERE user_id = ?", (user_id,))
 
 # ─── Cross-session user memory (Claude-style persistent memory) ───────────────
 def get_user_memory(user_id: str) -> dict:
@@ -1224,34 +1227,16 @@ def get_beta_metrics(period_days: int = 7) -> dict:
         # Messages sent
         messages_sent = count_events("chat_message_sent")
 
-        # Adaptation used responses: count of adaptation_used events or chat_response_completed with adaptation_used=True
-        adapt_row = conn.execute(
-            """
-            SELECT COUNT(*) AS c FROM product_events
-            WHERE created_at >= ? AND (
-                event_name = 'adaptation_used' OR
-                (event_name = 'chat_response_completed' AND metadata_json LIKE '%"adaptation_used": true%')
-            )
-            """,
-            (cutoff,)
-        ).fetchone()
-        adaptation_used_responses = adapt_row["c"] if adapt_row else 0
+        # Adaptation used responses: count ONLY dedicated 'adaptation_used' events.
+        # We do NOT also count chat_response_completed with adaptation_used=True metadata
+        # to avoid double-counting (one response = one adaptation event).
+        adaptation_used_responses = count_events("adaptation_used")
 
-        # Positive & negative feedback in period from product_events (augmented with feedback table)
-        pos_events = count_events("feedback_positive")
-        neg_events = count_events("feedback_negative")
-
-        fb_table_pos_row = conn.execute(
-            "SELECT COUNT(*) AS c FROM feedback WHERE helpful = 1 AND created_at >= ?",
-            (cutoff,)
-        ).fetchone()
-        fb_table_neg_row = conn.execute(
-            "SELECT COUNT(*) AS c FROM feedback WHERE helpful = 0 AND created_at >= ?",
-            (cutoff,)
-        ).fetchone()
-
-        fb_pos = max(pos_events, fb_table_pos_row["c"] if fb_table_pos_row else 0)
-        fb_neg = max(neg_events, fb_table_neg_row["c"] if fb_table_neg_row else 0)
+        # Positive & negative feedback in period from product_events only.
+        # We do NOT take max() against the feedback table to avoid double-counting
+        # thumbs-up/down events that are already recorded as product_events.
+        fb_pos = count_events("feedback_positive")
+        fb_neg = count_events("feedback_negative")
 
         # Chat errors
         chat_err_row = conn.execute(
@@ -1263,13 +1248,19 @@ def get_beta_metrics(period_days: int = 7) -> dict:
         ).fetchone()
         chat_errors = chat_err_row["c"] if chat_err_row else 0
 
-        # Calculated rates
-        landing_to_signup_rate = round(signup_completed / landing_views, 4) if landing_views > 0 else 0.0
-        signup_completion_rate = round(signup_completed / signup_started, 4) if signup_started > 0 else 0.0
-        signup_to_chat_rate = round(chat_users / signup_completed, 4) if signup_completed > 0 else 0.0
+        def _safe_rate(numerator: int, denominator: int) -> float:
+            """Compute a bounded conversion rate in [0.0, 1.0]."""
+            if denominator <= 0:
+                return 0.0
+            return round(min(1.0, numerator / denominator), 4)
+
+        # Calculated rates — all clamped to [0, 1] to guard against cohort skew.
+        landing_to_signup_rate = _safe_rate(signup_completed, landing_views)
+        signup_completion_rate = _safe_rate(signup_completed, signup_started)
+        signup_to_chat_rate    = _safe_rate(chat_users, signup_completed)
         total_fb = fb_pos + fb_neg
-        positive_feedback_rate = round(fb_pos / total_fb, 4) if total_fb > 0 else 0.0
-        adaptation_usage_rate = round(adaptation_used_responses / messages_sent, 4) if messages_sent > 0 else 0.0
+        positive_feedback_rate = _safe_rate(fb_pos, total_fb)
+        adaptation_usage_rate  = _safe_rate(adaptation_used_responses, messages_sent)
 
         return {
             "period_days": period_days,
@@ -1394,4 +1385,11 @@ def update_beta_feedback_status(feedback_id: int, status: str) -> bool:
             "UPDATE beta_feedback SET status = ? WHERE id = ?",
             (status, feedback_id)
         )
+        return cursor.rowcount > 0
+
+
+def delete_beta_feedback(feedback_id: int) -> bool:
+    """Admin hard-delete of a beta feedback entry by ID. Returns True if deleted."""
+    with get_conn() as conn:
+        cursor = conn.execute("DELETE FROM beta_feedback WHERE id = ?", (feedback_id,))
         return cursor.rowcount > 0
