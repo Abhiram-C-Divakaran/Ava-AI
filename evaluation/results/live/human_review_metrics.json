@@ -1,5 +1,5 @@
 {
-  "primary_reviewer_id": "Lead AI Evaluator",
+  "primary_reviewer_id": "automated_heuristic_rater_v1",
   "total_reviewed": 60,
   "adapted_wins": 22,
   "adapted_win_rate_pct": 36.67,

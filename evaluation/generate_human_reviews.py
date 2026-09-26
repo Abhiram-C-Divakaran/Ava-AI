@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
-evaluation/generate_human_reviews.py — Conduct Systematic Blind Human Review.
+evaluation/generate_heuristic_reviews.py — Automated Heuristic Blind-Response Evaluator.
 
-Applies a standardized, objective rubric to evaluate all 60 generated A/B pairs:
+WARNING: This script uses grade_case() — a deterministic heuristic function.
+It does NOT represent human judgment. Results must be reported as:
+  "automated heuristic blind-response evaluation"
+NOT as "human review", "expert evaluation", or any claim of human authorship.
+
+The heuristic applies a standardized, objective rubric to evaluate all 60 generated A/B pairs:
 - Instruction Adherence (1.0 - 5.0)
 - Clarity (1.0 - 5.0)
 - Usefulness (1.0 - 5.0)
@@ -10,7 +15,7 @@ Applies a standardized, objective rubric to evaluate all 60 generated A/B pairs:
 - Correctness (1.0 - 5.0)
 - Preferred Response (A, B, or TIE)
 - Objective Reviewer Notes
-- Reviewer Provenance (reviewer_id, reviewed_at, review_round)
+- Provenance (reviewer_id, reviewed_at, review_round)
 
 Evaluates purely based on response content, constraints, and user fit without knowing
 which response is adapted.
@@ -257,11 +262,15 @@ def grade_case(case_data: dict, resp_a: str, resp_b: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate completed blind human evaluation reviews.")
+    parser = argparse.ArgumentParser(
+        description="Generate automated heuristic blind evaluation scores. "
+                    "NOTE: grade_case() is a deterministic heuristic, NOT human review. "
+                    "Results must be reported as 'automated heuristic evaluation'."
+    )
     parser.add_argument("--cases", default=os.path.join(BASE_DIR, "evaluation", "response_eval_cases.json"))
     parser.add_argument("--dataset", default=os.path.join(BASE_DIR, "evaluation", "human_review_dataset.json"))
     parser.add_argument("--out", default=None)
-    parser.add_argument("--reviewer", default="reviewer_01")
+    parser.add_argument("--reviewer", default="automated_heuristic_rater_v1")
     args = parser.parse_args()
 
     with open(args.cases, "r", encoding="utf-8") as f:

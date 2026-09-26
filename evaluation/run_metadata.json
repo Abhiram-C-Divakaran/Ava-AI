@@ -2,6 +2,8 @@
   "evaluation_id": "addcabae-3fec-470b-9e3e-bd9fae1f246e",
   "generation_mode": "offline",
   "provider": "local_deterministic_generator",
+  "requested_model": "deterministic_engine",
+  "actual_model": "deterministic_engine",
   "model": "deterministic_engine",
   "temperature": 0.2,
   "case_count": 60,
@@ -9,5 +11,6 @@
   "started_at": "2026-09-20T11:15:35.254988+00:00",
   "completed_at": "2026-09-20T11:15:39.869710+00:00",
   "git_commit": "c005c86b0a35d1c5730cf441b1f8a3b06e6b9506",
+  "working_tree_dirty": false,
   "randomization_seed": 42
 }

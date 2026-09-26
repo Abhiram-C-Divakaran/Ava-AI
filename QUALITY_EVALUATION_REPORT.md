@@ -3,7 +3,7 @@
 **Evaluation Date**: September 20, 2026  
 **Target Release**: Ava AI `v1.0.1` (Evaluation Integrity & Maintenance Release)  
 **Evaluated Main Commit**: [`c005c86b0a35d1c5730cf441b1f8a3b06e6b9506`](https://github.com/Abhiram-C-Divakaran/Ava-AI/commit/c005c86b0a35d1c5730cf441b1f8a3b06e6b9506)  
-**Core Model**: `llama-3.3-70b-versatile` (Inference-only; frozen weights)  
+**Production Model**: `openai/gpt-oss-120b` (migrated in v1.0.1; live evaluation used `llama-3.3-70b-versatile` prior to Groq deprecation)  
 **Architecture Formula**:  
 $$\text{AVA} = \text{LLM} + \text{Session Memory} + \text{Persistent Factual Memory} + \text{Behavioral Preference Learning} + \text{Feedback-Driven Strategy Learning} + \text{Closed-Loop Behavioral Adaptation}$$
 
@@ -17,9 +17,9 @@ Phase 7 evaluated Ava AI empirically to answer the fundamental post-release ques
 Phase 7.1 established strict scientific integrity, mode isolation, and provenance tracking across the entire evaluation framework:
 1. **Explicit Evaluation Modes**: `evaluation/run_response_eval.py` strictly mandates `--mode offline` or `--mode live`. Silent fallback is eliminated.
 2. **Fallback Prohibition in Live Mode**: Live mode requires a valid `GROQ_API_KEY`, rejects mock/dummy keys, and immediately fails upon any provider error without falling back to deterministic generators.
-3. **Strict Human Review Validation**: `evaluation/process_human_reviews.py` enforces complete 60-case validation, strict $[1.0, 5.0]$ numeric bounds (zero silent `4.0` defaults), and strict preference choices (`A`, `B`, `TIE`). Multi-reviewer inter-rater reliability (percentage agreement and Cohen's Kappa) is fully supported.
+3. **Strict Review Validation**: `evaluation/process_human_reviews.py` enforces complete 60-case validation, strict $[1.0, 5.0]$ numeric bounds (zero silent `4.0` defaults), and strict preference choices (`A`, `B`, `TIE`). Multi-reviewer inter-rater reliability (percentage agreement and Cohen's Kappa) is fully supported.
 4. **Partitioned Results**: Results are cleanly stored in `evaluation/results/offline/` and `evaluation/results/live/` with full provenance metadata (`run_metadata.json`).
-5. **Truthful Project Claims**: Prior to completing verified live human evaluation runs, project claims state: *"Ava has a validated offline controlled A/B evaluation pipeline."*
+5. **Truthful Project Claims**: Prior to completing verified live human evaluation runs, automated scoring must be declared as *"Automated heuristic blind-response evaluation"* and never claimed as genuine human review.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -29,16 +29,21 @@ Phase 7.1 established strict scientific integrity, mode isolation, and provenanc
 │    - Status: COMPLETE (60 paired cases, 120 synthetic responses, blind review)  │
 │    - Suite: evaluation/run_response_eval.py --mode offline                      │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ B. Live Groq A/B Evaluation (Llama-3.3-70b-versatile Real LLM Outputs)         │
-│    - Status: COMPLETE (60 paired cases, 120 live LLM responses, blind review)  │
+│ B. Live Groq A/B Generation + Automated Heuristic Evaluation                    │
+│    - Status: COMPLETE (60 paired cases, 120 live LLM responses)                 │
+│    - Reviewer: automated_heuristic_rater_v1 (Deterministic heuristic rater)     │
 │    - Suite: evaluation/run_response_eval.py --mode live --temperature 0.2       │
 │    - Results: 57.9% decided win rate (22/38), +0.19 fit delta, 100% correctness │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ C. Independent Factual Memory Benchmark (Objective Information Retrieval)       │
+│ C. Live LLM Generation + Genuine Human Evaluation                               │
+│    - Status: SPECIFIED (evaluation/results/live/human_review_template.csv)      │
+│    - Suite: evaluation/process_human_reviews.py (Multi-rater Cohen's Kappa)     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ D. Independent Factual Memory Benchmark (Objective Information Retrieval)       │
 │    - Status: COMPLETE (20 cases, 100% recall, 0.0% false memory, 0.0% leakage)  │
 │    - Suite: evaluation/evaluate_memory.py                                       │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ D. Structural Behavioral Policy & Strategy Benchmark (State Machine Regressions)│
+│ E. Structural Behavioral Policy & Strategy Benchmark (State Machine Regressions)│
 │    - Status: COMPLETE (60 cases, convergence, reversal, and 6 strategies)      │
 │    - Suite: scripts/run_staging_observation.py & evaluate_convergence.py       │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -96,18 +101,18 @@ Phase 7.1 established strict scientific integrity, mode isolation, and provenanc
 
 ---
 
-## Section B: Live Groq A/B Evaluation (`llama-3.3-70b-versatile`)
+## Section B: Live Groq A/B Evaluation + Automated Heuristic Rating
 
 - **Run Date**: September 21, 2026
 - **Evaluated Main Commit**: [`c4848ae5c45ca83b6ea86144fdf23713eb4ec1b7`](https://github.com/Abhiram-C-Divakaran/Ava-AI/commit/c4848ae5c45ca83b6ea86144fdf23713eb4ec1b7)
 - **Generation Mode**: `live`
 - **Provider**: `groq`
-- **Model**: `llama-3.3-70b-versatile`
+- **Evaluated Model**: `llama-3.3-70b-versatile` (captured live prior to upstream deprecation; production canonical model migrated to `openai/gpt-oss-120b` in v1.0.1)
 - **Temperature**: `0.2`
 - **Randomization Seed**: `42`
 - **Review Count**: 60 paired cases (120 individual responses)
-- **Lead Evaluator**: Lead AI Evaluator (single genuine reviewer; no fabricated raters)
-- **Status**: **COMPLETE & EMPIRICALLY VALIDATED**
+- **Reviewer Identifier**: `automated_heuristic_rater_v1` (Automated heuristic evaluation via `evaluation/generate_human_reviews.py`; NOT human evaluation)
+- **Status**: **COMPLETE & EMPIRICALLY VALIDATED (AUTOMATED HEURISTIC)**
 
 ### Win / Loss / Tie Distribution
 

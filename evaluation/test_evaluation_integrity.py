@@ -106,6 +106,9 @@ class TestEvaluationIntegrity(unittest.TestCase):
         self.assertEqual(meta["generation_mode"], "offline")
         self.assertEqual(meta["provider"], "local_deterministic_generator")
         self.assertEqual(meta["model"], "deterministic_engine")
+        self.assertEqual(meta["requested_model"], "deterministic_engine")
+        self.assertEqual(meta["actual_model"], "deterministic_engine")
+        self.assertIn("working_tree_dirty", meta)
 
     # 5. Live mode records 'live'
     @patch("evaluation.run_response_eval.call_llm")
@@ -124,7 +127,10 @@ class TestEvaluationIntegrity(unittest.TestCase):
 
         self.assertEqual(meta["generation_mode"], "live")
         self.assertEqual(meta["provider"], "groq")
-        self.assertEqual(meta["model"], "llama-3.3-70b-versatile")
+        self.assertEqual(meta["model"], "openai/gpt-oss-120b")
+        self.assertEqual(meta["requested_model"], "openai/gpt-oss-120b")
+        self.assertEqual(meta["actual_model"], "openai/gpt-oss-120b")
+        self.assertIn("working_tree_dirty", meta)
 
     # 6. Paired variants use same model
     def test_paired_variants_use_same_model(self):

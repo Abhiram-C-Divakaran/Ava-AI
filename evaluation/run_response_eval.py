@@ -46,7 +46,7 @@ if BASE_DIR not in sys.path:
 import database as db
 import adaptation
 import memory
-from llm import call_llm
+from llm import call_llm, resolve_model
 from main import assemble_chat_prompt_context
 
 
@@ -63,6 +63,17 @@ def get_git_commit() -> str:
     except Exception:
         pass
     return "unknown"
+
+
+def is_working_tree_dirty() -> bool:
+    """Check if the git working tree has uncommitted modifications."""
+    try:
+        res = subprocess.run(["git", "status", "--porcelain"], cwd=BASE_DIR, capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            return bool(res.stdout.strip())
+    except Exception:
+        pass
+    return False
 
 
 def validate_groq_api_key_for_live() -> str:
@@ -292,11 +303,16 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
         # Validate key up-front before doing any setup
         validate_groq_api_key_for_live()
         provider = "groq"
-        model_name = model if model else "llama-3.3-70b-versatile"
+        requested_model = model if model else os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+        actual_model = resolve_model(requested_model)
+        model_name = actual_model
         print(f"  • Provider:            {provider}")
-        print(f"  • Model:               {model_name}")
+        print(f"  • Requested Model:     {requested_model}")
+        print(f"  • Actual Model:        {actual_model}")
     else:
         provider = "local_deterministic_generator"
+        requested_model = "deterministic_engine"
+        actual_model = "deterministic_engine"
         model_name = "deterministic_engine"
         print(f"  • Provider:            {provider} (Offline Controlled Suite)")
         print(f"  • Model:               {model_name}")
@@ -493,6 +509,8 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
             "evaluation_id": str(uuid.uuid4()),
             "generation_mode": mode,
             "provider": provider,
+            "requested_model": requested_model,
+            "actual_model": actual_model,
             "model": model_name,
             "temperature": temperature,
             "case_count": len(cases),
@@ -500,6 +518,7 @@ def run_response_evaluation(cases_path: str, mode: str, temperature: float = 0.2
             "started_at": started_at,
             "completed_at": completed_at,
             "git_commit": get_git_commit(),
+            "working_tree_dirty": is_working_tree_dirty(),
             "randomization_seed": seed,
         }
 
