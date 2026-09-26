@@ -67,8 +67,10 @@ ENABLE_CODE_EXECUTION = (
 )
 
 # LLM Inference
+# v1.0.1 model migration: llama-3.3-70b-versatile was decommissioned by Groq (HTTP 404).
+# Default is now openai/gpt-oss-120b. Override via GROQ_MODEL env-var.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # Optional Integrations
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")

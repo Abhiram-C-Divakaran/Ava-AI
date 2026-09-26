@@ -1,0 +1,2074 @@
+[
+  {
+    "case_id": "prog_001",
+    "category": "programming",
+    "prompt": "How do Python generators maintain state between yield statements?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Python generators keep a hidden frame that stores local variables, the instruction pointer, and the stack each time they hit a\u202f`yield`. When `next()` is called again, execution resumes right after the last `yield` with all locals exactly as they were.  \n\n```python\ndef count():\n    i = 0               # i is stored in the generator\u2019s frame\n    while True:\n        yield i        # pause, preserving i and the loop state\n        i += 1          # resume here on the next call\n\ng = count()\nprint(next(g))  # 0\nprint(next(g))  # 1\n```\n\nThe generator object\u2019s internal state (locals, stack, and current bytecode offset) is what lets it pick up where it left off.",
+    "response_B": "Python generators keep their state in a hidden frame object that stores local variables, the instruction pointer, and the execution stack. When a `yield` runs, the frame is suspended and the generator object retains this snapshot; calling `next()` (or `await`\u2011ing an async generator) restores the frame and continues from the saved point. This way each `yield` resumes exactly where the previous one left off, preserving all intermediate values.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1757,
+    "latency_B_ms": 1162,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_001_0757",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_002",
+    "category": "programming",
+    "prompt": "Explain Rust Arc and Mutex memory overhead when sharing state across threads.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "`Arc<T>` adds a single atomic reference\u2011count (usually a `usize`) stored alongside the heap allocation, so each clone incurs an extra atomic increment/decrement and a pointer indirection when accessing the inner `T`. `Mutex<T>` adds a lock word (typically a `usize` or `u32` for the OS futex state) plus possible padding to align to cache\u2011line boundaries, and each lock/unlock performs an atomic compare\u2011exchange and may cause a kernel transition on contention. Together they introduce roughly\u202f2\u202fwords of per\u2011allocation overhead plus the cost of atomic operations on every clone, lock, and unlock, plus potential cache\u2011line bouncing when multiple threads contend. In practice the overhead is modest for low\u2011contention workloads but can dominate performance if locks are heavily contested. \n\n```rust\nuse std::sync::{Arc, Mutex};\nuse std::thread;\n\nlet data = Arc::new(Mutex::new(0usize));\nlet mut handles = Vec::new();\n\nfor _ in 0..4 {\n    let d = Arc::clone(&data);\n    handles.push(thread::spawn(move || {\n        let mut guard = d.lock().unwrap(); // atomic lock\n        *guard += 1;                       // read\u2011modify\u2011write\n    }));\n}\nfor h in handles { h.join().unwrap(); }\nprintln!(\"Result: {}\", *data.lock().unwrap());\n```",
+    "response_B": "`Arc<T>` stores a pointer to a heap\u2011allocated control block that holds the reference count (an atomic usize) and the `T` value; each clone increments the atomic count, so the overhead is one extra pointer per handle plus the atomic increment/decrement on every clone or drop. `Mutex<T>` wraps the data with a lock flag (usually a `pthread_mutex_t` or a platform\u2011specific atomic flag) and may add padding to align to cache lines, so each protected value incurs at least a few extra bytes and the cost of acquiring/releasing the lock (an atomic compare\u2011exchange and possible kernel fallback). Together, an `Arc<Mutex<T>>` adds the pointer, the atomic ref\u2011count, the mutex state, and any alignment padding, plus runtime overhead from atomic operations and potential contention when multiple threads contend for the lock. In practice the memory overhead is modest (typically 2\u20133 words per shared value), while the performance impact depends on lock contention and the frequency of cloning the `Arc`.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1480,
+    "latency_B_ms": 1580,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_002_0d01",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_003",
+    "category": "programming",
+    "prompt": "Explain TypeScript conditional types and distributive behavior over naked type parameters.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "TypeScript conditional types have the form `T extends U ? X : Y`, returning `X` if `T` is assignable to `U`, otherwise `Y`. When the checked type `T` is a *naked* type parameter (used directly, not wrapped), the conditional is applied to each member of a union individually, producing a union of the results\u2014this is the distributive property. For example, `type Foo<T> = T extends string ? number : boolean;` yields `Foo<\"a\" | 42>` \u2192 `number | boolean`. Wrapping `T` (e.g., `[T]`) disables distribution, treating the whole union as a single type. This lets you control whether you want per\u2011union\u2011member logic or a single check.",
+    "response_B": "TypeScript conditional types use the syntax `T extends U ? X : Y` to select one of two types based on whether a type `T` is assignable to `U`. When the checked type `T` is a *naked* type parameter (i.e., not wrapped in a tuple or other container), the conditional distributes over each member of a union, producing a union of the results. For example, `type ToArray<T> = T extends any ? T[] : never;` applied to `string | number` yields `string[] | number[]` because the conditional is evaluated separately for `string` and `number`.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10010,
+    "latency_B_ms": 2972,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_003_c529",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_004",
+    "category": "programming",
+    "prompt": "How do buffered vs unbuffered channels differ during deadlocks in Go?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Buffered channels have a finite queue, so a send only blocks when the buffer is full; this lets a goroutine continue past the send even if no receiver is ready yet. Unbuffered channels have no queue, so every send blocks until another goroutine receives, making mismatched send/receive patterns more likely to deadlock. A deadlock occurs when all goroutines are blocked on channel operations with no one able to proceed\u2014unbuffered channels hit this instantly, while buffered ones can mask it until the buffer empties.  \n\n```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"time\"\n)\n\nfunc main() {\n\t// Unbuffered deadlock\n\t// ch := make(chan int) // uncomment for deadlock\n\t// Buffered version avoids immediate deadlock\n\tch := make(chan int, 2)\n\n\tgo func() {\n\t\tch <- 1 // non\u2011blocking until two values are queued\n\t\tch <- 2\n\t\tch <- 3 // blocks here if buffer is full\n\t\tfmt.Println(\"sent 3\")\n\t}()\n\n\ttime.Sleep(time.Second) // give sender time to block\n\tfmt.Println(<-ch, <-ch) // receive two values, unblocks sender\n}\n```  \n\nWith the unbuffered channel (`make(chan int)`) the first send would block forever because no receiver exists, causing a deadlock; the buffered channel (`make(chan int, 2)`) lets the first two sends proceed before blocking.",
+    "response_B": "Unbuffered channels block the sender until a receiver is ready (and vice\u2011versa), so if no goroutine is receiving the send will stall and the runtime will report a deadlock as soon as all goroutines are blocked. Buffered channels let a send proceed until the buffer\u2019s capacity is reached; deadlock only occurs when the buffer is full and no goroutine is receiving, or when all goroutines are otherwise blocked. In short, buffering adds slack that can prevent immediate deadlocks, but once the buffer is exhausted the same deadlock condition applies.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 2974,
+    "latency_B_ms": 13436,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_004_6cd8",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_005",
+    "category": "programming",
+    "prompt": "Write a PostgreSQL window function query calculating 7-day rolling revenue.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Use a windowed `SUM()` that looks back six days plus the current day:  \n\n```sql\nSELECT\n    sale_date,\n    revenue,\n    SUM(revenue) OVER (\n        ORDER BY sale_date\n        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n    ) AS revenue_7day_rolling\nFROM sales\nORDER BY sale_date;\n```  \n\nThis returns each day\u2019s revenue and the total revenue for that day and the previous six days.",
+    "response_B": "Use a window sum over the last seven days:\n\n```sql\nSELECT\n    sale_date,\n    revenue,\n    SUM(revenue) OVER (\n        ORDER BY sale_date\n        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n    ) AS revenue_7day_rolling\nFROM sales\nORDER BY sale_date;\n```\n\nThis sums each day\u2019s revenue with the previous six days, giving a 7\u2011day rolling total. Adjust the table/column names as needed.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1211,
+    "latency_B_ms": 1084,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_005_dfa3",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_006",
+    "category": "programming",
+    "prompt": "Implement an LRU cache decorator using collections.OrderedDict.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Here\u2019s a compact LRU\u2011cache decorator built on\u202f`collections.OrderedDict` that limits the cache to a given `maxsize` and evicts the least\u2011recently\u2011used entry when the limit is exceeded:\n\n```python\nfrom collections import OrderedDict\nfrom functools import wraps\n\ndef lru_cache(maxsize=128):\n    def decorator(func):\n        cache = OrderedDict()\n\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            key = (args, tuple(sorted(kwargs.items())))\n            if key in cache:\n                cache.move_to_end(key)          # mark as recently used\n                return cache[key]\n            result = func(*args, **kwargs)\n            cache[key] = result\n            if len(cache) > maxsize:\n                cache.popitem(last=False)       # discard LRU entry\n            return result\n        return wrapper\n    return decorator\n```\n\n**Usage**\n\n```python\n@lru_cache(maxsize=3)\ndef fib(n):\n    return n if n < 2 else fib(n-1) + fib(n-2)\n\nprint([fib(i) for i in range(6)])   # cached calls after the first few\n```\n\nThe decorator stores call arguments as a hashable key, moves a hit to the end of the `OrderedDict`, and removes the oldest entry once `maxsize` is exceeded.",
+    "response_B": "Here\u2019s a compact LRU\u2011cache decorator built on\u202f`collections.OrderedDict`:\n\n```python\nfrom collections import OrderedDict\nfrom functools import wraps\n\ndef lru_cache(maxsize=128):\n    def decorator(func):\n        cache = OrderedDict()\n\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            # key must be hashable; combine args and sorted kwargs\n            key = args + tuple(sorted(kwargs.items()))\n            if key in cache:\n                cache.move_to_end(key)          # mark as most\u2011recent\n                return cache[key]\n            result = func(*args, **kwargs)\n            cache[key] = result\n            if len(cache) > maxsize:            # evict least\u2011recent\n                cache.popitem(last=False)\n            return result\n        return wrapper\n    return decorator\n```\n\nThe decorator stores results in an `OrderedDict`, moves accessed entries to the end to denote recent use, and discards the oldest entry when the cache exceeds `maxsize`. Use it like `@lru_cache(64)` above any pure function.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 12795,
+    "latency_B_ms": 1377,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_006_a3cc",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_007",
+    "category": "programming",
+    "prompt": "Show how to structure a multi-stage Dockerfile for a production Node.js application.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "intermediate",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "A multi\u2011stage Dockerfile lets you compile your Node.js app in a builder image, then copy only the runtime artifacts into a minimal production image.  \n\nIn the **builder** stage you use a full Node image, set `WORKDIR`, copy `package*.json`, run `npm ci` (or `npm install`), copy the source, and run the build script (e.g., `npm run build`).  \n\nIn the **final** stage you start from a lightweight Node (or `alpine`) image, copy the compiled output and only the production `node_modules`, set `NODE_ENV=production`, expose the port, and define `CMD [\"node\", \"dist/index.js\"]`.  \n\n```Dockerfile\n# ---------- Builder ----------\nFROM node:20 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build   # produces ./dist\n\n# ---------- Production ----------\nFROM node:20-alpine AS runtime\nWORKDIR /app\nENV NODE_ENV=production\nCOPY --from=builder /app/dist ./dist\nCOPY --from=builder /app/node_modules ./node_modules\nEXPOSE 3000\nCMD [\"node\", \"dist/index.js\"]\n```",
+    "response_B": "```Dockerfile\n# ---------- Builder stage ----------\nFROM node:20-alpine AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci               # install all deps\nCOPY . .\nRUN npm run build        # compile TypeScript / bundle assets\n\n# ---------- Production stage ----------\nFROM node:20-alpine AS runtime\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev    # only production deps\nCOPY --from=builder /app/dist ./dist   # copy built output\nEXPOSE 3000\nCMD [\"node\", \"dist/index.js\"]\n```  \n\nThe first stage installs full dependencies, builds the app, and the second stage pulls only the compiled code and production\u2011only packages, keeping the final image small and secure.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 13474,
+    "latency_B_ms": 1345,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_007_9fca",
+      "verbosity": "detailed",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_008",
+    "category": "programming",
+    "prompt": "How do C++20 coroutine promises and awaitable handles operate?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "C++20 coroutines separate the *promise* (which builds the return object and controls suspension) from the *awaitable* (which defines how `co_await` interacts with the coroutine), and the runtime uses a `std::coroutine_handle<promise_type>` to resume, destroy, or query the coroutine\u2019s state. The promise type must provide `get_return_object()`, `initial_suspend()`, `final_suspend()`, `return_void()`/`return_value()`, and optionally `await_transform()` to customize awaiting, while any type used with `co_await` must supply `await_ready()`, `await_suspend(handle)`, and `await_resume()`. The handle is the bridge: `handle.resume()` continues execution, `handle.done()` checks completion, and `handle.destroy()` frees resources.\n\n```cpp\n#include <coroutine>\n#include <iostream>\n\nstruct Generator {\n    struct promise_type {\n        int current;\n        std::suspend_always initial_suspend() noexcept { return {}; }\n        std::suspend_always final_suspend() noexcept   { return {}; }\n        auto get_return_object() noexcept {\n            return Generator{ std::coroutine_handle<promise_type>::from_promise(*this) };\n        }\n        std::suspend_always yield_value(int v) noexcept {\n            current = v;\n            return {};\n        }\n        void return_void() noexcept {}\n        void unhandled_exception() noexcept { std::terminate(); }\n    };\n\n    std::coroutine_handle<promise_type> h;\n    explicit Generator(std::coroutine_handle<promise_type> h) : h(h) {}\n    ~Generator() { if (h) h.destroy(); }\n\n    bool next() {\n        h.resume();\n        return !h.done();\n    }\n    int value() const { return h.promise().current; }\n};\n\nGenerator count_to_three() {\n    co_yield 1;\n    co_yield 2;\n    co_yield 3;\n}\n\nint main() {\n    auto gen = count_to_three();\n    while (gen.next())\n        std::cout << gen.value() << ' ';\n}\n```\n\nThe `promise_type` builds the `Generator` object, `co_yield` uses `yield_value` to provide an awaitable that suspends, and the `std::coroutine_handle` lets `main` drive the coroutine step\u2011by\u2011step.",
+    "response_B": "In C++20 a coroutine\u2019s **promise type** supplies the interface between the coroutine frame and the caller: it defines `get_return_object()` (the value the caller receives), `initial_suspend()` and `final_suspend()` (which control when the coroutine first suspends and when it yields control at the end), and `unhandled_exception()` (how exceptions are propagated). The **coroutine handle** (`std::coroutine_handle<promise_type>`) is a lightweight, type\u2011erased pointer to the coroutine\u2019s frame; it lets the caller `resume()` the coroutine, `destroy()` its resources, and query its state (`done()`). An **awaitable** object implements `await_ready()`, `await_suspend(handle)`, and `await_resume()`; when co_awaited, the compiler generates code that uses the handle to suspend the current coroutine and resume the awaited one according to those three functions. In practice, the promise creates the handle, the handle drives execution, and awaitables decide when and how that execution is paused and resumed.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 3445,
+    "latency_B_ms": 13844,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_008_9c7e",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_009",
+    "category": "programming",
+    "prompt": "Write a bash script with robust error handling (set -euo pipefail) to backup a directory.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "intermediate",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "```bash\n#!/usr/bin/env bash\nset -euo pipefail\n\n# Usage: backup.sh SOURCE_DIR DEST_DIR\nif [[ $# -ne 2 ]]; then\n  echo \"Usage: $0 <source_dir> <dest_dir>\" >&2\n  exit 1\nfi\n\nsrc=\"${1%/}\"\ndst=\"${2%/}\"\ntimestamp=$(date +%Y%m%d_%H%M%S)\narchive=\"${dst}/backup_${timestamp}.tar.gz\"\n\n# Verify source exists and is readable\nif [[ ! -d \"$src\" || ! -r \"$src\" ]]; then\n  echo \"Error: source directory '$src' does not exist or is not readable.\" >&2\n  exit 2\nfi\n\n# Create destination if missing\nmkdir -p \"$dst\"\n\n# Create compressed tarball\ntar -czf \"$archive\" -C \"$(dirname \"$src\")\" \"$(basename \"$src\")\"\n\n# Verify archive was created\nif [[ ! -f \"$archive\" ]]; then\n  echo \"Error: backup failed, archive not created.\" >&2\n  exit 3\nfi\n\necho \"Backup of '$src' completed successfully: $archive\"\n```",
+    "response_B": "Here\u2019s a concise, robust backup script using `set -euo pipefail`:\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n\nSRC_DIR=\"${1:-/path/to/source}\"\nDEST_DIR=\"${2:-/path/to/backup}\"\nTIMESTAMP=$(date +\"%Y%m%d_%H%M%S\")\nARCHIVE=\"${DEST_DIR}/backup_${TIMESTAMP}.tar.gz\"\n\nmkdir -p \"$DEST_DIR\"\nif [[ ! -d \"$SRC_DIR\" ]]; then\n  echo \"Source directory '$SRC_DIR' does not exist.\" >&2\n  exit 1\nfi\n\ntar -czf \"$ARCHIVE\" -C \"$(dirname \"$SRC_DIR\")\" \"$(basename \"$SRC_DIR\")\"\necho \"Backup of '$SRC_DIR' completed: $ARCHIVE\"\n```\n\nRun it as `./backup.sh /my/data /my/backups`; it validates inputs, creates a timestamped tar.gz, and aborts on any error.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1570,
+    "latency_B_ms": 10816,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_009_d740",
+      "verbosity": "detailed",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "prog_0010",
+    "category": "programming",
+    "prompt": "Explain Python GIL impacts on CPU-bound vs IO-bound threads with a benchmark snippet.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "The GIL lets only one thread execute Python bytecode at a time, so CPU\u2011bound threads on multi\u2011core machines get little or no speedup. IO\u2011bound threads usually release the GIL while waiting for system calls (e.g.,\u202fsleep, socket I/O), letting other threads run and often scaling close to the number of cores. Below is a short benchmark that runs a CPU\u2011heavy loop and an IO\u2011heavy sleep in four threads each:\n\n```python\nimport time, threading\nfrom concurrent.futures import ThreadPoolExecutor\n\ndef cpu_task():\n    # simple CPU\u2011bound work: sum of a large range\n    return sum(range(10_000_000))\n\ndef io_task():\n    # IO\u2011bound work: sleep releases the GIL\n    time.sleep(0.5)\n    return \"done\"\n\ndef run_benchmark(func, label):\n    start = time.perf_counter()\n    with ThreadPoolExecutor(max_workers=4) as ex:\n        results = list(ex.map(func, range(4)))  # launch 4 threads\n    elapsed = time.perf_counter() - start\n    print(f\"{label}: {elapsed:.3f}s, results={results}\")\n\nrun_benchmark(cpu_task, \"CPU\u2011bound\")\nrun_benchmark(io_task, \"IO\u2011bound\")\n```",
+    "response_B": "The GIL lets only one thread execute Python bytecode at a time, so CPU\u2011bound threads contend for it and see little speedup, while I/O\u2011bound threads often release the GIL during system calls and can run concurrently. In practice, a CPU\u2011heavy loop in multiple threads runs almost as fast as a single thread, whereas many network or file reads scale with thread count.  \n\n```python\nimport threading, time, urllib.request\n\ndef cpu_task():\n    x = 0\n    for _ in range(10_000_000):\n        x += 1\n\ndef io_task():\n    urllib.request.urlopen('https://httpbin.org/delay/1').read()\n\ndef run(fn, n):\n    start = time.time()\n    threads = [threading.Thread(target=fn) for _ in range(n)]\n    for t in threads: t.start()\n    for t in threads: t.join()\n    print(f'{fn.__name__} x{n}: {time.time()-start:.2f}s')\n\nrun(cpu_task, 4)   # little improvement over 1 thread\nrun(io_task, 4)    # roughly 1\u202fs instead of 4\u202fs\n```",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 5866,
+    "latency_B_ms": 3480,
+    "policy_adapted": {
+      "user_id": "eval_user_prog_0010_e99f",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_with_code",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_with_code",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_001",
+    "category": "conceptual",
+    "prompt": "Explain the CAP theorem tradeoffs between Consistency and Partition Tolerance in distributed databases.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "In the CAP theorem, a system that must tolerate network partitions (P) cannot guarantee both strong consistency (C) and full availability (A) simultaneously. When a partition occurs, choosing consistency means rejecting or delaying requests on some nodes so all responses reflect the same state; choosing availability means serving requests locally, potentially returning divergent data. Thus the trade\u2011off is between preserving a single, up\u2011to\u2011date view of data versus keeping the system responsive despite the partition. In practice, designers pick the side that best matches their application\u2019s correctness and latency requirements.",
+    "response_B": "The CAP theorem states that a distributed system can guarantee at most two of Consistency, Availability, and Partition tolerance simultaneously. When a network partition occurs, a system must choose between keeping data **consistent** (all nodes see the same value) or remaining **available** (serving reads/writes despite the split). Prioritizing consistency means rejecting or delaying operations on the isolated side until the partition heals; prioritizing partition tolerance (and thus availability) allows operations to continue, potentially creating divergent replicas that are reconciled later. In practice, many databases adopt \u201ceventual consistency\u201d to stay partition\u2011tolerant while offering high availability.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 11393,
+    "latency_B_ms": 9740,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_001_3c96",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_002",
+    "category": "conceptual",
+    "prompt": "What is Dependency Injection and how does it decouple unit testing?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "Dependency Injection (DI) is a design pattern where an object\u2019s required collaborators are supplied from the outside rather than created internally. By receiving dependencies through constructors, setters, or interfaces, the object no longer hard\u2011codes concrete implementations, making it easy to swap in test doubles (mocks or stubs). This separation lets unit tests isolate the class under test, injecting lightweight substitutes that control behavior and avoid side effects. In short, DI removes tight coupling to concrete services, enabling straightforward, deterministic testing.",
+    "response_B": "Dependency Injection (DI) is a design pattern where an object receives its required collaborators (services, repositories, etc.) from external code rather than creating them itself. By supplying those collaborators at construction or via setters, you can replace real implementations with lightweight test doubles (mocks or stubs) during unit tests, isolating the class under test. This separation removes hard\u2011coded dependencies, making tests faster, more reliable, and easier to write.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 9923,
+    "latency_B_ms": 1126,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_002_9638",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_003",
+    "category": "conceptual",
+    "prompt": "Explain the ACID properties of relational databases with concrete concurrency anomalies.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "ACID guarantees that transactions are **Atomic** (all\u2011or\u2011nothing), **Consistent** (preserve database rules), **Isolated** (appear to run alone), and **Durable** (changes survive crashes). Isolation is enforced by preventing concurrency anomalies such as **dirty reads** (reading uncommitted data), **non\u2011repeatable reads** (seeing different values on re\u2011query within the same transaction), **phantom reads** (new rows appearing in a range query), and **write\u2011skew** (two concurrent updates that together violate a constraint). These anomalies arise when isolation levels like Read Uncommitted or Read Committed are used instead of stricter levels (Repeatable Read or Serializable). Strong isolation (Serializable) eliminates them by ensuring transactions execute as if serialized.",
+    "response_B": "ACID guarantees that a transaction is **Atomic** (all-or-nothing), **Consistent** (leaves the database in a valid state), **Isolated** (appears to run alone), and **Durable** (its effects survive crashes). Isolation prevents concurrency anomalies such as **dirty reads** (reading uncommitted data), **non\u2011repeatable reads** (seeing different values on re\u2011query), **phantom reads** (new rows appearing in a range query), and **lost updates** (two transactions overwriting each other\u2019s changes). Strong isolation levels like\u202fSERIALIZABLE eliminate all these anomalies, while weaker levels (READ\u202fCOMMITTED, REPEATABLE\u202fREAD) allow some of them for higher performance. Choosing the right level balances correctness against throughput.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 11652,
+    "latency_B_ms": 1323,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_003_044a",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_004",
+    "category": "conceptual",
+    "prompt": "What are the core tradeoffs between microservices and a modular monolith?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "A modular monolith keeps the whole system in one deployable unit, giving you simpler testing, easier transactions, and lower operational overhead, while still letting you organize code into clear, independent modules. Microservices split functionality into separate services, offering independent scaling, technology heterogeneity, and fault isolation, but they introduce network latency, distributed\u2011system complexity, and higher DevOps costs. The trade\u2011off is essentially simplicity and cohesion versus flexibility and scalability; choose the monolith when you value rapid iteration and low ops burden, and microservices when you need granular scaling or strict isolation. In practice many teams start with a modular monolith and extract services only as clear boundaries and scaling needs emerge.",
+    "response_B": "A modular monolith keeps the whole system in one deployable unit, giving you simpler deployment, easier end\u2011to\u2011end testing, and tighter data consistency, while still letting you organize code into clear, independent modules. Microservices split functionality into separate services, offering independent scaling, technology heterogeneity, and team autonomy, but they add operational overhead, network latency, and complexity around distributed transactions and monitoring. Choose a modular monolith when you value low operational cost and strong consistency, and move to microservices when you need granular scaling or isolated failure domains. The trade\u2011off is essentially simplicity versus flexibility and scalability.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 2872,
+    "latency_B_ms": 1353,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_004_44be",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_005",
+    "category": "conceptual",
+    "prompt": "Compare REST API over-fetching with GraphQL query resolution tradeoffs.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "REST endpoints return static representations, so clients often receive more data than needed (over\u2011fetching) or must make multiple calls for related resources, leading to inefficiency. GraphQL lets clients request exactly the fields they need, eliminating over\u2011fetching, but requires a resolver layer that must assemble data per query, which can introduce N+1 query problems, higher CPU usage, and more complex caching. The trade\u2011off is between REST\u2019s simpler, cache\u2011friendly responses and GraphQL\u2019s flexible, bandwidth\u2011efficient queries that demand careful resolver design and performance monitoring.",
+    "response_B": "REST endpoints often return fixed payloads, so clients may receive more fields than needed (over\u2011fetching) or must make multiple calls to gather related data. GraphQL lets clients specify exactly the fields they want, eliminating over\u2011fetching, but the server must parse, validate, and resolve each field, which can increase CPU load and complicate caching. The trade\u2011off is simpler, cache\u2011friendly REST at the cost of bandwidth versus flexible, bandwidth\u2011efficient GraphQL with higher query\u2011execution overhead. Use REST when predictable responses and CDN caching dominate; use GraphQL when clients need varied data shapes and you can manage resolver complexity.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 12895,
+    "latency_B_ms": 1220,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_005_44a9",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_006",
+    "category": "conceptual",
+    "prompt": "Walk through recursive DNS resolution from root servers to authoritative records.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "A recursive resolver first queries a root name server, which returns the NS records for the TLD (e.g.,\u202f`.com`). The resolver then contacts one of those TLD servers, receiving the NS records for the domain\u2019s authoritative zone (e.g.,\u202f`example.com`). It finally queries an authoritative server for that zone, which returns the requested record (A, AAAA, MX, etc.) and often includes a TTL for caching. The resolver caches each response along the way so future lookups can skip the earlier steps.",
+    "response_B": "A recursive resolver receives your domain query, then asks a root server for the\u202f\u201c.com\u201d\u202f(TLD) name\u2011server referral. It contacts that TLD server, which points it to the domain\u2019s authoritative name server, and finally queries that server for the exact record (A, AAAA, MX, etc.). The authoritative server returns the answer, which the resolver caches and sends back to the client. Each step is cached to speed up future lookups.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 5019,
+    "latency_B_ms": 5507,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_006_13ce",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_007",
+    "category": "conceptual",
+    "prompt": "Explain the generational garbage collection hypothesis and how it optimizes heap scanning.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": false,
+    "response_A": "The generational garbage\u2011collection hypothesis observes that most objects die young, so the heap is divided into a short\u2011lived \u201cyoung\u201d generation and a longer\u2011lived \u201cold\u201d generation. By scanning only the young generation most frequently, the collector examines a small, densely populated region where most garbage resides, reducing overall heap\u2011scanning work. Objects that survive several young\u2011generation collections are promoted to the old generation, which is scanned less often because its objects tend to be long\u2011lived. This separation lets the GC focus effort where it\u2019s most effective, improving throughput and pause times.",
+    "response_B": "The generational garbage\u2011collection hypothesis observes that most objects die young, so the heap is divided into a young generation (where new objects are allocated) and an older generation (for survivors). By collecting the young generation frequently and only scanning the old generation when necessary, the collector reduces the amount of memory it must examine, because most live objects are found in the young space and the old space is scanned less often. This selective scanning cuts overall heap\u2011traversal cost and improves pause times while still eventually reclaiming long\u2011lived objects.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 13506,
+    "latency_B_ms": 3009,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_007_3307",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_008",
+    "category": "conceptual",
+    "prompt": "What is the difference between symmetric and asymmetric encryption in TLS key exchanges?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "Symmetric encryption uses a single shared secret key to both encrypt and decrypt data, offering fast performance for bulk data transfer; asymmetric encryption uses a public\u2011private key pair, allowing parties to establish that shared secret securely without prior exchange. In TLS, asymmetric algorithms (e.g., RSA, ECDHE) negotiate or exchange the symmetric session key, after which all application data is protected with symmetric encryption. This combination leverages the speed of symmetric ciphers and the secure key agreement of asymmetric cryptography.",
+    "response_B": "Symmetric encryption uses a single shared secret key for both encrypting and decrypting data, offering high speed for bulk traffic. Asymmetric encryption employs a public\u2011private key pair; the public key encrypts (or verifies) and the private key decrypts (or signs), providing authentication and secure key exchange but at lower performance. In TLS, the asymmetric step secures the exchange of a pre\u2011master secret, after which both parties derive symmetric keys for the actual data transfer. (Language pair: auto\u2011detect \u2192 TLS terminology)",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 549101,
+    "latency_B_ms": 196817,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_008_6850",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_009",
+    "category": "conceptual",
+    "prompt": "Explain OAuth 2.0 Authorization Code Flow with PKCE step by step.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "1. The client generates a high\u2011entropy code verifier, derives a code challenge (e.g., SHA\u2011256 base64\u2011url\u2011encoded), and redirects the user\u2019s browser to the authorization endpoint with\u202fclient_id,\u202fredirect_uri,\u202fresponse_type=code,\u202fcode_challenge,\u202fcode_challenge_method, and requested scopes.  \n2. The user authenticates and consents; the authorization server redirects back to\u202fredirect_uri\u202fwith an authorization\u202fcode\u202fand the original\u202fstate\u202fvalue.  \n3. The client sends a POST to the token endpoint containing\u202fgrant_type=authorization_code,\u202fcode,\u202fredirect_uri,\u202fclient_id,\u202fcode_verifier, and (if applicable) client authentication.  \n4. The server verifies that the\u202fcode_verifier\u202fmatches the previously received\u202fcode_challenge; upon success it returns an\u202faccess token\u202f(and optionally a refresh token) to the client.",
+    "response_B": "1. The client (e.g., a mobile app) generates a high\u2011entropy **code verifier** and derives a **code challenge** (usually a SHA\u2011256 hash) from it, then starts the flow by sending the user to the authorization endpoint with the challenge, client ID, redirect URI, and requested scopes.  \n2. The user authenticates with the authorization server and, if needed, grants consent; the server then redirects the user back to the client\u2019s redirect URI, appending an **authorization code**.  \n3. The client receives this code and makes a back\u2011channel POST to the token endpoint, sending the code, its client ID, redirect URI, and the original **code verifier**.  \n4. The authorization server hashes the verifier, compares it to the original challenge, and if they match, issues an **access token** (and optionally a refresh token and ID token).  \n5. The client can now use the access token to call protected APIs; the PKCE step ensures that a leaked authorization code cannot be exchanged without the verifier, protecting public clients.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 272372,
+    "latency_B_ms": 51711,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_009_2bd8",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concept_010",
+    "category": "conceptual",
+    "prompt": "Explain Event-Driven Architecture event sourcing vs change data capture.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false
+    },
+    "constraints": {
+      "requires_code": false
+    },
+    "a_is_adapted": true,
+    "response_A": "Event\u2011Driven Architecture (EDA) uses immutable events as the primary means of communication between services, allowing decoupled, reactive processing. Event sourcing stores every state\u2011changing action as an event in an append\u2011only log, making the log the source of truth for rebuilding any aggregate\u2019s state. Change Data Capture (CDC) instead reads the data\u2011store\u2019s transaction log or triggers to emit events that reflect row\u2011level changes, without treating those events as the authoritative state source. In short, event sourcing models business events as the canonical data, while CDC captures low\u2011level data mutations to synchronize downstream systems.",
+    "response_B": "Event\u2011Driven Architecture (EDA) builds systems around immutable events that represent something that happened, letting services react to those events asynchronously.\u202fEvent sourcing stores every state\u2011changing action as an event in an append\u2011only log, so the current state is rebuilt by replaying those events.\u202fChange Data Capture (CDC) instead monitors a database\u2019s transaction log or tables and emits events that reflect the *result* of a change (insert, update, delete) without preserving the original intent or full history.\u202fThus, event sourcing is a design pattern for modeling state, while CDC is a technique for extracting change events from existing data stores.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 634900,
+    "latency_B_ms": 345106,
+    "policy_adapted": {
+      "user_id": "eval_user_concept_010_8968",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_001",
+    "category": "concise_pref",
+    "prompt": "What does HTTP status code 429 signify?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "HTTP\u202f429 means \u201cToo Many Requests.\u201d It indicates the client has sent more requests than the server allows within a defined time window, typically as part of rate\u2011limiting. The response may include a\u202fRetry\u2011After\u202fheader telling the client when to try again.",
+    "response_B": "HTTP\u202f429 means \u201cToo Many Requests.\u201d It indicates the client has sent more requests than the server allows within a given time window, typically as part of rate\u2011limiting. The response usually includes a\u202fRetry\u2011After header telling the client when to try again.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 567445,
+    "latency_B_ms": 284637,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_001_8c26",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_002",
+    "category": "concise_pref",
+    "prompt": "Git rebase vs git merge: what is the key difference?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "Git\u202fmerge combines two branches by creating a new merge commit that preserves the original branch histories. Git\u202frebase moves (rewrites) the commits from one branch onto the tip of another, producing a linear, \u201cas\u2011if\u2011you\u2011had\u2011worked\u2011on\u2011the\u2011target\u2011branch\u201d history. Use merge to keep full history; use rebase for a cleaner, linear timeline.",
+    "response_B": "Git\u202fmerge combines two branches by creating a new merge commit that preserves the original branch histories, resulting in a graph with a fork\u2011and\u2011join shape. Git\u202frebase moves (rewrites) the commits from one branch onto the tip of another, producing a straight\u2011line history without a merge commit. Use merge when you want to keep the true chronological context; use rebase when you prefer a clean, linear log.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 945739,
+    "latency_B_ms": 470811,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_002_c7a2",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_003",
+    "category": "concise_pref",
+    "prompt": "Explain the TCP 3-way handshake.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "The TCP 3\u2011way handshake establishes a reliable connection between a client and server. 1) The client sends a SYN packet to the server, indicating the initial sequence number. 2) The server replies with a SYN\u2011ACK, acknowledging the client\u2019s SYN and providing its own sequence number. 3) The client sends an ACK to confirm the server\u2019s sequence number, after which the connection is open and data transfer can begin.",
+    "response_B": "The TCP 3\u2011way handshake sets up a reliable connection between two hosts.  \n1. The client sends a **SYN** packet to the server, indicating it wants to connect.  \n2. The server replies with a **SYN\u2011ACK**, acknowledging the client\u2019s SYN and sending its own SYN.  \n3. The client finishes with an **ACK**, acknowledging the server\u2019s SYN.  \nAfter this exchange both sides agree on initial sequence numbers and the connection is established.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 925,
+    "latency_B_ms": 1196,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_003_3f95",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_004",
+    "category": "concise_pref",
+    "prompt": "Docker volume vs bind mount difference.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": false,
+    "response_A": "A Docker **volume** is a managed storage area stored in Docker\u2019s internal directory (e.g.,\u202f`/var/lib/docker/volumes`). It\u2019s created, backed up, and shared across containers by Docker, and its data persists even if the container is removed. A **bind mount** maps a specific host directory or file into the container\u2019s filesystem; it uses the host\u2019s path directly, so changes on the host are immediately visible inside the container and vice versa. Volumes are preferred for persistent, Docker\u2011managed data, while bind mounts are useful for development or when you need to expose a host directory to the container.",
+    "response_B": "A Docker volume is a managed storage area that Docker creates and owns, stored under `/var/lib/docker/volumes/`. A bind mount uses a host directory or file directly, specified by an absolute path. Volumes are easier to back up, share between containers, and are removed with `docker volume rm`; bind mounts give you direct access to host files and can expose host data to the container. Use volumes for persistent, container\u2011managed data; use bind mounts for development, configuration files, or when you need to edit files on the host.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 866,
+    "latency_B_ms": 957,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_004_ea9f",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_005",
+    "category": "concise_pref",
+    "prompt": "What are Redis allkeys-lru vs volatile-lru eviction policies?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "Redis eviction policies decide which keys to remove when memory is full.  \n**allkeys-lru** evicts the least\u2011recently\u2011used key from the entire keyspace, regardless of expiration.  \n**volatile-lru** evicts only keys that have an expiration set (TTL), again using the least\u2011recently\u2011used heuristic.  \nBoth use an LRU approximation, not a perfect LRU.",
+    "response_B": "Redis eviction policies decide which keys to remove when memory is full.  \n**allkeys-lru** evicts the least\u2011used key from the entire dataset, regardless of expiration.  \n**volatile-lru** evicts only keys that have an expiration set, again using least\u2011used order.  \nSo, allkeys\u2011lru can delete any key, while volatile\u2011lru is limited to expiring keys.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 4751,
+    "latency_B_ms": 971,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_005_5ed5",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_006",
+    "category": "concise_pref",
+    "prompt": "What does API idempotency mean for HTTP POST and PUT?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "Idempotency means that making the same HTTP request multiple times has the same effect as making it once.  \nFor **PUT**, the operation is naturally idempotent: each identical request replaces the resource with the same data, so repeated calls leave the resource unchanged.  \nFor **POST**, idempotency is not guaranteed by default; you must design the server (e.g., using a client\u2011supplied idempotency key) so that repeated POSTs create the same resource or return the same result instead of duplicating it.",
+    "response_B": "Idempotency means that making the same request repeatedly produces the same result as making it once.  \nFor a **PUT** request, the operation is naturally idempotent: each identical PUT updates the resource to the same state.  \nFor a **POST**, idempotency is optional; if the server assigns a unique identifier (e.g., via an Idempotency-Key header) and ignores duplicate POSTs, it can behave idempotently, otherwise each POST may create a new resource.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 921,
+    "latency_B_ms": 917,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_006_1b5b",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_007",
+    "category": "concise_pref",
+    "prompt": "What are the rules of Semantic Versioning MAJOR.MINOR.PATCH?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "Semantic Versioning (SemVer) uses the format MAJOR.MINOR.PATCH.  \n- Increment MAJOR when you make incompatible API changes.  \n- Increment MINOR when you add functionality in a backward\u2011compatible way.  \n- Increment PATCH for backward\u2011compatible bug fixes.  \nPre\u2011release and build metadata can be appended after a hyphen or plus sign, but they don\u2019t affect version precedence.",
+    "response_B": "Semantic Versioning (MAJOR.MINOR.PATCH) follows these rules:\n\n1. **MAJOR** version increments when you make incompatible API changes.  \n2. **MINOR** version increments when you add functionality in a backward\u2011compatible manner.  \n3. **PATCH** version increments when you make backward\u2011compatible bug fixes.  \n\nPre\u2011release and build metadata can be appended after a `-` or `+`, but they don\u2019t affect the version precedence rules.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 892,
+    "latency_B_ms": 887,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_007_9a15",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_008",
+    "category": "concise_pref",
+    "prompt": "Why do browsers enforce Cross-Origin Resource Sharing (CORS)?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": false,
+    "response_A": "Browsers enforce CORS to enforce the same\u2011origin policy, which protects users from malicious sites reading data they shouldn\u2019t see.  \nWhen a script from one origin requests a resource from another, the server must explicitly allow it; otherwise the browser blocks the response.  \nThis prevents cross\u2011site request forgery, data leaks, and other attacks that could exploit a user\u2019s authenticated session or sensitive data.",
+    "response_B": "Browsers enforce CORS to uphold the same\u2011origin policy, which prevents a web page from freely accessing resources on another domain. This protects users from malicious sites that could read sensitive data or perform unwanted actions on behalf of the user. CORS works by having the server send specific headers that explicitly allow or deny cross\u2011origin requests, giving developers control over which origins can interact with their APIs.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 897,
+    "latency_B_ms": 4613,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_008_f5c1",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_009",
+    "category": "concise_pref",
+    "prompt": "What four conditions are necessary for deadlock to occur?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "Deadlock requires four conditions:  \n1. **Mutual exclusion** \u2013 at least one resource is non\u2011shareable.  \n2. **Hold and wait** \u2013 a process holds resources while requesting more.  \n3. **No preemption** \u2013 resources cannot be forcibly taken away.  \n4. **Circular wait** \u2013 a cycle of processes each waiting for a resource held by the next.",
+    "response_B": "Deadlock requires four conditions:  \n1. **Mutual exclusion** \u2013 at least one resource is non\u2011shareable.  \n2. **Hold and wait** \u2013 a process holds resources while requesting more.  \n3. **No preemption** \u2013 resources cannot be forcibly taken away.  \n4. **Circular wait** \u2013 a cycle of processes each waiting for a resource held by the next.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 8908,
+    "latency_B_ms": 6331,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_009_9d3b",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "concise_010",
+    "category": "concise_pref",
+    "prompt": "What is the difference between a process and a thread in Linux?",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "tone": "direct"
+    },
+    "constraints": {
+      "max_words": 60
+    },
+    "a_is_adapted": true,
+    "response_A": "A process is an isolated execution context with its own memory space, file descriptors, and scheduling priority, while a thread shares the process\u2019s address space and resources but has its own stack and program counter. Processes are heavier, requiring context switches that copy more state; threads are lighter, enabling faster communication and lower overhead. In Linux, the kernel treats threads as special kinds of processes (tasks) that share the same PID namespace but have distinct TIDs. This sharing allows threads to communicate via shared memory without IPC mechanisms, whereas processes must use pipes, sockets, or shared memory explicitly.",
+    "response_B": "A process in Linux is an independent program instance with its own memory space, file descriptors, and scheduling priority. A thread is a lightweight execution unit that shares the same memory space and resources of its parent process but has its own stack and program counter. Threads can communicate faster and switch context more cheaply than processes, but a crash in one thread can bring down the entire process.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10330,
+    "latency_B_ms": 6427,
+    "policy_adapted": {
+      "user_id": "eval_user_concise_010_965c",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "direct",
+      "preferred_strategy": "concise_direct",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "concise_direct",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_001",
+    "category": "detailed_pref",
+    "prompt": "How do you plan and execute a zero-downtime database schema migration?",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "Plan the migration in three phases: (1) **prepare** by adding nullable columns, creating new tables, and writing backward\u2011compatible code; (2) **deploy** the new schema changes with a rolling update or blue\u2011green deployment, keeping the old schema live; (3) **switch** by updating application routing to the new schema, then drop the old objects after a safe period. Use feature flags, database replication, and automated rollback scripts to ensure any failure can be reversed instantly, guaranteeing zero downtime.",
+    "response_B": "Plan by making only backward\u2011compatible changes: add new columns, tables, or indexes first, then drop old ones later. Execute in phases\u2014run the \u201cadd\u201d migration in a maintenance window, test reads/writes, then enable feature toggles to switch to the new schema, and finally run the \u201cremove\u201d migration after confirming no live traffic uses the old objects. Use a blue\u2011green or canary deployment, monitor latency and error rates, and keep a rollback script ready. This staged, reversible approach keeps the database online and avoids downtime.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 3580,
+    "latency_B_ms": 5961,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_001_8156",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_002",
+    "category": "detailed_pref",
+    "prompt": "Explain the architecture and deployment strategy for Micro-Frontends using Module Federation.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "Micro\u2011Frontends with Module Federation split a monorepo or repo\u2011per\u2011team into independently deployable bundles that expose components or routes via a shared `webpack.config.js`. Each host app consumes remote modules by declaring a `remotes` entry and a `shared` map to dedupe common libraries, enabling runtime loading of the latest remote code. Deployment is typically container\u2011based: each micro\u2011frontend is built, versioned, and pushed to a CDN or artifact store; the host pulls the remote manifest at runtime, allowing zero\u2011downtime updates. To keep consistency, use a shared versioning policy (e.g., semantic tags) and a central registry that tracks remote URLs, so the host can resolve the correct remote version without redeploying.",
+    "response_B": "Micro\u2011Frontends with Module Federation split a large app into independently deployable \u201cremote\u201d bundles that expose components, while a \u201chost\u201d app stitches them together at runtime. Each remote is built with Webpack\u202f5, declares shared libraries (React, Redux, etc.) in its `moduleFederationPlugin`, and is published to a CDN or artifact store. The host imports those exposed modules via dynamic imports, allowing hot updates without redeploying the whole app. Deployment is typically CI\u2011driven: each remote is built, versioned, and pushed to a CDN; the host pulls the latest remote manifests, caches them, and falls back to a local bundle if a remote is unavailable. This strategy gives teams autonomy, reduces build times, and keeps runtime bundle sizes small.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 9751,
+    "latency_B_ms": 7132,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_002_10d2",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_003",
+    "category": "detailed_pref",
+    "prompt": "Explain token bucket vs leaky bucket rate limiting algorithms and their implementation tradeoffs.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "Token\u2011bucket allows bursts: tokens accumulate at a fixed rate up to a bucket size; each request consumes a token, and if none are available the request is delayed or rejected. Leaky\u2011bucket smooths traffic: it drains at a constant rate, so requests are queued and served at a steady pace regardless of burstiness. Implementation tradeoffs: token\u2011bucket is simpler to code and supports bursty traffic, but requires careful token\u2011refill logic; leaky\u2011bucket guarantees strict pacing and is easier to enforce with a single timer, but it can waste capacity if traffic is uneven. In practice, token\u2011bucket is preferred for API rate limits, while leaky\u2011bucket suits traffic shaping on network interfaces.",
+    "response_B": "Token\u2011bucket allows bursts: tokens accumulate up to a bucket size, and each request consumes a token; if the bucket is empty the request is throttled. Leaky\u2011bucket smooths traffic by draining the bucket at a constant rate, so requests are served at a steady pace regardless of bursts. In practice, token\u2011bucket is simpler to implement with a counter and timestamp, and it gives more flexibility for bursty traffic. Leaky\u2011bucket requires a queue or timer to enforce the constant leak, which can add latency but guarantees a perfectly regular output rate. Thus, choose token\u2011bucket for burst tolerance and leaky\u2011bucket when you need strict, smooth traffic shaping.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10799,
+    "latency_B_ms": 7866,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_003_5439",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_004",
+    "category": "detailed_pref",
+    "prompt": "How should an enterprise securely implement JWT authentication with token rotation and revocation?",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": false,
+    "response_A": "Use short\u2011lived access tokens (e.g., 5\u201315\u202fmin) signed with a strong algorithm (RS256 or ES256) and embed a unique `jti` and `exp`. Issue a long\u2011lived refresh token (e.g., 30\u202fdays) stored in an HTTP\u2011Only, Secure cookie or encrypted storage, and rotate it on every use: when a client presents a refresh token, the server issues a new access token **and** a new refresh token, then invalidates the old one. Keep a revocation store (e.g., Redis or a database table) keyed by `jti` or a token\u2011version field; check this store on each request to block revoked tokens. Enforce HTTPS everywhere, validate audience, issuer, and signature, and consider short\u2011lived refresh tokens with a \u201ctoken version\u201d claim that the server increments on logout or credential changes. This pattern gives you stateless access tokens, secure rotation, and a simple revocation mechanism.",
+    "response_B": "1. Issue a short\u2011lived access JWT (e.g., 15\u202fmin) and a long\u2011lived refresh JWT (e.g., 30\u202fdays) signed with a secure algorithm (RS256 or HS256 with a strong key).  \n2. Store the refresh token in an HTTP\u2011Only, Secure cookie or a dedicated token store; when the access token expires, the client sends the refresh token to a protected `/refresh` endpoint that validates the token, checks a revocation list, and issues a new access token plus a new refresh token (rotating the old one).  \n3. Maintain a server\u2011side revocation list (e.g., Redis or a database table keyed by token ID or jti) and mark a refresh token as revoked when the user logs out, changes password, or the token is detected as compromised; reject any subsequent refresh attempts with that token.  \n4. Optionally, embed a `jti` claim in each JWT, enforce short token lifetimes, and use a secure, tamper\u2011evident storage for revocation data to ensure that revoked tokens cannot be reused.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7630,
+    "latency_B_ms": 10596,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_004_daec",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_005",
+    "category": "detailed_pref",
+    "prompt": "Walk through Raft consensus leader election and log replication failure recovery.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "**Raft Leader Election (step\u2011by\u2011step)**  \n\n1. **Initial state** \u2013 All servers start as *followers* with a current term\u202f=\u202f0.  \n2. **Election timeout** \u2013 If a follower receives no heartbeats within its randomized timeout, it becomes a *candidate*, increments its term, votes for itself, and sends `RequestVote` RPCs to all peers.  \n3. **Vote collection** \u2013 A server grants its vote if the candidate\u2019s term \u2265 its own term and it has not voted in this term.  \n4. **Majority check** \u2013 When a candidate receives votes from a majority of servers, it transitions to *leader*, resets its heartbeat timer, and starts sending periodic `AppendEntries` heartbeats.  \n5. **Term out\u2011of\u2011sync** \u2013 If a server receives an RPC with a higher term, it updates its term, reverts to follower, and records the new leader\u2019s ID.  \n\n**Log Replication & Failure Recovery (step\u2011by\u2011step)**  \n\n1. **AppendEntries from leader** \u2013 The leader sends `AppendEntries` RPCs containing the next log index, previous log term, and a batch of new entries.  \n2. **Consistency check** \u2013 Each follower verifies that its log contains an entry at `prevLogIndex` with term `prevLogTerm`. If not, it rejects the RPC and returns the index of the conflict.  \n3. **Conflict resolution** \u2013 The follower truncates its log from the conflicting index onward and appends the new entries.  \n4. **Commit index update** \u2013 The leader updates its `commitIndex` when it knows that a majority of followers have stored an entry at a given index.  \n5. **State machine apply** \u2013 Followers apply committed entries to their state machines in order.  \n\n**Failure scenarios & recovery**  \n\n- **Leader crash** \u2013 Followers detect missing heartbeats, start a new election, and a new leader is elected. The new leader may have a different log; it will use `AppendEntries` to bring followers up\u2011to\u2011date.  \n- **Network partition** \u2013 If a majority of nodes remain connected, they elect a leader and continue replication. Nodes in minority partitions will stay followers; once connectivity returns, they catch up via `AppendEntries` and may be forced to roll back to the majority\u2019s log.  \n- **Stale follower",
+    "response_B": "In Raft, a follower that hasn\u2019t heard from a leader for a timeout becomes a candidate, increments its term, votes for itself, and requests votes from all peers. If it receives a majority of votes, it becomes leader, sends initial heartbeats (AppendEntries with no entries) to assert authority, and starts replicating new log entries to followers. Followers append received entries to their logs and reply success; the leader waits for a majority of acknowledgments before committing the entry and applying it to the state machine. If a leader fails, followers time out, start a new election, and the new leader will catch up any out\u2011of\u2011sync followers by sending missing entries via AppendEntries until all logs are consistent.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 11105,
+    "latency_B_ms": 8122,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_005_182f",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_006",
+    "category": "detailed_pref",
+    "prompt": "Detail the Linux process lifecycle from fork/exec through zombie and termination.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "**Linux Process Lifecycle \u2013 Step\u2011by\u2011Step**\n\n1. **`fork()`**  \n   - The kernel creates a new task descriptor (task_struct) for the child.  \n   - The child inherits the parent\u2019s memory space via copy\u2011on\u2011write, file descriptors, signal dispositions, and other attributes.  \n   - `fork()` returns `0` in the child and the child\u2019s PID in the parent.\n\n2. **`exec()`**  \n   - The child replaces its memory image with a new program: the kernel loads the executable\u2019s ELF headers, sets up a new stack, and maps the program\u2019s segments.  \n   - The process\u2019s PID remains unchanged; only the address space, registers, and auxiliary vectors are updated.  \n   - After a successful `exec()`, the child\u2019s previous code and data are discarded.\n\n3. **Execution Phase**  \n   - The process runs until it either exits normally (`exit()`/`_exit()`), is terminated by a signal, or is killed by the kernel.  \n   - While running, it may spawn more children, open files, create threads, etc.\n\n4. **Termination**  \n   - **Normal exit**: The process calls `exit()` or returns from `main()`. The kernel cleans up resources (file descriptors, memory mappings, etc.) but keeps the task_struct alive until the parent reads its status.  \n   - **Signal termination**: If a fatal signal (e.g., SIGKILL, SIGTERM) is delivered, the kernel performs the same cleanup but may also perform signal\u2011specific actions (e.g., core dump).  \n   - **Kernel\u2011initiated exit**: For example, a process that exceeds its resource limits may be killed by the kernel.\n\n5. **Zombie State**  \n   - After termination, the process enters the *zombie* state: its task_struct remains to hold exit status and PID until the parent calls `wait()`/`waitpid()`.  \n   - The zombie holds minimal resources (no memory, no open files) but retains the PID and exit code.\n\n6. **Reaping**  \n   - The parent performs `wait()`/`waitpid()` (or receives `SIGCHLD`) to collect the child\u2019s exit status.  \n   - The kernel then frees the task_struct, releasing the PID back to the pool.  \n   - If the parent dies before reaping, the init process (PID\u202f1) adopts the zombie and reaps it automatically.\n\n7. **Edge Cases**  \n   - **Orphaned",
+    "response_B": "When a process calls **fork()**, the kernel creates a child process that is an exact copy of the parent, including its address space and file descriptors. The child then typically calls **exec()**, which replaces its memory image with a new program while preserving the PID and open files. When the child finishes, it calls **exit()**; the kernel marks it as a **zombie**\u2014its exit status is stored, but its resources aren\u2019t fully released until the parent calls **wait()** or **waitpid()**. Once the parent reaps the child, the zombie is removed and the process\u2019s resources are freed.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10928,
+    "latency_B_ms": 8290,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_006_dec2",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_007",
+    "category": "detailed_pref",
+    "prompt": "How do you optimize a large monorepo CI/CD build pipeline for speed and cache efficiency?",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "Use a dependency graph to run only the affected projects, enable parallel jobs, and cache build artifacts per package. Leverage a remote cache (e.g., Bazel, Gradle, or a custom artifact store) so that identical outputs are reused across runs. Enable incremental builds and artifact promotion to avoid full rebuilds after each commit. Configure the pipeline to trigger only on changed directories and use matrix jobs for language\u2011specific builds. Monitor cache hit rates and adjust cache TTLs or storage tiers to keep the cache fresh and efficient.",
+    "response_B": "Use a dependency graph to run only the affected projects in parallel, and split the pipeline into stages that can be cached independently. Store build artifacts and test results in a remote cache keyed by commit hash and dependency hash, so repeated runs reuse the same outputs. Leverage incremental build tools (e.g., Bazel, Pants, Nx) that detect file changes and rebuild only what\u2019s necessary. Finally, run selective test suites (unit, integration, smoke) based on the changed modules, and use a shared artifact registry to avoid re\u2011downloading dependencies.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10648,
+    "latency_B_ms": 6453,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_007_4b59",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_008",
+    "category": "detailed_pref",
+    "prompt": "Explain virtual memory paging, page tables, and TLB translation in modern x86-64 CPUs.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "Virtual memory paging in x86\u201164 maps 48\u2011bit virtual addresses to 52\u2011bit physical frames using a four\u2011level page\u2011table hierarchy: PML4 \u2192 PDPT \u2192 PD \u2192 PT. Each page\u2011table entry contains the physical frame number plus permission and status bits (present, writable, user, etc.). The CPU translates a virtual address by walking these tables, combining the frame numbers with the page offset to form a physical address. A Translation Lookaside Buffer (TLB) caches recent virtual\u2011to\u2011physical mappings; on a TLB miss, the hardware walks the page tables, loads the entry into the TLB, and then performs the translation.",
+    "response_B": "Virtual memory paging lets the CPU treat physical RAM as a set of fixed\u2011size pages, mapping virtual addresses to physical ones so programs can use more memory than physically available. The OS builds multi\u2011level page tables (PML4, PDPT, PD, PT in x86\u201164) that translate each virtual page number into a physical frame number. When a virtual address is accessed, the CPU walks these tables, but to avoid repeated table walks it first checks the Translation Lookaside Buffer (TLB), a small cache of recent virtual\u2011to\u2011physical mappings. If the TLB contains the entry, the CPU uses it directly; otherwise it performs the table walk, loads the mapping into the TLB, and then proceeds.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 11311,
+    "latency_B_ms": 7307,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_008_16fb",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_009",
+    "category": "detailed_pref",
+    "prompt": "Explain B-tree vs LSM-tree indexing storage engines and their write amplification tradeoffs.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "B\u2011trees keep data sorted on disk, so each write updates a single leaf node and may cause a cascade of page splits, leading to high write amplification when many updates target the same region. LSM\u2011trees batch writes in memory, flush them to sorted runs on disk, and merge runs lazily, so each write touches only the in\u2011memory buffer and a few merge passes, reducing write amplification but increasing read amplification. The trade\u2011off is that B\u2011trees offer lower read latency and simpler consistency, while LSM\u2011trees excel at high write throughput and lower write amplification at the cost of more complex compaction and higher read costs.",
+    "response_B": "B\u2011tree indexes keep data sorted on disk, so every insert or update rewrites the leaf page and may cause a cascade of page splits, leading to high write amplification\u2014often 2\u20133\u00d7 the logical write size. LSM\u2011tree engines buffer writes in memory, flush them as large sorted runs, and merge runs lazily, so each logical write is written once to the new run and later merged, giving lower write amplification (\u22481\u00d7) but higher read amplification due to multiple runs. The trade\u2011off is that B\u2011trees offer lower read latency and simpler range queries, while LSM\u2011trees excel in write\u2011heavy workloads with lower write amplification at the cost of more complex compaction and potentially higher read costs.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10298,
+    "latency_B_ms": 873,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_009_4130",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "detail_010",
+    "category": "detailed_pref",
+    "prompt": "Detail the TLS 1.3 1-RTT handshake cryptographic negotiation step by step.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "step_by_step": true
+    },
+    "constraints": {
+      "min_words": 150
+    },
+    "a_is_adapted": true,
+    "response_A": "**TLS\u202f1.3 1\u2011RTT Handshake \u2013 Cryptographic Negotiation (Step\u2011by\u2011Step)**  \n\n1. **ClientHello (1st round\u2011trip)**  \n   - Client sends `ClientHello` with:  \n     - TLS version\u202f1.3, random, session ID, cipher\u2011suite list (e.g., `TLS_AES_128_GCM_SHA256`), key\u2011share entry (client\u2019s X25519 public key), supported groups, and extensions (`supported_versions`, `supported_groups`, `key_share`, `pre_shared_key`, `early_data`, etc.).  \n   - No server authentication or key exchange data is sent yet.\n\n2. **ServerHello (1st round\u2011trip)**  \n   - Server replies with `ServerHello` containing:  \n     - Selected cipher\u2011suite, server\u2019s random, selected key\u2011share (server\u2019s X25519 public key), and any extensions (`supported_versions`, `key_share`, `pre_shared_key`, `supported_groups`).  \n   - Server may also send `EncryptedExtensions` immediately after, which include server\u2011chosen parameters (e.g., `supported_groups`, `signature_algorithms`, `supported_versions`).\n\n3. **Server Authentication & Certificate**  \n   - Server sends `Certificate` (X.509 chain) and `CertificateVerify` (signature over the transcript up to this point).  \n   - Server may also send `CertificateRequest` if client authentication is required.\n\n4. **Server Finished**  \n   - Server sends `Finished` containing the hash of the entire handshake transcript so far, encrypted with the handshake traffic secret derived from the shared key.\n\n5. **Client Finished**  \n   - Client receives all server messages, verifies the server\u2019s `Finished` using the handshake traffic secret.  \n   - Client then sends its own `Finished` message, encrypted with the same handshake traffic secret.\n\n6. **Key",
+    "response_B": "1. **ClientHello** \u2013 The client sends a ClientHello containing supported cipher suites, a random nonce, and its own key share (DH or ECDHE).  \n2. **ServerHello + ServerKeyShare** \u2013 The server replies with a ServerHello, its own key share, and a Certificate chain; it then signs the handshake transcript with its private key (CertificateVerify).  \n3. **Finished** \u2013 The server sends a Finished message that includes a hash of all previous handshake messages, proving integrity.  \n4. **ClientKeyShare + Finished** \u2013 The client responds with its key share (if not already sent) and a Finished message; both sides derive the shared secret, compute traffic keys, and the 1\u2011RTT handshake is complete.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 11128,
+    "latency_B_ms": 8002,
+    "policy_adapted": {
+      "user_id": "eval_user_detail_010_5dc3",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_step_by_step",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_step_by_step",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_001",
+    "category": "code_conflict",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "user_profile": {
+      "code_examples": false,
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "forbids_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "The Observer pattern lets an object (the subject) maintain a list of dependents (observers) and automatically notify them of state changes, usually via a callback or event. It decouples the subject from its observers, so each can evolve independently. Advantages include easier maintenance, dynamic subscription, and a single source of truth that keeps all observers in sync without tight coupling. This makes systems more modular, testable, and scalable.",
+    "response_B": "The Observer pattern defines a one\u2011to\u2011many dependency between objects so that when one object (the subject) changes state, all its dependents (observers) are automatically notified and updated. It decouples the subject from its observers, allowing each to evolve independently. Advantages include easier maintenance, dynamic subscription of observers, and support for broadcast communication without tight coupling. This makes systems more modular, testable, and adaptable to change.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 3202,
+    "latency_B_ms": 8722,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_001_7dea",
+      "verbosity": "balanced",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_002",
+    "category": "code_conflict",
+    "prompt": "Explain the Observer design pattern and its advantages.",
+    "user_profile": {
+      "code_examples": true,
+      "technical_depth": "intermediate"
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "The Observer pattern lets an object (the **subject**) maintain a list of dependents (**observers**) and automatically notify them of state changes, usually via a `notify()` method.  \n**Advantages:** it promotes loose coupling\u2014observers can be added or removed at runtime without altering the subject; it supports one\u2011to\u2011many relationships, enabling multiple components to react to a single event; and it centralizes change\u2011propagation logic, simplifying maintenance.  \n\n```python\nclass Subject:\n    def __init__(self):\n        self._observers = []\n\n    def register(self, obs):\n        self._observers.append(obs)\n\n    def notify(self, data):\n        for obs in self._observers:\n            obs.update(data)\n\nclass Observer:\n    def update(self, data):\n        print(f\"Received: {data}\")\n\n# Usage\nsub = Subject()\nsub.register(Observer())\nsub.notify(\"Hello\")\n```\nThis snippet shows a subject notifying all registered observers when new data arrives.",
+    "response_B": "The Observer pattern lets an object (the **subject**) maintain a list of dependents (**observers**) and automatically notify them of state changes, usually via a callback or event method.  \nWhen the subject\u2019s state changes, it loops through its observers and calls their update method, keeping the subject and observers loosely coupled.  \nAdvantages include: **decoupling** (subjects don\u2019t need to know observer details), **dynamic subscription** (observers can join or leave at runtime), and **broadcast communication** (one change can inform many observers).  \n\n```python\nclass Subject:\n    def __init__(self):\n        self._observers = []\n\n    def register(self, obs):\n        self._observers.append(obs)\n\n    def notify(self, data):\n        for obs in self._observers:\n            obs.update(data)\n\nclass Observer:\n    def update(self, data):\n        print(f\"Observer received: {data}\")\n\n# Usage\nsub = Subject()\nsub.register(Observer())\nsub.notify(\"Hello, observers!\")\n```",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 6056,
+    "latency_B_ms": 11800,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_002_90c9",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_003",
+    "category": "code_conflict",
+    "prompt": "How does binary search work over sorted arrays?",
+    "user_profile": {
+      "code_examples": false,
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "forbids_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Binary search repeatedly splits a sorted array in half. It compares the target value to the middle element; if they match, the search ends. If the target is smaller, the algorithm discards the upper half; if larger, it discards the lower half. This halving continues until the element is found or the subarray size becomes zero, giving a logarithmic time complexity of O(log\u202fn).",
+    "response_B": "Binary search works on a sorted array by repeatedly halving the search interval.  \nStart with the whole array, find the middle element, and compare it to the target.  \nIf the middle equals the target, you\u2019re done; if the target is smaller, discard the upper half; if larger, discard the lower half.  \nRepeat this process on the remaining half until the target is found or the interval is empty.  \nThe algorithm runs in \\(O(\\log n)\\) time because the array size is halved each step.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7541,
+    "latency_B_ms": 943,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_003_6ef5",
+      "verbosity": "balanced",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_004",
+    "category": "code_conflict",
+    "prompt": "How does binary search work over sorted arrays?",
+    "user_profile": {
+      "code_examples": true,
+      "technical_depth": "intermediate"
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "Binary search works on a sorted array by repeatedly dividing the search interval in half.  \nStart with the whole array, compare the target to the middle element, and keep only the half that could contain the target.  \nRepeat this halving until the target is found or the interval becomes empty.  \nThe algorithm runs in O(log\u202fn) time, making it very efficient for large sorted lists.",
+    "response_B": "Binary search repeatedly splits a sorted array in half, comparing the target value to the middle element.  \nIf the target equals the middle, the search ends.  \nIf the target is smaller, the algorithm discards the upper half; if larger, it discards the lower half.  \nThis halving continues until the target is found or the subarray becomes empty, giving \\(O(\\log n)\\) time.  \n\n```python\ndef binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7201,
+    "latency_B_ms": 7658,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_004_08cc",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_005",
+    "category": "code_conflict",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "user_profile": {
+      "code_examples": false,
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "forbids_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "The Circuit Breaker pattern prevents a failing service from repeatedly being called, which would waste resources and cascade failures. It tracks failures and, after a threshold, trips to an \u201copen\u201d state where calls fail immediately for a cooldown period. Once the period ends, it allows a limited number of test calls; if they succeed, the breaker closes, otherwise it stays open. This protects downstream services and improves overall system resilience.",
+    "response_B": "The Circuit Breaker pattern prevents a failing service from repeatedly trying to contact a downstream microservice, which would otherwise exacerbate latency and resource exhaustion. It monitors call success/failure rates and, when failures exceed a threshold, trips to an \u201copen\u201d state where calls fail fast for a cooldown period. After the cooldown, it allows a limited number of \u201chalf\u2011open\u201d test calls; if they succeed, the breaker closes, otherwise it reopens. This protects the system from cascading failures and gives services time to recover.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7333,
+    "latency_B_ms": 2513,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_005_b43f",
+      "verbosity": "balanced",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_006",
+    "category": "code_conflict",
+    "prompt": "Explain the Circuit Breaker pattern for distributed microservices.",
+    "user_profile": {
+      "code_examples": true,
+      "technical_depth": "intermediate"
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "The Circuit Breaker pattern prevents a failing service from repeatedly trying to execute a call that is likely to fail, protecting the system from cascading failures. It tracks failures and, after a threshold, opens the circuit so subsequent calls return immediately or fallback logic, then periodically tries to close it once the service appears healthy.  \n\nIn a Spring Boot microservice you can use Resilience4j:\n\n```java\n@CircuitBreaker(name = \"myService\", fallbackMethod = \"fallback\")\npublic String callRemote() {\n    return restTemplate.getForObject(\"http://remote/api\", String.class);\n}\n\nprivate String fallback(Throwable t) {\n    return \"Service unavailable \u2013 fallback response\";\n}\n```\n\nThis opens the circuit after a set number of failures, then retries after a cooldown period.",
+    "response_B": "The Circuit Breaker pattern protects microservices from cascading failures by monitoring call success/failure rates. When failures exceed a threshold, the circuit \u201copens,\u201d immediately returning an error without attempting the remote call. After a timeout, it \u201ccloses\u201d or goes to a half\u2011open state to test if the service has recovered. If the test succeeds, the circuit closes; if it fails, it reopens. This keeps the system responsive and prevents overload of failing services.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7928,
+    "latency_B_ms": 7121,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_006_3941",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_007",
+    "category": "code_conflict",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "user_profile": {
+      "code_examples": false,
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "forbids_code": true
+    },
+    "a_is_adapted": true,
+    "response_A": "Exponential backoff with jitter spreads retry attempts over time by first increasing the wait period exponentially and then adding a random offset. This prevents many clients from retrying simultaneously, which would otherwise create a \u201cthundering herd\u201d that overloads the server. The random jitter ensures that even if the base backoff times are the same, each client\u2019s retry schedule differs, smoothing traffic and reducing peak load.",
+    "response_B": "Exponential backoff spreads retries by increasing the wait time after each failure, so not all clients retry at the same instant. Adding jitter randomizes that wait time, preventing synchronized retries that would otherwise create a \u201cthundering herd.\u201d Together, they reduce peak load spikes and improve overall system stability. This approach is common in distributed systems and API rate\u2011limiting.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 8680,
+    "latency_B_ms": 6314,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_007_bbd1",
+      "verbosity": "balanced",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_008",
+    "category": "code_conflict",
+    "prompt": "How does exponential backoff with jitter prevent thundering herds?",
+    "user_profile": {
+      "code_examples": true,
+      "technical_depth": "intermediate"
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "Exponential backoff spreads retry attempts over increasing time intervals, so a single request isn\u2019t retried immediately after a failure. Adding jitter randomizes each interval, preventing many clients from retrying at the same moment. Together, they break the synchronized burst of traffic that would otherwise overwhelm the server, thus avoiding a thundering herd.",
+    "response_B": "Exponential backoff spreads retries over time by doubling the wait interval after each failure, so not all clients retry simultaneously. Adding jitter randomizes each client\u2019s wait within that interval, preventing them from lining up on the same retry tick. Together, they break the synchronized burst of traffic that would otherwise overwhelm a server\u2014this is the \u201cthundering herd\u201d problem. The result is a smoother, more predictable load on the system.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 7394,
+    "latency_B_ms": 7848,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_008_2f66",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_009",
+    "category": "code_conflict",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "user_profile": {
+      "code_examples": false,
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "forbids_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "Offset\u2011based pagination uses a numeric offset and a page size, e.g. `SELECT \u2026 LIMIT 20 OFFSET 40`, which skips the first 40 rows and returns the next 20. It\u2019s simple but can return duplicate or missing rows if the underlying data changes between requests.  \n\nCursor\u2011based pagination returns a cursor (often the last row\u2019s unique key) and the next query uses `WHERE id > cursor LIMIT 20`. This approach is stable against inserts/deletes and scales better for large datasets, but requires a unique, monotonically increasing key.",
+    "response_B": "Offset\u2011based pagination uses a numeric offset (e.g., `?page=3&size=20`) to skip a set number of rows, which is simple but can become slow and inconsistent when the underlying data changes. Cursor\u2011based pagination passes a token (often the last seen record\u2019s ID or a composite key) to fetch the next set, ensuring stable ordering and better performance on large datasets. The cursor approach avoids duplicate or missing rows during inserts/deletes, but requires a stable sort key and can be slightly more complex to implement. In practice, cursor pagination is preferred for high\u2011traffic APIs, while offset works fine for small, static lists.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 6530,
+    "latency_B_ms": 2086,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_009_bbcd",
+      "verbosity": "balanced",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "conflict_010",
+    "category": "code_conflict",
+    "prompt": "Explain how pagination works using offset-based vs cursor-based strategies.",
+    "user_profile": {
+      "code_examples": true,
+      "technical_depth": "intermediate"
+    },
+    "constraints": {
+      "requires_code": true
+    },
+    "a_is_adapted": false,
+    "response_A": "Offset\u2011based pagination uses a page number or offset value to skip rows, e.g. `SELECT \u2026 LIMIT 20 OFFSET 40`. It\u2019s simple but can return duplicate or missing rows if the underlying data changes between requests. Cursor\u2011based pagination returns a token (often the last row\u2019s key) and the next query uses `WHERE key > cursor LIMIT 20`. This approach is more stable with inserts/deletes and scales better for large datasets.",
+    "response_B": "Offset\u2011based pagination uses a numeric offset and limit: `SELECT * FROM table ORDER BY id LIMIT 20 OFFSET 40;` It\u2019s simple but can double\u2011count or miss rows if data changes between requests. Cursor\u2011based pagination stores the last seen key (e.g., `id > 123`) and fetches the next set: `SELECT * FROM table WHERE id > 123 ORDER BY id LIMIT 20;` This approach is stable under inserts/deletes and scales better for large datasets. Cursor queries can be written in SQL or using ORM methods, e.g., `db.query('SELECT * FROM table WHERE id > ?', [lastId], { limit: 20 })`. Both methods return the same number of rows, but cursor pagination avoids the performance hit of large offsets.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1918,
+    "latency_B_ms": 9216,
+    "policy_adapted": {
+      "user_id": "eval_user_conflict_010_31a9",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "override_001",
+    "category": "override",
+    "prompt": "Explain Kubernetes architecture in deep detail with a comprehensive overview.",
+    "user_profile": {
+      "verbosity": "concise",
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "explicit_override": "detailed"
+    },
+    "a_is_adapted": true,
+    "response_A": "Kubernetes is a container\u2011orchestration platform built around a master\u2011node/worker\u2011node architecture. The **control plane** (master) runs the API server, scheduler, controller manager, and etcd. The API server exposes a RESTful interface; all cluster state is stored in etcd, a distributed key\u2011value store. The scheduler watches for unscheduled pods and assigns them to nodes based on resource requests, taints, and affinity rules. The controller manager runs controllers (e.g., replication, endpoint, node, job, cronjob) that reconcile desired state with actual state by watching API objects and issuing commands to the kubelet.\n\nEach **worker node** runs a kubelet, kube-proxy, and container runtime (Docker, containerd, CRI\u2011O). The kubelet registers the node with the API server, pulls images, starts containers, and reports pod status. Kube-proxy implements cluster networking via iptables or IPVS, creating virtual IPs (ClusterIP) and load\u2011balancing services across pods. The node also runs the pod sandbox and manages local storage volumes.\n\n**Networking**: Pods receive unique IPs from a CIDR block; the CNI plugin (Calico, Flannel, Weave, etc.) configures networking and network policies. Services expose pods via stable IPs and DNS names; external traffic can be routed through Ingress controllers (NGINX, Traefik) or load balancers. Network policies enforce traffic rules between pods.\n\n**Storage**: Persistent volumes (PVs) and persistent volume claims (PVCs) abstract storage. Dynamic provisioning uses StorageClasses to provision PVs on demand from cloud providers or local storage. CSI drivers plug into the kubelet to attach/detach volumes.\n\n**Deployment model**: Deployments, StatefulSets, DaemonSets, and Jobs manage pod replicas, rolling updates, and scaling. ReplicaSets ensure the desired number of pod replicas. Horizontal Pod Autoscaler (HPA) scales replicas based on metrics (CPU, custom). Cluster Autoscaler adjusts node count in cloud environments.\n\n**Security**: RBAC controls API access; PodSecurityPolicies or OPA Gatekeeper enforce",
+    "response_B": "Kubernetes is a container orchestration system built around a master\u2011node cluster that runs a control plane (API server, scheduler, controller manager, etcd) and worker nodes that run kubelet, kube-proxy, and container runtime. The control plane manages cluster state, scheduling pods to nodes, and maintaining desired configurations, while kubelet on each node ensures containers match the spec and reports status back to the API server. Networking is handled by a flat IP space and a CNI plugin, allowing pods to communicate across nodes, and services expose stable endpoints via load balancers or DNS. Storage is abstracted through persistent volumes and dynamic provisioning, letting pods attach durable storage regardless of node location. This architecture enables declarative, scalable, and self\u2011healing deployments across heterogeneous environments.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 10625,
+    "latency_B_ms": 6281,
+    "policy_adapted": {
+      "user_id": "eval_user_override_001_e9c5",
+      "verbosity": "concise",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "override_002",
+    "category": "override",
+    "prompt": "What is WebAssembly? Give me a quick, concise one-paragraph answer.",
+    "user_profile": {
+      "verbosity": "detailed",
+      "technical_depth": "advanced"
+    },
+    "constraints": {
+      "explicit_override": "concise"
+    },
+    "a_is_adapted": true,
+    "response_A": "WebAssembly (Wasm) is a low\u2011level binary instruction format designed for fast, efficient execution in web browsers and other environments. It compiles high\u2011level languages like C, C++, Rust, and JavaScript into a compact, stack\u2011based bytecode that runs at near\u2011native speed. Wasm enables performance\u2011critical applications\u2014such as games, video editing, and scientific simulations\u2014to run securely and portably across browsers and servers.",
+    "response_B": "WebAssembly (Wasm) is a low\u2011level binary format designed for fast, efficient execution in web browsers and other environments. It compiles high\u2011level languages like C, C++, Rust, and JavaScript into a compact, platform\u2011independent representation that runs at near\u2011native speed. Wasm enables developers to build performance\u2011critical web applications, games, and even server\u2011side services that load quickly and execute securely.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 9195,
+    "latency_B_ms": 9103,
+    "policy_adapted": {
+      "user_id": "eval_user_override_002_f332",
+      "verbosity": "detailed",
+      "technical_depth": "advanced",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": "detailed_explanation",
+      "avoided_strategies": []
+    },
+    "strategy_selected": "detailed_explanation",
+    "adaptation_used": true
+  },
+  {
+    "case_id": "override_003",
+    "category": "override",
+    "prompt": "Explain monads in functional programming. Do not give me code, concept only.",
+    "user_profile": {
+      "code_examples": true
+    },
+    "constraints": {
+      "explicit_override": "no_code"
+    },
+    "a_is_adapted": false,
+    "response_A": "Monads are a design pattern that encapsulate values together with a computational context\u2014such as possible failure, state, or I/O\u2014so that functions can be composed without exposing that context. They provide two core operations: `return` (or `unit`) to inject a plain value into the context, and `bind` (or `flatMap`) to chain operations while preserving the context. By obeying the monad laws\u2014left identity, right identity, and associativity\u2014monads guarantee predictable composition. This abstraction lets programmers write pure, modular code while still handling effects like errors, state changes, or asynchronous operations.",
+    "response_B": "A monad is a design pattern that encapsulates values and a context, providing a way to chain operations while preserving that context. It defines two main functions: `bind` (often written as `>>=`) to apply a function to the wrapped value and `return` (or `pure`) to wrap a plain value. Monads enforce a uniform interface, so different contexts\u2014like lists, options, or IO\u2014can be composed with the same syntax. This abstraction lets you write modular, composable code without leaking the underlying mechanics of each context.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 6738,
+    "latency_B_ms": 10442,
+    "policy_adapted": {
+      "user_id": "eval_user_override_003_e6b9",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": true
+  },
+  {
+    "case_id": "override_004",
+    "category": "override",
+    "prompt": "Write a Python script to scrape hyperlinks from an HTML string using BeautifulSoup.",
+    "user_profile": {
+      "code_examples": false
+    },
+    "constraints": {
+      "explicit_override": "requires_code"
+    },
+    "a_is_adapted": true,
+    "response_A": "```python\nfrom bs4 import BeautifulSoup\n\nhtml = \"\"\"<html><body><a href=\"https://example.com\">Example</a>\n<a href=\"/local\">Local</a></body></html>\"\"\"\n\nsoup = BeautifulSoup(html, \"html.parser\")\nlinks = [a.get(\"href\") for a in soup.find_all(\"a\") if a.get(\"href\")]\nprint(links)  # ['https://example.com', '/local']\n```\n\nThis script parses the HTML, extracts all `<a>` tags, pulls their `href` attributes, and prints the list of hyperlinks.",
+    "response_B": "Here\u2019s a minimal script that extracts all `<a>` tag URLs from an HTML string:\n\n```python\nfrom bs4 import BeautifulSoup\n\nhtml = \"\"\"<html><body>\n<a href=\"https://example.com\">Example</a>\n<a href=\"/local/page\">Local</a>\n</body></html>\"\"\"\n\nsoup = BeautifulSoup(html, \"html.parser\")\nlinks = [a.get(\"href\") for a in soup.find_all(\"a\") if a.get(\"href\")]\nprint(links)  # ['https://example.com', '/local/page']\n```\n\nThe script parses the HTML, finds every `<a>` tag, pulls its `href` attribute, and prints a list of URLs.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 4069,
+    "latency_B_ms": 5825,
+    "policy_adapted": {
+      "user_id": "eval_user_override_004_9f1f",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_005",
+    "category": "override",
+    "prompt": "What is the capital of Australia? Just give me the final answer all at once.",
+    "user_profile": {
+      "step_by_step": true
+    },
+    "constraints": {
+      "explicit_override": "no_steps"
+    },
+    "a_is_adapted": true,
+    "response_A": "Canberra is the capital of Australia.",
+    "response_B": "Canberra is the capital of Australia.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 2707,
+    "latency_B_ms": 953,
+    "policy_adapted": {
+      "user_id": "eval_user_override_005_aa92",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_006",
+    "category": "override",
+    "prompt": "Give me a thorough, detailed explanation of how TLS certificates are validated against a root store.",
+    "user_profile": {
+      "verbosity": "concise"
+    },
+    "constraints": {
+      "explicit_override": "detailed"
+    },
+    "a_is_adapted": false,
+    "response_A": "TLS certificates are validated by the client by first receiving the server\u2019s certificate chain, then verifying each certificate\u2019s signature against the next\u2011higher certificate, ending with a root certificate that must match a trusted root in the client\u2019s root store. The client checks each certificate\u2019s validity period, ensures the domain matches the subject or SAN, and consults revocation lists (CRL or OCSP) to confirm the cert hasn\u2019t been revoked. If all signatures chain to a trusted root and no revocation or expiration issues exist, the chain is accepted and the connection proceeds. This process guarantees that the server\u2019s identity is authenticated by a trusted authority.",
+    "response_B": "TLS certificates are validated by checking the certificate chain: the server\u2019s leaf certificate is verified against its issuer\u2019s certificate, and this process repeats until a root certificate is reached. Each certificate\u2019s signature is verified using the issuer\u2019s public key, and the certificate\u2019s validity period, revocation status (via CRL or OCSP), and key usage extensions are checked. The root certificate must be present in the client\u2019s trusted root store and must be self\u2011signed; its trust anchor is assumed trustworthy. If any step fails\u2014invalid signature, expired date, revoked status, or missing root\u2014the chain is rejected and the connection is aborted. This chain\u2011of\u2011trust model ensures that only certificates issued by trusted authorities are accepted.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 5394,
+    "latency_B_ms": 9261,
+    "policy_adapted": {
+      "user_id": "eval_user_override_006_8158",
+      "verbosity": "concise",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_007",
+    "category": "override",
+    "prompt": "What port does standard HTTPS use? Keep it short and brief.",
+    "user_profile": {
+      "verbosity": "detailed"
+    },
+    "constraints": {
+      "explicit_override": "concise"
+    },
+    "a_is_adapted": true,
+    "response_A": "HTTPS uses port 443 by default.",
+    "response_B": "HTTPS uses port\u202f443 by default.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 8659,
+    "latency_B_ms": 7434,
+    "policy_adapted": {
+      "user_id": "eval_user_override_007_8f80",
+      "verbosity": "detailed",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_008",
+    "category": "override",
+    "prompt": "What are the security principles behind Zero Trust architecture? No programming code please.",
+    "user_profile": {
+      "code_examples": true
+    },
+    "constraints": {
+      "explicit_override": "no_code"
+    },
+    "a_is_adapted": false,
+    "response_A": "Zero Trust architecture is built on the idea that no user or device is trusted by default, even inside the network. Its core principles are: **verify every request** (continuous authentication and authorization), **apply least privilege** (users and services only get the minimum access they need), **segment the network** into micro\u2011segments to limit lateral movement, and **assume breach** (design for detection and rapid response). Continuous monitoring and real\u2011time analytics are also essential to detect anomalies and enforce policies automatically.",
+    "response_B": "Zero Trust architecture is built on the idea that no user or device is trusted by default, even if inside the network. The core principles are: **verify every request** (continuous authentication and authorization), **assume breach** (minimize trust boundaries), **least privilege** (grant only the minimum access needed), **micro\u2011segmentation** (isolate workloads to limit lateral movement), and **continuous monitoring** (log, analyze, and respond to anomalies). These principles collectively reduce attack surface and limit damage if a breach occurs.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 6520,
+    "latency_B_ms": 9502,
+    "policy_adapted": {
+      "user_id": "eval_user_override_008_8667",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": true,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_009",
+    "category": "override",
+    "prompt": "Show me the exact Python code to compute Fibonacci numbers with memoization.",
+    "user_profile": {
+      "code_examples": false
+    },
+    "constraints": {
+      "explicit_override": "requires_code"
+    },
+    "a_is_adapted": false,
+    "response_A": "Here\u2019s a concise Python implementation using `functools.lru_cache` for memoization:\n\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fib(n: int) -> int:\n    \"\"\"Return the nth Fibonacci number.\"\"\"\n    return n if n <= 1 else fib(n-1) + fib(n-2)\n\n# Example usage:\nprint([fib(i) for i in range(10)])  # 0, 1, 1, 2, 3, 5, 8, 13, 21, 34\n```\n\nThe decorator caches each computed value, so subsequent calls are O(1).",
+    "response_B": "Here\u2019s a minimal Python implementation using `functools.lru_cache` for memoization:\n\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fib(n: int) -> int:\n    \"\"\"Return the nth Fibonacci number.\"\"\"\n    return n if n <= 1 else fib(n - 1) + fib(n - 2)\n```\n\nCall `fib(10)` to get the 10th Fibonacci number, and the cache automatically stores intermediate results.",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 4757,
+    "latency_B_ms": 4543,
+    "policy_adapted": {
+      "user_id": "eval_user_override_009_f05c",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": false,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  },
+  {
+    "case_id": "override_010",
+    "category": "override",
+    "prompt": "What is the boiling point of water at sea level? Skip the steps, just the answer.",
+    "user_profile": {
+      "step_by_step": true
+    },
+    "constraints": {
+      "explicit_override": "no_steps"
+    },
+    "a_is_adapted": false,
+    "response_A": "The boiling point of water at sea level is 100\u202f\u00b0C (212\u202f\u00b0F). This is the temperature at which water vapor pressure equals atmospheric pressure.",
+    "response_B": "The boiling point of water at sea level is 100\u202f\u00b0C (212\u202f\u00b0F).",
+    "generation_mode_A": "live",
+    "generation_mode_B": "live",
+    "model_A": "llama-3.3-70b-versatile",
+    "model_B": "llama-3.3-70b-versatile",
+    "latency_A_ms": 1078,
+    "latency_B_ms": 858,
+    "policy_adapted": {
+      "user_id": "eval_user_override_010_e428",
+      "verbosity": "balanced",
+      "technical_depth": "intermediate",
+      "code_examples": false,
+      "step_by_step": true,
+      "examples": true,
+      "tone": "friendly",
+      "preferred_strategy": null,
+      "avoided_strategies": []
+    },
+    "strategy_selected": null,
+    "adaptation_used": false
+  }
+]

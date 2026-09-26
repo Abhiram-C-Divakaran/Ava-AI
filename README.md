@@ -41,7 +41,8 @@ Ava AI is a personal intelligence assistant designed around persistent personali
                                        ▼
 +─────────────────────────────────────────────────────────────────────────────+
 |                               GENERATIVE CORE                               |
-|              Model: LLaMA 3.3 70B Versatile (via Groq LPUs)                 |
+|   Model: openai/gpt-oss-120b (via Groq LPUs)                                |
+|   [v1.0.1: llama-3.3-70b-versatile decommissioned by Groq; migrated]        |
 +──────────────────────────────────────┬──────────────────────────────────────+
                                        │
                                        ▼
@@ -78,7 +79,8 @@ Ava is deliberately engineered **NOT** to be a vector Retrieval-Augmented Genera
 ## 2. Core Capabilities & Mechanics
 
 ### Generative Core
-- **Primary Model**: `llama-3.3-70b-versatile` (via Groq Cloud API)
+- **Primary Model**: `openai/gpt-oss-120b` (via Groq Cloud API)
+  > **v1.0.1 Migration Note**: `llama-3.3-70b-versatile` was decommissioned by Groq (HTTP 404 on this account). The canonical model has been explicitly migrated to `openai/gpt-oss-120b`. See `LIVE_EVALUATION_REPORT.md` for evaluation provenance.
 - **Voice Transcription**: `whisper-large-v3`
 
 ### The 6 Behavioral Preference Dimensions

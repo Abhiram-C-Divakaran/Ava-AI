@@ -10,7 +10,111 @@ load_dotenv()
 
 API_KEY = os.getenv("GROQ_API_KEY", "")
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# v1.0.1 model migration: llama-3.3-70b-versatile decommissioned by Groq (HTTP 404).
+# Canonical model is now openai/gpt-oss-120b.
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# Documented explicit alias table for legacy model names.
+# resolve_model() returns the resolved model string deterministically.
+MODEL_ALIASES: dict[str, str] = {
+    # Legacy alias support if requested by legacy callers
+    "llama-3.1-70b-versatile": "openai/gpt-oss-120b",
+    "llama-3.3-70b-specdec": "openai/gpt-oss-120b",
+    "gpt-oss-120b": "openai/gpt-oss-120b",
+    "gpt-oss-20b": "openai/gpt-oss-20b",
+}
+
+# Documented Retry Policy Constants
+DEFAULT_MAX_RETRIES = 5
+MAX_RETRY_DELAY_SECONDS = 10.0
+MAX_TOTAL_RETRY_BUDGET_SECONDS = 40.0
+
+
+def resolve_model(requested_model: str = "") -> str:
+    """
+    Resolve requested model name to actual Groq model ID string.
+
+    Deterministic and testable:
+    - If empty string or None, returns canonical MODEL.
+    - If found in MODEL_ALIASES, returns the mapped model.
+    - If unknown/unmapped, returns requested_model without silent modification.
+    """
+    if not requested_model:
+        return os.getenv("GROQ_MODEL", MODEL)
+    return MODEL_ALIASES.get(requested_model, requested_model)
+
+
+def get_model_info(requested_model: str | None = None) -> dict:
+    """
+    Return diagnostic model resolution information.
+
+    Exposes requested_model and actual_model so aliases are never hidden.
+    Useful for health endpoints, evaluation provenance, and diagnostic logging.
+    """
+    req = requested_model if requested_model is not None else os.getenv("GROQ_MODEL", MODEL)
+    actual = resolve_model(req)
+    return {
+        "requested_model": req,
+        "actual_model": actual,
+        "was_remapped": actual != req,
+    }
+
+
+def parse_retry_after(headers_or_response, body_text: str = "") -> float | None:
+    """
+    Parse retry delay in seconds from HTTP Retry-After header or response body.
+
+    Handles:
+    - Header seconds (int or float): '2', '2.5'
+    - Header milliseconds: '500ms' -> 0.5
+    - Body text patterns: 'try again in 2.5s', 'try again in 500ms', 'try again in 1m30s'
+    """
+    header_val = None
+    if hasattr(headers_or_response, "headers"):
+        headers = headers_or_response.headers
+        header_val = headers.get("Retry-After") or headers.get("retry-after")
+        if not body_text and hasattr(headers_or_response, "text"):
+            body_text = headers_or_response.text
+    elif isinstance(headers_or_response, dict):
+        header_val = headers_or_response.get("Retry-After") or headers_or_response.get("retry-after")
+    elif isinstance(headers_or_response, (str, int, float)):
+        header_val = str(headers_or_response)
+
+    if header_val is not None:
+        h_str = str(header_val).strip()
+        # Milliseconds e.g. "500ms"
+        ms_match = re.match(r"^([0-9.]+)\s*ms$", h_str, re.IGNORECASE)
+        if ms_match:
+            try:
+                return float(ms_match.group(1)) / 1000.0
+            except ValueError:
+                pass
+        # Seconds e.g. "2" or "2.5" or "2s"
+        s_match = re.match(r"^([0-9.]+)\s*s?$", h_str, re.IGNORECASE)
+        if s_match:
+            try:
+                return float(s_match.group(1))
+            except ValueError:
+                pass
+
+    if body_text:
+        # Groq error message format: "try again in 2.5s" or "try again in 500ms" or "try again in 1m20.5s"
+        wait_match = re.search(r"try again in (?:(\d+)m)?([0-9.]+)(ms|s)", body_text, re.IGNORECASE)
+        if wait_match:
+            mins = float(wait_match.group(1)) if wait_match.group(1) else 0.0
+            val = float(wait_match.group(2))
+            unit = wait_match.group(3).lower()
+            secs = (val / 1000.0) if unit == "ms" else val
+            return (mins * 60.0) + secs
+
+        # Generic retry-after in body
+        gen_match = re.search(r"retry[- ]after[:\s]+([0-9.]+)\s*(ms|s)?", body_text, re.IGNORECASE)
+        if gen_match:
+            val = float(gen_match.group(1))
+            unit = (gen_match.group(2) or "s").lower()
+            return (val / 1000.0) if unit == "ms" else val
+
+    return None
 
 BASE_SYSTEM_PROMPT = """You are Ava — a capable, honest, and friendly AI assistant.
 
@@ -311,8 +415,9 @@ def handle_repetition_request(message: str) -> str | None:
     # Extract the number - look for patterns like "100 times", "10 times", "5x"
     number_match = re.search(r'\b(\d+)\s*(?:times?|x)\b', msg, re.IGNORECASE)
     if not number_match:
-        # Try to find any number
-        number_match = re.search(r'\b(\d+)\b', msg)
+        # Only fallback to bare number if the verb is specifically 'repeat'
+        if re.search(r'\brepeat\b', msg):
+            number_match = re.search(r'\brepeat\b.*?\b(\d+)\b', msg)
         if not number_match:
             return None
     
@@ -410,15 +515,23 @@ def build_system_prompt(custom_instructions: str = "", personality: str = "frien
 # ─── LLM CALL FUNCTIONS ───────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
+def call_llm(prompt: str, max_retries: int = DEFAULT_MAX_RETRIES, temperature: float = 0.65,
              custom_instructions: str = "", personality: str = "friendly",
              max_tokens: int = 2000, system_prompt_override: str | None = None,
-             mode: str = "flash") -> str:
+             mode: str = "flash", model: str | None = None) -> str:
     """
     Call the LLM with the given prompt.
-    
-    FIRST: Check if this is a repetition request. If so, handle it deterministically
-    and bypass the LLM entirely. This ensures EXACT counting.
+
+    Deterministic repetition handling bypasses LLM entirely.
+
+    Documented Retry Policy:
+    - Bounded attempts: max_retries (default 5).
+    - Per-attempt delay: respects Retry-After header / error text, clamped to MAX_RETRY_DELAY_SECONDS (10.0s).
+    - Fallback backoff: exponential 1s/2s/4s (clamped).
+    - Total backoff budget: strictly bounded.
+    - Transient status codes: 429, 502, 503, 504 retry.
+    - Non-transient client errors: 400, 401, 403, 404, etc. raise ValueError immediately without retry.
+    - Timeouts & ConnectionErrors: retry up to max_retries, then raise clean ValueError.
     """
     # ─── DETERMINISTIC REPETITION HANDLER ─────────────────────────────
     repetition_response = handle_repetition_request(prompt)
@@ -441,8 +554,10 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
     else:
         system_prompt = base_prompt
     
+    req_model = model or os.getenv("GROQ_MODEL", MODEL)
+    actual_model = resolve_model(req_model)
     payload = {
-        "model": MODEL,
+        "model": actual_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -462,7 +577,11 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
             elif response.status_code in (429, 502, 503, 504):
                 if attempt == max_retries - 1:
                     raise ValueError(f"Groq API transient error {response.status_code}: {response.text}")
-                wait = min(2 ** attempt, 4)
+                parsed_delay = parse_retry_after(response)
+                if parsed_delay is not None:
+                    wait = min(max(parsed_delay, 0.05), MAX_RETRY_DELAY_SECONDS)
+                else:
+                    wait = min(2 ** attempt, 4.0)
                 time.sleep(wait)
                 continue
             elif 400 <= response.status_code < 500:
@@ -471,17 +590,18 @@ def call_llm(prompt: str, max_retries: int = 3, temperature: float = 0.65,
             else:
                 if attempt == max_retries - 1:
                     raise ValueError(f"Groq API error {response.status_code}: {response.text}")
-                time.sleep(1)
+                time.sleep(1.0)
         except (requests.Timeout, requests.ConnectionError) as e:
             if attempt == max_retries - 1:
                 raise ValueError(f"Groq API request failed after {max_retries} attempts: {str(e)}")
-            time.sleep(min(2 ** attempt, 2))
+            time.sleep(min(2 ** attempt, 2.0))
     
-    raise ValueError("Max retries exceeded")
+    raise ValueError(f"Groq API request exhausted all {max_retries} attempts.")
 
 
 def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: str = "friendly",
-                       system_prompt_override: str | None = None, mode: str = "flash") -> Generator[str, None, None]:
+                       system_prompt_override: str | None = None, mode: str = "flash",
+                       model: str | None = None) -> Generator[str, None, None]:
     """
     Streaming version of LLM call.
     
@@ -513,8 +633,10 @@ def call_llm_streaming(prompt: str, custom_instructions: str = "", personality: 
     else:
         system_prompt = base_prompt
     
+    req_model = model or os.getenv("GROQ_MODEL", MODEL)
+    actual_model = resolve_model(req_model)
     payload = {
-        "model": MODEL,
+        "model": actual_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
