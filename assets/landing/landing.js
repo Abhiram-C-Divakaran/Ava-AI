@@ -171,6 +171,50 @@ function renderIcons(root = document) {
   });
 }
 
+// ─── Privacy-Safe First-Party Telemetry ─────────────────────────────────────
+// Privacy Model:
+// - Generates transient pseudorandom anonymous session ID without fingerprinting
+// - Never collects IP, device identifiers, or canvas/hardware hashes
+// - Non-blocking: failures never impede user navigation, auth, or chatbot interaction
+function getAnonymousSessionId() {
+  try {
+    let id = sessionStorage.getItem('ava_anon_session_id');
+    if (!id) {
+      id = 'anon_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      sessionStorage.setItem('ava_anon_session_id', id);
+    }
+    return id;
+  } catch (_) {
+    return 'anon_ephemeral';
+  }
+}
+
+function trackEvent(name, metadata = {}) {
+  try {
+    const payload = JSON.stringify({
+      event: name,
+      page: window.location.pathname || '/',
+      anonymous_session_id: getAnonymousSessionId(),
+      metadata: metadata
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/events', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true
+      }).catch(() => {});
+    }
+  } catch (_) {
+    // Non-blocking: analytics failures must never interrupt user flow
+  }
+}
+
+// Track initial landing view
+trackEvent('landing_view', { path: window.location.pathname || '/' });
+
 const $ = s => document.querySelector(s);
 
 // Render Features
@@ -227,7 +271,7 @@ $('#faq-list').innerHTML = faqs
   )
   .join('');
 
-document.querySelectorAll('.faq-question').forEach(button => {
+document.querySelectorAll('.faq-question').forEach((button, i) => {
   button.onclick = () => {
     const isCurrentlyOpen = button.getAttribute('aria-expanded') === 'true';
     document.querySelectorAll('.faq-item').forEach(item => {
@@ -238,12 +282,16 @@ document.querySelectorAll('.faq-question').forEach(button => {
       const ans = item.querySelector('.faq-answer');
       btn.setAttribute('aria-expanded', String(shouldOpen));
       ans.setAttribute('aria-hidden', String(!shouldOpen));
+      if (isTarget && shouldOpen) {
+        trackEvent('faq_open', { question_id: button.id || `faq_${i}`, faq_index: i });
+      }
     });
   };
 });
 
 // Interactive Product Demo Mockup
 let demoIndex = 0;
+let demoInitialized = false;
 $('.demo-tabs').innerHTML = demos
   .map(
     (d, i) =>
@@ -254,6 +302,10 @@ $('.demo-tabs').innerHTML = demos
 function setDemo(i) {
   demoIndex = i;
   const d = demos[i];
+  if (demoInitialized) {
+    trackEvent('hero_demo_click', { demo_id: `demo_${i}`, demo_title: d.title });
+  }
+  demoInitialized = true;
   $('#demo-question').textContent = d.question;
   $('#demo-intro').textContent = d.intro;
   $('#demo-checklist').innerHTML = d.items.map(t => `<li>${t}</li>`).join('');
@@ -352,6 +404,7 @@ async function destination() {
 }
 document.querySelectorAll('[data-start]').forEach(a =>
   a.addEventListener('click', async e => {
+    trackEvent('hero_get_started_click', { location: a.id || 'hero_cta' });
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     a.setAttribute('aria-busy', 'true');
@@ -361,7 +414,10 @@ document.querySelectorAll('[data-start]').forEach(a =>
 
 // Watch Demo dialog
 const demoDialog = $('#demo-dialog');
-$('#watch-demo').onclick = () => demoDialog.showModal();
+$('#watch-demo').onclick = () => {
+  trackEvent('hero_demo_click', { demo_id: 'preview_dialog', demo_title: 'Watch Demo' });
+  demoDialog.showModal();
+};
 demoDialog.querySelector('.modal-close').onclick = () => demoDialog.close();
 $('#explore-demo').onclick = () => {
   demoDialog.close();
@@ -402,6 +458,7 @@ function signedOut() {
 }
 
 async function openChat(prompt = '') {
+  trackEvent('floating_chat_open', { source: prompt ? 'demo_prompt' : 'launcher' });
   returnFocus = document.activeElement;
   drawer.hidden = false;
   $('#chat-launcher').setAttribute('aria-expanded', 'true');
@@ -678,3 +735,17 @@ form.addEventListener('submit', async e => {
     if (activeUser && !drawer.hidden) input.focus();
   }
 });
+
+// Observe feature section view
+if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
+  const featObserver = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        trackEvent('feature_section_view', { section_id: entry.target.id || 'features' });
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2 });
+  const featEl = document.querySelector('#features');
+  if (featEl) featObserver.observe(featEl);
+}

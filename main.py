@@ -12,7 +12,7 @@ import aiohttp
 import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
@@ -112,6 +112,16 @@ app.state.limiter = limiter
 
 def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
     metrics.inc("rate_limit_events")
+    try:
+        db.record_product_event(
+            event_name="rate_limit_hit",
+            anonymous_session_id="rate_limit",
+            page=request.url.path[:128],
+            user_id=request.session.get("user_id") if hasattr(request, "session") else None,
+            metadata={"endpoint": request.url.path[:64]}
+        )
+    except Exception:
+        pass
     return _rate_limit_exceeded_handler(request, exc)
 
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
@@ -199,6 +209,14 @@ ADMIN_PASSWORD = config.ADMIN_PASSWORD
 def require_admin(request: Request):
     if not request.session.get("is_admin"):
         raise HTTPException(status_code=401, detail="Admin authentication required")
+
+def require_admin_beta(request: Request):
+    user_id = request.session.get("user_id")
+    is_admin = request.session.get("is_admin")
+    if not user_id and not is_admin:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
 def require_user(request: Request) -> str:
     user_id = request.session.get("user_id")
@@ -325,6 +343,80 @@ class ChangePasswordRequest(BaseModel):
 class TermsAcceptRequest(BaseModel):
     terms_accepted: bool
 
+class ProductEventRequest(BaseModel):
+    event: str
+    page: str
+    anonymous_session_id: str
+    metadata: Optional[dict] = Field(default_factory=dict)
+
+class BetaFeedbackRequest(BaseModel):
+    category: str
+    message: str
+    allow_follow_up: Optional[bool] = False
+
+# ─── Beta Analytics Event Taxonomy & Security Rules ─────────────────────────
+# Privacy Model:
+# - Anonymous visitors use random anonymous session IDs.
+# - No IP addresses, device/hardware fingerprints, or browser fingerprints are collected or derived.
+# - No raw chat messages, prompts, assistant responses, or factual memory contents are stored in analytics.
+# - No passwords, emails, session cookies, API keys, or OAuth tokens are accepted in event metadata.
+# - Metadata is strictly allowlisted, bounded in size, and stripped of sensitive keys.
+
+ALLOWED_PRODUCT_EVENTS = {
+    # Landing events
+    "landing_view",
+    "hero_get_started_click",
+    "hero_demo_click",
+    "feature_section_view",
+    "faq_open",
+    "floating_chat_open",
+    # Authentication funnel
+    "signup_started",
+    "signup_completed",
+    "login_completed",
+    # Product funnel
+    "chat_opened",
+    "chat_message_sent",
+    "chat_response_completed",
+    "feedback_positive",
+    "feedback_negative",
+    # Memory/adaptation aggregate events
+    "memory_used",
+    "adaptation_used",
+    "adaptation_reset",
+    # Error events
+    "chat_error",
+    "stream_error",
+    "rate_limit_hit",
+}
+
+ALLOWED_EVENT_METADATA = {
+    "landing_view": {"referrer_type", "path"},
+    "hero_get_started_click": {"location"},
+    "hero_demo_click": {"demo_id", "demo_title"},
+    "feature_section_view": {"section_id"},
+    "faq_open": {"question_id", "faq_index"},
+    "floating_chat_open": {"source"},
+    "signup_started": {"source"},
+    "signup_completed": {"method"},
+    "login_completed": {"method"},
+    "chat_opened": {"source"},
+    "chat_message_sent": {"source", "mode", "has_image"},
+    "chat_response_completed": {"source", "streaming", "adaptation_used", "memory_used", "latency_bucket"},
+    "feedback_positive": {"source", "helpful"},
+    "feedback_negative": {"source", "helpful"},
+    "memory_used": {"source"},
+    "adaptation_used": {"strategy", "source"},
+    "adaptation_reset": {"source"},
+    "chat_error": {"error_type", "status_code"},
+    "stream_error": {"error_type"},
+    "rate_limit_hit": {"endpoint"},
+}
+
+FORBIDDEN_METADATA_SUBSTRINGS = (
+    "password", "email", "secret", "token", "prompt", "message", "cookie", "api_key", "bearer", "auth"
+)
+
 # ─── Auth ──────────────────────────────────────────────────────────────
 @app.post("/api/auth/signup")
 @limiter.limit("5/minute")
@@ -343,6 +435,17 @@ def signup(req: SignupRequest, request: Request):
         terms_accepted=req.terms_accepted
     )
     request.session["user_id"] = user_id
+    try:
+        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        db.record_product_event(
+            event_name="signup_completed",
+            anonymous_session_id=anon_id,
+            page="/auth.html",
+            user_id=user_id,
+            metadata={"method": "email"}
+        )
+    except Exception:
+        pass
     log_event("user_signup_success")
     return {
         "user_id": user_id, 
@@ -364,6 +467,17 @@ def login(req: LoginRequest, request: Request):
     if is_admin:
         request.session["is_admin"] = True
         request.session["admin_verified"] = True
+    try:
+        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        db.record_product_event(
+            event_name="login_completed",
+            anonymous_session_id=anon_id,
+            page="/auth.html",
+            user_id=user["user_id"],
+            metadata={"method": "email"}
+        )
+    except Exception:
+        pass
     log_event("login_success", is_admin=is_admin)
     return {
         "user_id": user["user_id"],
@@ -438,6 +552,10 @@ async def google_auth(request: Request):
                 password=temp_pw, 
                 terms_accepted=True
             )
+            try:
+                db.record_product_event("signup_completed", "oauth_google", "/auth.html", user_id=user_id, metadata={"method": "google"})
+            except Exception:
+                pass
         else:
             user_id = user['user_id']
         
@@ -445,6 +563,10 @@ async def google_auth(request: Request):
         if user and user.get("is_admin", 0) == 1:
             request.session["is_admin"] = True
             request.session["admin_verified"] = True
+        try:
+            db.record_product_event("login_completed", "oauth_google", "/auth.html", user_id=user_id, metadata={"method": "google"})
+        except Exception:
+            pass
         log_event("oauth_login_success", provider="google")
         
         safe_name = name.replace("'", "\\'")
@@ -716,6 +838,18 @@ def chat(req: ChatRequest, request: Request):
         if doc and doc["user_id"] != current_user:
             raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
 
+    anon_id = request.headers.get("X-Anonymous-Session") or "session"
+    try:
+        db.record_product_event(
+            event_name="chat_message_sent",
+            anonymous_session_id=anon_id,
+            page="/chat.html",
+            user_id=user_id,
+            metadata={"source": "chat_page", "mode": req.mode or "flash", "has_image": bool(req.image_base64)}
+        )
+    except Exception:
+        pass
+
     # ─── Memory storage command ──────────────────────────────────────────────
     memory_code_match = re.match(r"^Remember this code:\s*(.+)$", req.message, re.IGNORECASE)
     if memory_code_match:
@@ -810,6 +944,16 @@ def chat(req: ChatRequest, request: Request):
         metrics.inc("chat_errors")
         logger.exception("Chat LLM execution failed")
         response = "I'm sorry, I encountered an error processing your request."
+        try:
+            db.record_product_event(
+                event_name="chat_error",
+                anonymous_session_id=anon_id,
+                page="/chat.html",
+                user_id=user_id,
+                metadata={"error_type": "llm_error"}
+            )
+        except Exception:
+            pass
 
     latency_ms = int((time.time() - start_time) * 1000)
     metrics.record_latency(latency_ms)
@@ -823,6 +967,43 @@ def chat(req: ChatRequest, request: Request):
         user_message=req.message, agent_response=response, intent=intent,
         sentiment=sentiment, frustration=frustration, latency_ms=latency_ms)
     memory.maybe_refresh_user_memory(user_id, session_id, req.message, response)
+
+    adapt_used = bool(aug_meta.get("adaptation_used", False))
+    mem_used = bool(aug_meta.get("user_memory_context"))
+    latency_bucket = "<1s" if latency_ms < 1000 else ("<3s" if latency_ms < 3000 else ">=3s")
+    try:
+        db.record_product_event(
+            event_name="chat_response_completed",
+            anonymous_session_id=anon_id,
+            page="/chat.html",
+            user_id=user_id,
+            metadata={
+                "source": "chat_page",
+                "streaming": False,
+                "adaptation_used": adapt_used,
+                "memory_used": mem_used,
+                "latency_bucket": latency_bucket
+            }
+        )
+        if adapt_used:
+            db.record_product_event(
+                event_name="adaptation_used",
+                anonymous_session_id=anon_id,
+                page="/chat.html",
+                user_id=user_id,
+                metadata={"strategy": aug_meta.get("strategy") or "concise_direct", "source": "chat_page"}
+            )
+        if mem_used:
+            db.record_product_event(
+                event_name="memory_used",
+                anonymous_session_id=anon_id,
+                page="/chat.html",
+                user_id=user_id,
+                metadata={"source": "chat_page"}
+            )
+    except Exception:
+        pass
+
     try:
         adaptation.observe_interaction(
             user_id=user_id,
@@ -869,6 +1050,19 @@ def chat_stream(req: ChatRequest, request: Request):
         doc = db.get_document(req.doc_id)
         if doc and doc["user_id"] != current_user:
             raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
+
+    anon_id = request.headers.get("X-Anonymous-Session") or "session"
+    source = "landing_drawer" if ("index.html" in request.headers.get("referer", "") or request.headers.get("referer", "").endswith("/")) else "chat_page"
+    try:
+        db.record_product_event(
+            event_name="chat_message_sent",
+            anonymous_session_id=anon_id,
+            page="/chat.html",
+            user_id=user_id,
+            metadata={"source": source, "mode": req.mode or "flash", "has_image": bool(req.image_base64)}
+        )
+    except Exception:
+        pass
 
     def generate():
         # ─── Memory storage command ──────────────────────────────────────────────
@@ -1036,6 +1230,43 @@ def chat_stream(req: ChatRequest, request: Request):
             latency_ms=latency_ms
         )
         memory.maybe_refresh_user_memory(user_id, session_id, req.message, full_response)
+
+        adapt_used = bool(aug_meta.get("adaptation_used", False))
+        mem_used = bool(aug_meta.get("user_memory_context"))
+        latency_bucket = "<1s" if latency_ms < 1000 else ("<3s" if latency_ms < 3000 else ">=3s")
+        try:
+            db.record_product_event(
+                event_name="chat_response_completed",
+                anonymous_session_id=anon_id,
+                page="/chat.html",
+                user_id=user_id,
+                metadata={
+                    "source": source,
+                    "streaming": True,
+                    "adaptation_used": adapt_used,
+                    "memory_used": mem_used,
+                    "latency_bucket": latency_bucket
+                }
+            )
+            if adapt_used:
+                db.record_product_event(
+                    event_name="adaptation_used",
+                    anonymous_session_id=anon_id,
+                    page="/chat.html",
+                    user_id=user_id,
+                    metadata={"strategy": aug_meta.get("strategy") or "concise_direct", "source": source}
+                )
+            if mem_used:
+                db.record_product_event(
+                    event_name="memory_used",
+                    anonymous_session_id=anon_id,
+                    page="/chat.html",
+                    user_id=user_id,
+                    metadata={"source": source}
+                )
+        except Exception:
+            pass
+
         try:
             adaptation.observe_interaction(
                 user_id=user_id,
@@ -1204,6 +1435,19 @@ def feedback(req: FeedbackRequest, request: Request):
     except Exception as e:
         logger.warning(f"Adaptation feedback processing failed: {e}")
 
+    try:
+        fb_event = "feedback_positive" if req.helpful else "feedback_negative"
+        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        db.record_product_event(
+            event_name=fb_event,
+            anonymous_session_id=anon_id,
+            page="/chat.html",
+            user_id=user_id,
+            metadata={"source": "chat_page", "helpful": bool(req.helpful)}
+        )
+    except Exception:
+        pass
+
     log_event("feedback_recorded", helpful=req.helpful)
     return {"status": "recorded"}
 
@@ -1231,6 +1475,17 @@ def get_user_adaptation(user_id: str, request: Request):
 def reset_user_adaptation(user_id: str, request: Request):
     require_same_user(request, user_id)
     adaptation.reset_adaptation_profile(user_id)
+    try:
+        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        db.record_product_event(
+            event_name="adaptation_reset",
+            anonymous_session_id=anon_id,
+            page="/chat.html",
+            user_id=user_id,
+            metadata={"source": "settings"}
+        )
+    except Exception:
+        pass
     log_event("adaptation_profile_reset", user_id=user_id)
     return {"status": "reset", "user_id": user_id, "message": "Adaptation profile reset to defaults"}
 
@@ -1704,6 +1959,165 @@ def analytics(request: Request):
 def user_analytics(user_id: str, request: Request):
     require_same_user(request, user_id)
     return db.get_user_stats(user_id)
+
+# ─── Beta Analytics Ingest & Validation Endpoints ────────────────────────────
+
+@app.post("/api/events")
+@limiter.limit("60/minute")
+def ingest_event(req: ProductEventRequest, request: Request):
+    """
+    Controlled first-party product analytics ingest endpoint.
+    Validates event names against an allowlist, strips unapproved metadata keys,
+    rejects oversized values, and enforces strict privacy rules.
+    """
+    event_name = req.event.strip() if req.event else ""
+    if event_name not in ALLOWED_PRODUCT_EVENTS:
+        raise HTTPException(status_code=400, detail=f"Invalid or unrecognized event '{event_name}'")
+
+    page = req.page.strip()[:128] if req.page else "/"
+    anon_id = req.anonymous_session_id.strip() if req.anonymous_session_id else ""
+    if not anon_id or len(anon_id) > 64:
+        raise HTTPException(status_code=400, detail="Invalid anonymous_session_id")
+
+    raw_meta = req.metadata
+    if raw_meta is None:
+        raw_meta = {}
+    elif not isinstance(raw_meta, dict):
+        raise HTTPException(status_code=400, detail="Metadata must be a dictionary")
+
+    if len(raw_meta) > 10:
+        raise HTTPException(status_code=400, detail="Metadata exceeds maximum allowed keys (10)")
+
+    allowed_keys = ALLOWED_EVENT_METADATA.get(event_name, set())
+    clean_meta = {}
+
+    for k, v in raw_meta.items():
+        k_str = str(k).strip()
+        k_lower = k_str.lower()
+        if any(sub in k_lower for sub in FORBIDDEN_METADATA_SUBSTRINGS):
+            raise HTTPException(status_code=400, detail=f"Sensitive metadata field '{k_str}' rejected")
+        if k_str not in allowed_keys:
+            continue  # Strip unknown keys
+
+        if isinstance(v, str):
+            if len(v) > 200:
+                raise HTTPException(status_code=400, detail=f"Metadata value for '{k_str}' exceeds 200 characters")
+            v_lower = v.lower()
+            if any(sub in v_lower for sub in ("bearer ", "password", "session_token", "jwt")):
+                raise HTTPException(status_code=400, detail=f"Sensitive content in metadata value for '{k_str}'")
+            clean_meta[k_str] = v
+        elif isinstance(v, (int, float, bool)) or v is None:
+            clean_meta[k_str] = v
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported metadata value type for '{k_str}'")
+
+    meta_json = json.dumps(clean_meta)
+    if len(meta_json.encode("utf-8")) > 2048:
+        raise HTTPException(status_code=400, detail="Metadata JSON payload exceeds size limit (2048 bytes)")
+
+    user_id = request.session.get("user_id")
+
+    try:
+        db.record_product_event(
+            event_name=event_name,
+            anonymous_session_id=anon_id,
+            page=page,
+            user_id=user_id,
+            metadata=clean_meta
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record product event: {e}")
+
+    return {"status": "accepted"}
+
+
+@app.get("/api/admin/beta-metrics")
+def get_beta_metrics_endpoint(request: Request, period_days: int = 7):
+    """
+    Authenticated admin endpoint providing aggregate product funnel KPIs.
+    Returns strictly aggregate counters and rates without exposing user-level event rows.
+    """
+    require_admin_beta(request)
+    days = max(1, min(period_days, 90))
+    return db.get_beta_metrics(days)
+
+
+@app.post("/api/beta-feedback")
+@limiter.limit("10/minute")
+def submit_beta_feedback(req: BetaFeedbackRequest, request: Request):
+    """
+    Beta tester feedback submission endpoint.
+    Validates category enum and message length (<= 2000 chars).
+    """
+    user_id = request.session.get("user_id")
+    category = req.category.strip() if req.category else ""
+    if category not in db.ALLOWED_FEEDBACK_CATEGORIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid category '{category}'. Must be one of {sorted(db.ALLOWED_FEEDBACK_CATEGORIES)}"
+        )
+
+    msg = req.message.strip() if req.message else ""
+    if not msg:
+        raise HTTPException(status_code=400, detail="Feedback message cannot be empty")
+    if len(msg) > 2000:
+        raise HTTPException(status_code=400, detail="Feedback message exceeds maximum length of 2000 characters")
+
+    try:
+        feedback_id = db.record_beta_feedback(
+            category=category,
+            message=msg,
+            user_id=user_id,
+            allow_follow_up=bool(req.allow_follow_up)
+        )
+        return {"status": "success", "id": feedback_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Failed to store beta feedback")
+        raise HTTPException(status_code=500, detail="Failed to save feedback")
+
+
+@app.get("/api/admin/beta-feedback")
+def get_beta_feedback_endpoint(
+    request: Request,
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """
+    Authenticated admin endpoint to review beta tester feedback.
+    Supports status, category filtering, and pagination.
+    """
+    require_admin_beta(request)
+    return {
+        "feedback": db.get_beta_feedback_list(
+            status=status,
+            category=category,
+            limit=limit,
+            offset=offset
+        )
+    }
+
+
+@app.patch("/api/admin/beta-feedback/{feedback_id}/status")
+def patch_beta_feedback_status_endpoint(
+    feedback_id: int,
+    request: Request,
+    body: dict = Body(...)
+):
+    """
+    Authenticated admin endpoint to update status of a beta feedback submission.
+    """
+    require_admin_beta(request)
+    new_status = body.get("status")
+    if not new_status or new_status not in db.ALLOWED_FEEDBACK_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status '{new_status}'")
+    updated = db.update_beta_feedback_status(feedback_id, new_status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Feedback item not found")
+    return {"status": "updated", "id": feedback_id, "new_status": new_status}
 
 # ─── Static Files & Admin Page ───────────────────────────────────────
 STATIC_DIR = (

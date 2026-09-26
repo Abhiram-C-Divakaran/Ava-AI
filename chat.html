@@ -372,6 +372,25 @@
     background: rgba(124,108,246,0.12);
     color: var(--purple-light);
   }
+  .feedback-nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all 0.15s;
+    line-height: 1;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .feedback-nav-btn:hover {
+    background: var(--border);
+    border-color: var(--violet);
+    color: var(--ink);
+  }
 
   /* ─── Messages ────────────────────────────────────────────────── */
   .messages {
@@ -1190,6 +1209,7 @@
       <div class="topbar-actions">
         <button class="search-toggle-btn" id="search-toggle" title="Toggle web search"><span class="search-dot"></span> Web Search</button>
         <button class="mode-toggle" id="mode-toggle" aria-label="Toggle response mode">⚡ Flash</button>
+        <button class="feedback-nav-btn" id="open-beta-feedback" title="Send beta feedback">💬 Feedback</button>
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">🌙</button>
       </div>
     </div>
@@ -1360,6 +1380,48 @@
       <button class="btn-secondary" id="rename-cancel">Cancel</button>
       <button class="btn-primary-modal" id="rename-save">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- Beta Feedback Modal -->
+<div class="modal-overlay" id="beta-feedback-overlay">
+  <div class="modal-card" style="max-width: 480px; padding: 24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
+      <h3 style="font-family:'Sora',sans-serif; font-size:1.15rem; font-weight:700; color:var(--ink); margin:0;">💬 Send Beta Feedback</h3>
+      <button class="modal-back" id="beta-feedback-close" type="button" aria-label="Close" style="width:30px; height:30px; font-size:1.1rem;">✕</button>
+    </div>
+    <p style="font-size:0.82rem; color:var(--muted); margin-bottom: 16px; line-height: 1.4;">
+      Help shape Ava AI! Share what's working well, what feels confusing, or what you'd like improved. Your conversation text is never attached.
+    </p>
+    <form id="beta-feedback-form">
+      <div style="margin-bottom: 14px;">
+        <label for="beta-feedback-category" style="display:block; font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--muted); margin-bottom:6px;">Category</label>
+        <select id="beta-feedback-category" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--ink); font-family:inherit; font-size:0.9rem;" required>
+          <option value="Bug">Bug</option>
+          <option value="Confusing">Confusing</option>
+          <option value="Memory issue">Memory issue</option>
+          <option value="Response quality">Response quality</option>
+          <option value="Feature request">Feature request</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <label for="beta-feedback-message" style="font-size:0.75rem; font-weight:600; text-transform:uppercase; color:var(--muted);">Message</label>
+          <span id="beta-feedback-counter" style="font-size:0.72rem; color:var(--muted);">0 / 2000</span>
+        </div>
+        <textarea id="beta-feedback-message" maxlength="2000" rows="4" placeholder="Describe your experience or feedback..." style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--ink); font-family:inherit; font-size:0.88rem; resize:vertical;" required></textarea>
+      </div>
+      <div style="margin-bottom: 18px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="beta-feedback-followup" style="accent-color:var(--violet); cursor:pointer;">
+        <label for="beta-feedback-followup" style="font-size:0.8rem; color:var(--ink); cursor:pointer;">Allow follow-up on this feedback</label>
+      </div>
+      <div id="beta-feedback-status" style="font-size:0.82rem; margin-bottom:12px; display:none;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button class="btn-secondary" id="beta-feedback-cancel" type="button" style="padding:8px 18px; border-radius:10px; border:1px solid var(--border); background:none; color:var(--ink); cursor:pointer;">Cancel</button>
+        <button class="btn-primary-modal" id="beta-feedback-submit" type="submit" style="padding:8px 20px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#0E0B3A; font-weight:600; cursor:pointer;">Send Feedback</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -1537,6 +1599,111 @@
     }
   }
   input.addEventListener('input', updateCharCount);
+
+  // ─── Beta Feedback Modal Logic ──────────────────────────────────
+  const betaFeedbackOverlay = document.getElementById('beta-feedback-overlay');
+  const openBetaFeedbackBtn = document.getElementById('open-beta-feedback');
+  const closeBetaFeedbackBtn = document.getElementById('beta-feedback-close');
+  const cancelBetaFeedbackBtn = document.getElementById('beta-feedback-cancel');
+  const betaFeedbackForm = document.getElementById('beta-feedback-form');
+  const betaFeedbackMsg = document.getElementById('beta-feedback-message');
+  const betaFeedbackCat = document.getElementById('beta-feedback-category');
+  const betaFeedbackFollowup = document.getElementById('beta-feedback-followup');
+  const betaFeedbackCounter = document.getElementById('beta-feedback-counter');
+  const betaFeedbackStatus = document.getElementById('beta-feedback-status');
+  const betaFeedbackSubmitBtn = document.getElementById('beta-feedback-submit');
+
+  function openBetaFeedback() {
+    if (betaFeedbackOverlay) {
+      betaFeedbackOverlay.classList.add('open');
+      if (betaFeedbackMsg) {
+        betaFeedbackMsg.value = '';
+        betaFeedbackMsg.focus();
+      }
+      if (betaFeedbackCounter) betaFeedbackCounter.textContent = '0 / 2000';
+      if (betaFeedbackStatus) {
+        betaFeedbackStatus.style.display = 'none';
+        betaFeedbackStatus.textContent = '';
+      }
+    }
+  }
+
+  function closeBetaFeedback() {
+    if (betaFeedbackOverlay) {
+      betaFeedbackOverlay.classList.remove('open');
+    }
+  }
+
+  if (openBetaFeedbackBtn) openBetaFeedbackBtn.addEventListener('click', openBetaFeedback);
+  if (closeBetaFeedbackBtn) closeBetaFeedbackBtn.addEventListener('click', closeBetaFeedback);
+  if (cancelBetaFeedbackBtn) cancelBetaFeedbackBtn.addEventListener('click', closeBetaFeedback);
+
+  if (betaFeedbackOverlay) {
+    betaFeedbackOverlay.addEventListener('click', (e) => {
+      if (e.target === betaFeedbackOverlay) closeBetaFeedback();
+    });
+  }
+
+  if (betaFeedbackMsg && betaFeedbackCounter) {
+    betaFeedbackMsg.addEventListener('input', () => {
+      const len = betaFeedbackMsg.value.length;
+      betaFeedbackCounter.textContent = `${len} / 2000`;
+    });
+  }
+
+  if (betaFeedbackForm) {
+    betaFeedbackForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = betaFeedbackMsg.value.trim();
+      const category = betaFeedbackCat.value;
+      const allow_follow_up = betaFeedbackFollowup.checked;
+
+      if (!message) return;
+      if (betaFeedbackSubmitBtn) {
+        betaFeedbackSubmitBtn.disabled = true;
+        betaFeedbackSubmitBtn.textContent = 'Sending...';
+      }
+
+      try {
+        const res = await fetch('/api/beta-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, message, allow_follow_up })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          betaFeedbackStatus.style.display = 'block';
+          betaFeedbackStatus.style.color = '#4ade80';
+          betaFeedbackStatus.textContent = '✓ Thank you! Your feedback has been received.';
+          betaFeedbackMsg.value = '';
+          if (betaFeedbackCounter) betaFeedbackCounter.textContent = '0 / 2000';
+          setTimeout(() => {
+            closeBetaFeedback();
+            if (betaFeedbackSubmitBtn) {
+              betaFeedbackSubmitBtn.disabled = false;
+              betaFeedbackSubmitBtn.textContent = 'Send Feedback';
+            }
+          }, 1400);
+        } else {
+          betaFeedbackStatus.style.display = 'block';
+          betaFeedbackStatus.style.color = '#f87171';
+          betaFeedbackStatus.textContent = data.detail || 'Could not send feedback. Please try again.';
+          if (betaFeedbackSubmitBtn) {
+            betaFeedbackSubmitBtn.disabled = false;
+            betaFeedbackSubmitBtn.textContent = 'Send Feedback';
+          }
+        }
+      } catch (err) {
+        betaFeedbackStatus.style.display = 'block';
+        betaFeedbackStatus.style.color = '#f87171';
+        betaFeedbackStatus.textContent = 'Network error. Please try again.';
+        if (betaFeedbackSubmitBtn) {
+          betaFeedbackSubmitBtn.disabled = false;
+          betaFeedbackSubmitBtn.textContent = 'Send Feedback';
+        }
+      }
+    });
+  }
 
   // ─── Profile modal logic ──────────────────────────────────────
   const profileOverlay = document.getElementById('profile-overlay');

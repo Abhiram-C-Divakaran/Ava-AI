@@ -622,25 +622,38 @@
         </div>
 
         <div class="content-card">
-            <h2><span class="icon">🔒</span> 4. Data Sharing</h2>
-            <p>We take your privacy seriously. We do not sell or rent your personal data to third parties.</p>
-            <p>Information may be shared with service providers who help operate Ava (such as hosting providers, LLM API providers, and analytics services), under strict confidentiality obligations.</p>
-            <p>We only share data that is necessary for the operation of the service, and we ensure all third-party providers comply with industry-standard security practices.</p>
-        </div>
-
-        <div class="content-card">
-            <h2><span class="icon">🗑️</span> 5. Data Retention &amp; Deletion</h2>
-            <p>You have control over your data:</p>
+            <h2><span class="icon">📊</span> 4. First-Party Product Analytics &amp; Telemetry</h2>
+            <p>To evaluate product readiness, understand feature adoption, and improve Ava during the beta phase, we collect privacy-safe first-party product events. We adhere to strict privacy safeguards:</p>
             <ul>
-                <li><strong>Retention</strong> — your data is stored as long as your account is active</li>
-                <li><strong>Deletion</strong> — you can request deletion of your account and all associated conversation history at any time</li>
-                <li><strong>Export</strong> — you can export all your data in a machine-readable format</li>
+                <li><strong>No Raw Chat or Prompt Storage</strong> — Product analytics telemetry <em>never</em> captures or records raw chat prompts, assistant responses, factual memory text, or passwords.</li>
+                <li><strong>No Invasive Fingerprinting</strong> — Anonymous visitors are tracked using only transient, random anonymous session IDs generated in your browser. We never track or derive identity from IP addresses, browser hardware fingerprints, or device identifiers.</li>
+                <li><strong>No Advertising or Data Brokerage</strong> — We do not sell, rent, or monetize your data. We never display third-party advertisements or use third-party tracker scripts.</li>
+                <li><strong>Controlled Metadata</strong> — Telemetry records only coarse, low-sensitivity metadata (e.g., referrer path, button category, response latency bucket). All unknown or sensitive metadata fields are rejected by the server.</li>
             </ul>
-            <p>We'll remove your data within a reasonable period after a deletion request, except where retention is required by law or for legitimate business purposes.</p>
         </div>
 
         <div class="content-card">
-            <h2><span class="icon">🛡️</span> 6. Security</h2>
+            <h2><span class="icon">🔒</span> 5. Data Sharing</h2>
+            <p>We take your privacy seriously. We do not sell or rent your personal data to third parties.</p>
+            <p>Information is processed solely by essential infrastructure providers required to operate Ava (such as cloud hosting and LLM inference providers via Groq), under strict confidentiality obligations.</p>
+            <p>We never share conversation logs or user data for third-party behavioral advertising or cross-site tracking.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🗑️</span> 6. Data Retention &amp; Deletion</h2>
+            <p>You have complete control over your data:</p>
+            <ul>
+                <li><strong>Raw Product Events</strong> — Retained for <strong>30 to 90 days</strong> (default: 60 days) and automatically purged by retention cleanup utilities.</li>
+                <li><strong>Beta Feedback</strong> — Retained until reviewed, resolved, or manually deleted by administrators.</li>
+                <li><strong>Conversation History &amp; Sessions</strong> — Stored as long as your account is active; individual conversations can be deleted at any time in the chat interface.</li>
+                <li><strong>Persistent Memory</strong> — Viewable and clearable at any time from your account settings.</li>
+                <li><strong>Account Deletion</strong> — You can request full deletion of your account and all associated data at any time.</li>
+            </ul>
+            <p>We will permanently purge your data upon request, except where retention is required by applicable law.</p>
+        </div>
+
+        <div class="content-card">
+            <h2><span class="icon">🛡️</span> 7. Security</h2>
             <p>We implement industry-standard security measures to protect your data:</p>
             <ul>
                 <li><strong>Encryption</strong> — all data is encrypted in transit (TLS) and at rest</li>
@@ -652,7 +665,7 @@
         </div>
 
         <div class="content-card">
-            <h2><span class="icon">📧</span> 7. Contact Us</h2>
+            <h2><span class="icon">📧</span> 8. Contact Us</h2>
             <p>If you have any questions about this Privacy Policy or how we handle your data, please reach out:</p>
             <p style="margin-top:8px;">
                 <strong>Email:</strong> <a href="mailto:privacy@ava.ai" style="color:var(--violet);text-decoration:underline;">privacy@ava.ai</a><br>

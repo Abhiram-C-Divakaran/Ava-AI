@@ -326,6 +326,21 @@ When deploying Ava behind a reverse proxy (e.g. Nginx, Cloudflare, Traefik, Cadd
 
 ---
 
-## 9. License
+## 9. Beta Analytics & Product Validation
+
+Ava incorporates a first-party, privacy-safe analytics layer specifically designed for beta validation with real users:
+
+- **Privacy-First Architecture**:
+  - **No Raw Prompts or Responses**: Telemetry events never capture user chat messages, assistant responses, factual memory content, or passwords.
+  - **Zero Fingerprinting**: Anonymous visitors are tracked solely using transient, randomly generated anonymous session IDs. No IP tracking, browser fingerprinting, or hardware canvas hashes.
+  - **No Third-Party Trackers**: No third-party trackers, session replay scripts, or advertising SDKs.
+- **Controlled Event Ingest**: `POST /api/events` validates event names against a strict allowlist (`landing_view`, `hero_get_started_click`, `hero_demo_click`, `feature_section_view`, `faq_open`, `floating_chat_open`, etc.) and strips unapproved or oversized metadata keys.
+- **Aggregate Admin Metrics**: `GET /api/admin/beta-metrics` exposes aggregate product KPIs (`landing_views`, `signup_completed`, `chat_users`, `messages_sent`, `positive_feedback_rate`, `adaptation_usage_rate`, `chat_errors`) protected by admin authentication (401 unauthenticated, 403 non-admin).
+- **Beta Tester Feedback**: `POST /api/beta-feedback` and admin dashboard view `GET /api/admin/beta-feedback` enable direct qualitative feedback collection categorized by Bug, Confusing, Memory issue, Response quality, or Feature request.
+- **Data Retention & Cleanup**: Raw product events are retained for 30–90 days (default: 60 days) and purged via `python scripts/cleanup_events.py --days 60`.
+
+---
+
+## 10. License
 
 Ava AI is open-source software licensed under the MIT License.
