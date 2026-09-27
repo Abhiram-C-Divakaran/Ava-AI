@@ -10,6 +10,7 @@ import re
 import secrets
 import aiohttp
 import logging
+import asyncio
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
@@ -97,6 +98,25 @@ except ImportError:
     REPLICATE_AVAILABLE = False
 
 # ─── Lifespan ──────────────────────────────────────────────────────────────
+async def _retention_cleanup_loop():
+    """
+    Background task: purge product_events older than PRODUCT_EVENT_RETENTION_DAYS.
+    Runs immediately on startup, then repeats every 24 hours.
+    Cleanup failure only logs a warning and never crashes the server.
+    """
+    retention_days = config.PRODUCT_EVENT_RETENTION_DAYS
+    while True:
+        try:
+            purged = db.delete_product_events_older_than(retention_days)
+            if purged:
+                logger.info(
+                    f"Retention cleanup: purged {purged} product_events "
+                    f"older than {retention_days} days."
+                )
+        except Exception as _e:
+            logger.warning(f"Retention cleanup failed: {_e}")
+        await asyncio.sleep(86400)  # 24 hours
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     val = config.validate_config()
@@ -106,14 +126,16 @@ async def lifespan(app: FastAPI):
             raise RuntimeError(f"Invalid production configuration: {val['errors']}")
     config.ensure_directories()
     db.init_db()
-    # Daily retention cleanup: purge product_events older than 90 days.
+    # Start 24-hour rolling retention cleanup (runs immediately then every 24h).
+    cleanup_task = asyncio.create_task(_retention_cleanup_loop())
     try:
-        purged = db.delete_product_events_older_than(90)
-        if purged:
-            logger.info(f"Startup retention cleanup: purged {purged} product_events older than 90 days.")
-    except Exception as _e:
-        logger.warning(f"Retention cleanup failed on startup: {_e}")
-    yield
+        yield
+    finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(title="Ava AI", version=__version__, lifespan=lifespan)
 app.state.limiter = limiter
@@ -458,7 +480,19 @@ def _strip_page(raw: str | None) -> str:
         path = "/"
     return path[:128] or "/"
 
-# ─── Auth ──────────────────────────────────────────────────────────────
+def get_safe_anonymous_session_id(request: Request) -> str:
+    """
+    Read X-Anonymous-Session from request headers, validate it through
+    normalize_anonymous_session_id(), and return either the sanitized ID
+    or the safe generic fallback 'server_session'.
+
+    This prevents malformed or malicious client values from entering product_events.
+    """
+    raw = request.headers.get("X-Anonymous-Session")
+    normalized = normalize_anonymous_session_id(raw)
+    return normalized if normalized else "server_session"
+
+# ─── Auth ───────────────────────────────────────────────────────
 @app.post("/api/auth/signup")
 @limiter.limit("5/minute")
 def signup(req: SignupRequest, request: Request):
@@ -477,7 +511,7 @@ def signup(req: SignupRequest, request: Request):
     )
     request.session["user_id"] = user_id
     try:
-        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        anon_id = get_safe_anonymous_session_id(request)
         db.record_product_event(
             event_name="signup_completed",
             anonymous_session_id=anon_id,
@@ -509,7 +543,7 @@ def login(req: LoginRequest, request: Request):
         request.session["is_admin"] = True
         request.session["admin_verified"] = True
     try:
-        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        anon_id = get_safe_anonymous_session_id(request)
         db.record_product_event(
             event_name="login_completed",
             anonymous_session_id=anon_id,
@@ -879,7 +913,7 @@ def chat(req: ChatRequest, request: Request):
         if doc and doc["user_id"] != current_user:
             raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
 
-    anon_id = request.headers.get("X-Anonymous-Session") or "session"
+    anon_id = get_safe_anonymous_session_id(request)
     try:
         db.record_product_event(
             event_name="chat_message_sent",
@@ -1092,7 +1126,7 @@ def chat_stream(req: ChatRequest, request: Request):
         if doc and doc["user_id"] != current_user:
             raise HTTPException(status_code=403, detail="Forbidden: document does not belong to you")
 
-    anon_id = request.headers.get("X-Anonymous-Session") or "session"
+    anon_id = get_safe_anonymous_session_id(request)
     source = "landing_drawer" if ("index.html" in request.headers.get("referer", "") or request.headers.get("referer", "").endswith("/")) else "chat_page"
     try:
         db.record_product_event(
@@ -1478,7 +1512,7 @@ def feedback(req: FeedbackRequest, request: Request):
 
     try:
         fb_event = "feedback_positive" if req.helpful else "feedback_negative"
-        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        anon_id = get_safe_anonymous_session_id(request)
         db.record_product_event(
             event_name=fb_event,
             anonymous_session_id=anon_id,
@@ -1517,7 +1551,7 @@ def reset_user_adaptation(user_id: str, request: Request):
     require_same_user(request, user_id)
     adaptation.reset_adaptation_profile(user_id)
     try:
-        anon_id = request.headers.get("X-Anonymous-Session") or "session"
+        anon_id = get_safe_anonymous_session_id(request)
         db.record_product_event(
             event_name="adaptation_reset",
             anonymous_session_id=anon_id,
@@ -2089,6 +2123,8 @@ def submit_beta_feedback(req: BetaFeedbackRequest, request: Request):
     """
     Beta tester feedback submission endpoint.
     Validates category enum and message length (<= 2000 chars).
+    Anonymous users may submit feedback but cannot request follow-up
+    (there is no identity to contact).
     """
     user_id = request.session.get("user_id")
     category = req.category.strip() if req.category else ""
@@ -2104,14 +2140,17 @@ def submit_beta_feedback(req: BetaFeedbackRequest, request: Request):
     if len(msg) > 2000:
         raise HTTPException(status_code=400, detail="Feedback message exceeds maximum length of 2000 characters")
 
+    # Anonymous users cannot request follow-up — there is no identity to contact.
+    effective_allow_follow_up = bool(req.allow_follow_up) if user_id else False
+
     try:
         feedback_id = db.record_beta_feedback(
             category=category,
             message=msg,
             user_id=user_id,
-            allow_follow_up=bool(req.allow_follow_up)
+            allow_follow_up=effective_allow_follow_up
         )
-        return {"status": "success", "id": feedback_id}
+        return {"status": "success", "id": feedback_id, "allow_follow_up": effective_allow_follow_up}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:

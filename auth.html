@@ -449,7 +449,27 @@
         }
     })();
 
-    // ─── Auth Logic ────────────────────────────────────────────────────
+    // ─── Anonymous Session ID ─────────────────────────────────────────
+    // Reuses the same key as the landing page so that landing_view →
+    // signup_started → signup_completed can be correlated without
+    // identifying the user. No IP, fingerprint, or device data used.
+    function getAnonymousSessionId() {
+        const KEY = 'ava_anon_session_id';
+        let id = sessionStorage.getItem(KEY);
+        if (!id || !/^[a-zA-Z0-9_\-]{1,64}$/.test(id)) {
+            try {
+                id = 'anon-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+            } catch (_) {
+                // Fallback for environments without crypto.randomUUID
+                const arr = new Uint8Array(12);
+                crypto.getRandomValues(arr);
+                id = 'anon-' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+            sessionStorage.setItem(KEY, id);
+        }
+        return id;
+    }
+
     const form = document.getElementById('auth-form');
     const title = document.getElementById('form-title');
     const subtitle = document.getElementById('form-subtitle');
@@ -522,6 +542,7 @@
         const email = document.getElementById('email').value.trim();
         const password = pwInput.value;
         const name = document.getElementById('name').value.trim();
+        const anonId = getAnonymousSessionId();
 
         // ─── For Signup: Validate Terms Acceptance ────────────────────
         if (mode === 'signup') {
@@ -535,6 +556,20 @@
                 }, 3000);
                 return;
             }
+            // ─── Fire signup_started once after client-side validation ─
+            // Do NOT emit on every keystroke; emit exactly once per attempt.
+            try {
+                fetch('/api/events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event: 'signup_started',
+                        page: '/auth.html',
+                        anonymous_session_id: anonId,
+                        metadata: { source: 'auth_form' }
+                    })
+                }).catch(() => {}); // Analytics failure must not block signup
+            } catch (_) {}
         }
 
         submitBtn.disabled = true;
@@ -542,21 +577,27 @@
 
         try {
             const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
-            
+
             // ─── For Signup: Include terms acceptance in the request ──
-            const body = mode === 'signup' 
-                ? { 
-                    name, 
-                    email, 
+            const body = mode === 'signup'
+                ? {
+                    name,
+                    email,
                     password,
                     terms_accepted: true,
                     terms_accepted_date: new Date().toISOString()
-                  } 
+                  }
                 : { email, password };
 
+            // ─── Include anonymous session for funnel attribution ─────
+            // This lets the backend correlate landing_view → signup_started
+            // → signup_completed without identifying the visitor.
             const res = await fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Anonymous-Session': anonId
+                },
                 body: JSON.stringify(body),
             });
 
@@ -592,8 +633,8 @@
 
             localStorage.setItem('neurosupport_user', JSON.stringify(userData));
 
-            successMsg.textContent = mode === 'signup' 
-                ? '✅ Account created! You have accepted the Terms & Privacy Policy. Redirecting…' 
+            successMsg.textContent = mode === 'signup'
+                ? '✅ Account created! You have accepted the Terms & Privacy Policy. Redirecting…'
                 : '✅ Signed in — redirecting…';
             successMsg.style.display = 'block';
 

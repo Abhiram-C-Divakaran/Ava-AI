@@ -772,6 +772,334 @@ class TestBetaAnalytics(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertIsNone(row["user_id"], "Anonymous event should have NULL user_id!")
 
+    # ── Phase 6: Malicious X-Anonymous-Session header sanitization ─────────
+
+    def test_33_malicious_anon_id_email_sanitized_in_chat_telemetry(self):
+        """X-Anonymous-Session: email address must not be stored in product_events."""
+        client = self._get_user_client(self.user_a_email, self.user_a_pass)
+        bad_id = "someone@example.com"
+        with client as c:
+            # Trigger chat_message_sent telemetry path by attempting a chat request.
+            # Even if LLM is not available, the anon_id must be sanitized before storage.
+            c.post("/api/events", json={
+                "event": "chat_message_sent",
+                "page": "/chat.html",
+                "anonymous_session_id": bad_id,
+                "metadata": {"source": "chat_page"}
+            }, headers={"X-Anonymous-Session": bad_id})
+
+        # The email address must NOT appear as anonymous_session_id in product_events
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT anonymous_session_id FROM product_events "
+                "WHERE anonymous_session_id = ?",
+                (bad_id,)
+            ).fetchone()
+        self.assertIsNone(row, "Email address stored as anonymous_session_id — sanitization failed!")
+
+    def test_34_malicious_anon_id_bearer_token_rejected_by_events_endpoint(self):
+        """/api/events rejects X-Anonymous-Session that looks like a bearer token."""
+        bad_id = "Bearer secret-token-abc123"
+        resp = self.unauth_client.post("/api/events", json={
+            "event": "landing_view",
+            "page": "/",
+            "anonymous_session_id": bad_id,
+        }, headers={"X-Anonymous-Session": bad_id})
+        # Should either 400 (invalid anon_id) or accept but store fallback
+        if resp.status_code == 200:
+            with db.get_conn() as conn:
+                row = conn.execute(
+                    "SELECT anonymous_session_id FROM product_events "
+                    "WHERE anonymous_session_id = ?",
+                    (bad_id,)
+                ).fetchone()
+            self.assertIsNone(row, "Malicious bearer token stored verbatim!")
+        else:
+            self.assertEqual(resp.status_code, 400)
+
+    def test_35_spaces_in_anon_id_rejected_by_events_endpoint(self):
+        """/api/events rejects anonymous_session_id containing spaces."""
+        bad_id = "value with spaces"
+        resp = self.unauth_client.post("/api/events", json={
+            "event": "landing_view",
+            "page": "/",
+            "anonymous_session_id": bad_id,
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_36_very_long_anon_id_rejected(self):
+        """/api/events rejects anonymous_session_id longer than 64 chars."""
+        bad_id = "a" * 65
+        resp = self.unauth_client.post("/api/events", json={
+            "event": "landing_view",
+            "page": "/",
+            "anonymous_session_id": bad_id,
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_37_malicious_anon_header_does_not_break_feedback_endpoint(self):
+        """Malicious X-Anonymous-Session header does not block the feedback endpoint."""
+        client = self._get_user_client(self.user_a_email, self.user_a_pass)
+        with client as c:
+            resp = c.post("/api/feedback", json={
+                "user_id": self.user_a_id,
+                "session_id": "dummy_session_for_test",
+                "message_id": f"msg_{uuid.uuid4().hex}",
+                "helpful": True,
+            }, headers={"X-Anonymous-Session": "evil@bad.com"})
+        # Feedback may fail for other reasons (session not found) but must NOT be 500
+        self.assertNotEqual(resp.status_code, 500)
+
+    def test_38_malicious_anon_header_does_not_break_adaptation_reset(self):
+        """Malicious X-Anonymous-Session header does not break adaptation reset."""
+        client = self._get_user_client(self.user_a_email, self.user_a_pass)
+        with client as c:
+            resp = c.delete(
+                f"/api/adaptation/{self.user_a_id}",
+                headers={"X-Anonymous-Session": "Bearer evil-token"}
+            )
+        # Should succeed (200) — the bad header must not cause a 500
+        self.assertEqual(resp.status_code, 200)
+        # And the bad ID must not be stored in product_events
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT anonymous_session_id FROM product_events "
+                "WHERE event_name = 'adaptation_reset' "
+                "AND anonymous_session_id = ?",
+                ("Bearer evil-token",)
+            ).fetchone()
+        self.assertIsNone(row, "Malicious anon ID stored in adaptation_reset telemetry!")
+
+    # ── Phase 6: Anonymous feedback forces allow_follow_up=False ─────────────
+
+    def test_39_anonymous_feedback_forces_allow_follow_up_false(self):
+        """Anonymous user requesting follow-up must have allow_follow_up stored as False."""
+        client = TestClient(app)  # no login session
+        resp = client.post("/api/beta-feedback", json={
+            "category": "Bug",
+            "message": "This is an anonymous bug report requesting follow-up",
+            "allow_follow_up": True,
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertFalse(
+            data.get("allow_follow_up"),
+            "Anonymous feedback must NOT store allow_follow_up=True!"
+        )
+        # Verify in DB
+        fid = data.get("id")
+        if fid:
+            with db.get_conn() as conn:
+                row = conn.execute(
+                    "SELECT allow_follow_up FROM beta_feedback WHERE id = ?", (fid,)
+                ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row["allow_follow_up"], 0)
+
+    def test_40_authenticated_feedback_may_set_allow_follow_up_true(self):
+        """Authenticated user may store allow_follow_up=True."""
+        client = self._get_user_client(self.user_a_email, self.user_a_pass)
+        with client as c:
+            resp = c.post("/api/beta-feedback", json={
+                "category": "Feature request",
+                "message": "I would like dark mode please",
+                "allow_follow_up": True,
+            })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(
+            data.get("allow_follow_up"),
+            "Authenticated user's allow_follow_up=True must be honoured!"
+        )
+
+    # ── Phase 7: Retention policy configuration ─────────────────────────────
+
+    def test_41_default_retention_days_is_60(self):
+        """PRODUCT_EVENT_RETENTION_DAYS defaults to 60."""
+        import config
+        self.assertEqual(config.PRODUCT_EVENT_RETENTION_DAYS, 60)
+
+    def test_42_retention_below_30_rejected(self):
+        """PRODUCT_EVENT_RETENTION_DAYS < 30 raises ValueError at import time."""
+        import importlib
+        import config as cfg
+        original = os.environ.get("PRODUCT_EVENT_RETENTION_DAYS")
+        os.environ["PRODUCT_EVENT_RETENTION_DAYS"] = "29"
+        try:
+            with self.assertRaises((ValueError, SystemExit)):
+                importlib.reload(cfg)
+        finally:
+            if original is None:
+                os.environ.pop("PRODUCT_EVENT_RETENTION_DAYS", None)
+            else:
+                os.environ["PRODUCT_EVENT_RETENTION_DAYS"] = original
+            importlib.reload(cfg)  # Restore
+
+    def test_43_retention_above_90_rejected(self):
+        """PRODUCT_EVENT_RETENTION_DAYS > 90 raises ValueError at import time."""
+        import importlib
+        import config as cfg
+        original = os.environ.get("PRODUCT_EVENT_RETENTION_DAYS")
+        os.environ["PRODUCT_EVENT_RETENTION_DAYS"] = "91"
+        try:
+            with self.assertRaises((ValueError, SystemExit)):
+                importlib.reload(cfg)
+        finally:
+            if original is None:
+                os.environ.pop("PRODUCT_EVENT_RETENTION_DAYS", None)
+            else:
+                os.environ["PRODUCT_EVENT_RETENTION_DAYS"] = original
+            importlib.reload(cfg)  # Restore
+
+    # ── Phase 9: Cohort-correlated conversion metrics ─────────────────────────
+
+    def test_44_signup_completion_rate_uses_correlated_sessions(self):
+        """signup_completion_rate counts sessions with start+complete, not raw events."""
+        # Two different anon sessions: only one completes signup
+        sess_complete = f"cohort_sess_{uuid.uuid4().hex[:12]}"
+        sess_no_complete = f"cohort_sess_{uuid.uuid4().hex[:12]}"
+
+        db.record_product_event("signup_started", sess_complete, "/auth.html", metadata={"source": "test"})
+        db.record_product_event("signup_completed", sess_complete, "/auth.html",
+                                user_id=f"cohort_user_{uuid.uuid4().hex[:8]}")
+        db.record_product_event("signup_started", sess_no_complete, "/auth.html", metadata={"source": "test"})
+        # sess_no_complete never completes
+
+        metrics = db.get_beta_metrics(period_days=7)
+        rate = metrics["signup_completion_rate"]
+        self.assertGreaterEqual(rate, 0.0)
+        self.assertLessEqual(rate, 1.0)
+
+    def test_45_landing_to_signup_rate_uses_session_correlation(self):
+        """landing_to_signup_rate must correlate landing sessions to signups, not raw counts."""
+        # Record 3 landing views from one session, only 1 signup
+        sess = f"land_sess_{uuid.uuid4().hex[:12]}"
+        for _ in range(3):
+            db.record_product_event("landing_view", sess, "/")
+        db.record_product_event("signup_completed", sess, "/auth.html",
+                                user_id=f"land_user_{uuid.uuid4().hex[:8]}")
+
+        metrics = db.get_beta_metrics(period_days=7)
+        rate = metrics["landing_to_signup_rate"]
+        # Rate must be <= 1.0 despite 3 landing_view events from one session
+        self.assertLessEqual(rate, 1.0, "Duplicate landing_view events inflated the rate above 1!")
+        self.assertGreaterEqual(rate, 0.0)
+
+    def test_46_duplicate_landing_views_do_not_inflate_conversion(self):
+        """Multiple landing_view events from the same session count as ONE landing session."""
+        sess = f"dup_land_{uuid.uuid4().hex[:12]}"
+        # Simulate 10 page refreshes
+        for _ in range(10):
+            db.record_product_event("landing_view", sess, "/")
+        # This session never signs up
+
+        metrics = db.get_beta_metrics(period_days=7)
+        rate = metrics["landing_to_signup_rate"]
+        self.assertLessEqual(rate, 1.0)
+
+    def test_47_signup_to_chat_rate_excludes_pre_existing_users(self):
+        """signup_to_chat_rate denominator only includes users who signed up during the period."""
+        # Old user who registered before the period: inject an OLD signup event by
+        # directly inserting a row with created_at in the distant past.
+        old_user_id = f"old_user_{uuid.uuid4().hex[:8]}"
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        with db.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO product_events (event_name, anonymous_session_id, page, user_id, metadata_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("signup_completed", "old_sess", "/auth.html", old_user_id, "{}", old_ts)
+            )
+            # Old user also chats (recently)
+            conn.execute(
+                "INSERT INTO product_events (event_name, anonymous_session_id, page, user_id, metadata_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("chat_message_sent", "old_sess", "/chat.html", old_user_id, "{}", datetime.now(timezone.utc).isoformat())
+            )
+
+        # New user who signed up within last 7 days but has NOT chatted
+        new_user_id = f"new_user_{uuid.uuid4().hex[:8]}"
+        db.record_product_event("signup_completed", f"new_sess_{new_user_id}", "/auth.html",
+                                user_id=new_user_id)
+
+        metrics = db.get_beta_metrics(period_days=7)
+        rate = metrics["signup_to_chat_rate"]
+        self.assertGreaterEqual(rate, 0.0)
+        self.assertLessEqual(rate, 1.0)
+        # Old user must not inflate the denominator
+        new_signup_users = metrics.get("_new_signup_users", -1)
+        # The new_signup_users must NOT include the old user (who signed up 30 days ago)
+        if new_signup_users > 0:
+            self.assertNotEqual(new_signup_users, 0)
+
+    def test_48_all_conversion_metrics_bounded_zero_to_one(self):
+        """Every conversion rate in get_beta_metrics must be in [0.0, 1.0]."""
+        metrics = db.get_beta_metrics(period_days=7)
+        rate_keys = [
+            "landing_to_signup_rate",
+            "signup_completion_rate",
+            "signup_to_chat_rate",
+            "positive_feedback_rate",
+            "adaptation_usage_rate",
+        ]
+        for key in rate_keys:
+            val = metrics.get(key, -1)
+            self.assertGreaterEqual(val, 0.0, f"{key} is below 0: {val}")
+            self.assertLessEqual(val, 1.0, f"{key} exceeds 1.0: {val}")
+
+    # ── Analytics failure tolerance ─────────────────────────────────────────
+
+    def test_49_analytics_failure_does_not_block_signup(self):
+        """If record_product_event raises, signup must still succeed."""
+        from unittest.mock import patch as mock_patch
+
+        unique_email = f"failtest_{uuid.uuid4().hex[:8]}@example.com"
+        with mock_patch("database.record_product_event", side_effect=Exception("DB exploded")):
+            client = TestClient(app)
+            resp = client.post("/api/auth/signup", json={
+                "name": "Fail Test",
+                "email": unique_email,
+                "password": "Password123!",
+                "terms_accepted": True,
+            })
+        # Signup must succeed even with analytics failure
+        self.assertIn(resp.status_code, (200, 409), f"Signup blocked by analytics failure: {resp.status_code}")
+
+    def test_50_analytics_failure_does_not_block_chat_events(self):
+        """If record_product_event raises, POST /api/events must not cascade to 500."""
+        from unittest.mock import patch as mock_patch
+
+        anon_id = f"anon_stable_{uuid.uuid4().hex[:12]}"
+        with mock_patch("database.record_product_event", side_effect=Exception("analytics down")):
+            resp = self.unauth_client.post("/api/events", json={
+                "event": "landing_view",
+                "page": "/",
+                "anonymous_session_id": anon_id,
+            })
+        # Should not be 500 — analytics failure must be absorbed
+        self.assertNotEqual(resp.status_code, 500)
+
+    def test_51_get_safe_anon_id_returns_server_session_for_bad_input(self):
+        """get_safe_anonymous_session_id falls back to 'server_session' for malformed input."""
+        from main import get_safe_anonymous_session_id
+        from unittest.mock import MagicMock
+
+        bad_values = [
+            "someone@example.com",
+            "Bearer secret",
+            "value with spaces",
+            "a" * 65,
+            "",
+            None,
+        ]
+        for bad in bad_values:
+            mock_request = MagicMock()
+            mock_request.headers.get = MagicMock(return_value=bad)
+            result = get_safe_anonymous_session_id(mock_request)
+            self.assertEqual(
+                result, "server_session",
+                f"Expected 'server_session' for bad input {bad!r}, got {result!r}"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

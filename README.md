@@ -332,12 +332,19 @@ Ava incorporates a first-party, privacy-safe analytics layer specifically design
 
 - **Privacy-First Architecture**:
   - **No Raw Prompts or Responses**: Telemetry events never capture user chat messages, assistant responses, factual memory content, or passwords.
-  - **Zero Fingerprinting**: Anonymous visitors are tracked solely using transient, randomly generated anonymous session IDs. No IP tracking, browser fingerprinting, or hardware canvas hashes.
+  - **Zero Fingerprinting**: Anonymous visitors are tracked solely using transient, randomly generated anonymous session IDs (`crypto.randomUUID()`-based). No IP tracking, browser fingerprinting, hardware canvas hashes, or device signatures.
+  - **Anonymous ID Sanitization**: All inbound `X-Anonymous-Session` header values are validated server-side through `get_safe_anonymous_session_id()` — only alphanumeric/hyphen/underscore IDs of 1–64 chars are accepted; malformed values fall back to the generic `"server_session"`.
   - **No Third-Party Trackers**: No third-party trackers, session replay scripts, or advertising SDKs.
-- **Controlled Event Ingest**: `POST /api/events` validates event names against a strict allowlist (`landing_view`, `hero_get_started_click`, `hero_demo_click`, `feature_section_view`, `faq_open`, `floating_chat_open`, etc.) and strips unapproved or oversized metadata keys.
-- **Aggregate Admin Metrics**: `GET /api/admin/beta-metrics` exposes aggregate product KPIs (`landing_views`, `signup_completed`, `chat_users`, `messages_sent`, `positive_feedback_rate`, `adaptation_usage_rate`, `chat_errors`) protected by admin authentication (401 unauthenticated, 403 non-admin).
-- **Beta Tester Feedback**: `POST /api/beta-feedback` and admin dashboard view `GET /api/admin/beta-feedback` enable direct qualitative feedback collection categorized by Bug, Confusing, Memory issue, Response quality, or Feature request.
-- **Data Retention & Cleanup**: Raw product events are retained for 30–90 days (default: 60 days) and purged via `python scripts/cleanup_events.py --days 60`.
+- **Real Signup Funnel**: `auth.html` emits `signup_started` exactly once after client-side validation passes (not on every keystroke). Both `/api/auth/signup` and `/api/auth/login` receive an `X-Anonymous-Session` header so the backend can correlate landing → signup → chat without identifying the visitor.
+- **Controlled Event Ingest**: `POST /api/events` validates event names against a strict allowlist and strips unapproved or oversized metadata keys.
+- **Cohort-Correct Conversion Metrics** (`GET /api/admin/beta-metrics`):
+  - **Landing → Signup**: % of distinct anonymous sessions with `landing_view` that also complete signup (repeat page views from one session count once).
+  - **Signup Completion**: % of `signup_started` sessions that successfully complete signup.
+  - **Signup → First Chat**: % of users who registered *during the reporting period* and subsequently send a chat message (pre-existing users excluded from the denominator).
+  - All rates are bounded `[0.0, 1.0]` via `_safe_rate()`.
+- **Beta Tester Feedback**: `POST /api/beta-feedback` collects qualitative feedback (Bug, Confusing, Memory issue, Response quality, Feature request). Anonymous users may submit feedback but **cannot** request follow-up (there is no identity to contact).
+- **Data Retention**: Raw product events are retained for **60 days** (configurable 30–90 days via `PRODUCT_EVENT_RETENTION_DAYS` env var). An automated background task runs every 24 hours to enforce the retention window. Account deletion immediately purges all associated product events and feedback.
+
 
 ---
 

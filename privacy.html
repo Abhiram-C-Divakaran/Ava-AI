@@ -643,11 +643,13 @@
             <h2><span class="icon">🗑️</span> 6. Data Retention &amp; Deletion</h2>
             <p>You have complete control over your data:</p>
             <ul>
-                <li><strong>Raw Product Events</strong> — Retained for <strong>30 to 90 days</strong> (default: 60 days) and automatically purged by retention cleanup utilities.</li>
-                <li><strong>Beta Feedback</strong> — Retained until reviewed, resolved, or manually deleted by administrators.</li>
-                <li><strong>Conversation History &amp; Sessions</strong> — Stored as long as your account is active; individual conversations can be deleted at any time in the chat interface.</li>
-                <li><strong>Persistent Memory</strong> — Viewable and clearable at any time from your account settings.</li>
-                <li><strong>Account Deletion</strong> — You can request full deletion of your account and all associated data at any time.</li>
+                <li><strong>Raw Product Events</strong> &mdash; Retained for a maximum of <strong>60 days</strong> (configurable 30&ndash;90 days via <code>PRODUCT_EVENT_RETENTION_DAYS</code>). Raw product events are removed by an automated background cleanup task that runs on application startup and then every 24&nbsp;hours. No raw chat messages, responses, or passwords are ever stored in product events.</li>
+                <li><strong>Anonymous Session Events</strong> &mdash; Anonymous visitor telemetry follows the same 60-day retention policy. Anonymous session IDs are randomly generated and contain no personally identifying information (no IP, browser fingerprint, or device data).</li>
+                <li><strong>Account-Associated Telemetry</strong> &mdash; When you delete your account, all product events and beta feedback linked to your account are permanently purged immediately.</li>
+                <li><strong>Beta Feedback</strong> &mdash; Retained until reviewed, resolved, or manually deleted by administrators. Anonymous feedback cannot include a follow-up contact request.</li>
+                <li><strong>Conversation History &amp; Sessions</strong> &mdash; Stored as long as your account is active; individual conversations can be deleted at any time in the chat interface.</li>
+                <li><strong>Persistent Memory</strong> &mdash; Viewable and clearable at any time from your account settings.</li>
+                <li><strong>Account Deletion</strong> &mdash; You can request full deletion of your account and all associated data at any time.</li>
             </ul>
             <p>We will permanently purge your data upon request, except where retention is required by applicable law.</p>
         </div>

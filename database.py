@@ -1198,6 +1198,18 @@ def get_beta_metrics(period_days: int = 7) -> dict:
     """
     Calculate aggregate product funnel metrics and conversion rates over period_days.
     Returns strictly aggregate KPIs without user-level event records.
+
+    Metric semantics (see BETA_TEST_PLAN.md for full definitions):
+    - landing_to_signup_rate:
+        distinct anonymous sessions with landing_view that also have signup_completed / total landing sessions
+    - signup_completion_rate:
+        distinct anonymous sessions with signup_started that also complete signup / total started sessions
+    - signup_to_chat_rate:
+        new users (signup_completed in period) who also send a chat message after signup / total new users
+    - positive_feedback_rate:
+        positive feedback events / total feedback events (product_events only, no double-count)
+    - adaptation_usage_rate:
+        adaptation_used events / chat_message_sent events
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
     with get_conn() as conn:
@@ -1208,11 +1220,12 @@ def get_beta_metrics(period_days: int = 7) -> dict:
             ).fetchone()
             return row["c"] if row else 0
 
+        # ── Raw activity counts ────────────────────────────────────────────
         landing_views = count_events("landing_view")
         signup_started = count_events("signup_started")
         signup_completed = count_events("signup_completed")
 
-        # Distinct chat users in the period
+        # Distinct chat users in the period (authenticated)
         chat_users_row = conn.execute(
             """
             SELECT COUNT(DISTINCT user_id) AS c FROM product_events
@@ -1228,13 +1241,11 @@ def get_beta_metrics(period_days: int = 7) -> dict:
         messages_sent = count_events("chat_message_sent")
 
         # Adaptation used responses: count ONLY dedicated 'adaptation_used' events.
-        # We do NOT also count chat_response_completed with adaptation_used=True metadata
-        # to avoid double-counting (one response = one adaptation event).
+        # Do NOT count chat_response_completed with adaptation_used=True to avoid double-counting.
         adaptation_used_responses = count_events("adaptation_used")
 
-        # Positive & negative feedback in period from product_events only.
-        # We do NOT take max() against the feedback table to avoid double-counting
-        # thumbs-up/down events that are already recorded as product_events.
+        # Positive & negative feedback — product_events is the single canonical source.
+        # Do NOT augment with the feedback table to prevent double-counting.
         fb_pos = count_events("feedback_positive")
         fb_neg = count_events("feedback_negative")
 
@@ -1249,21 +1260,115 @@ def get_beta_metrics(period_days: int = 7) -> dict:
         chat_errors = chat_err_row["c"] if chat_err_row else 0
 
         def _safe_rate(numerator: int, denominator: int) -> float:
-            """Compute a bounded conversion rate in [0.0, 1.0]."""
+            """Bounded conversion rate in [0.0, 1.0]. Returns 0.0 when denominator=0."""
             if denominator <= 0:
                 return 0.0
             return round(min(1.0, numerator / denominator), 4)
 
-        # Calculated rates — all clamped to [0, 1] to guard against cohort skew.
-        landing_to_signup_rate = _safe_rate(signup_completed, landing_views)
-        signup_completion_rate = _safe_rate(signup_completed, signup_started)
-        signup_to_chat_rate    = _safe_rate(chat_users, signup_completed)
+        # ── Cohort-correlated conversion rates ─────────────────────────────
+
+        # landing_to_signup_rate:
+        # Distinct anonymous sessions that had a landing_view AND a signup_completed.
+        # Denominator: all distinct anonymous sessions with landing_view in the period.
+        landing_sessions_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT anonymous_session_id) AS c
+            FROM product_events
+            WHERE event_name = 'landing_view' AND created_at >= ?
+              AND anonymous_session_id IS NOT NULL
+            """,
+            (cutoff,)
+        ).fetchone()
+        landing_sessions = landing_sessions_row["c"] if landing_sessions_row else 0
+
+        landed_and_converted_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT lv.anonymous_session_id) AS c
+            FROM product_events lv
+            WHERE lv.event_name = 'landing_view' AND lv.created_at >= ?
+              AND lv.anonymous_session_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM product_events sc
+                  WHERE sc.event_name = 'signup_completed'
+                    AND sc.anonymous_session_id = lv.anonymous_session_id
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        landed_and_converted = landed_and_converted_row["c"] if landed_and_converted_row else 0
+        landing_to_signup_rate = _safe_rate(landed_and_converted, landing_sessions)
+
+        # signup_completion_rate:
+        # Distinct anonymous sessions with signup_started that also have signup_completed.
+        started_sessions_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT anonymous_session_id) AS c
+            FROM product_events
+            WHERE event_name = 'signup_started' AND created_at >= ?
+              AND anonymous_session_id IS NOT NULL
+            """,
+            (cutoff,)
+        ).fetchone()
+        started_sessions = started_sessions_row["c"] if started_sessions_row else 0
+
+        completed_from_started_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT ss.anonymous_session_id) AS c
+            FROM product_events ss
+            WHERE ss.event_name = 'signup_started' AND ss.created_at >= ?
+              AND ss.anonymous_session_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM product_events sc
+                  WHERE sc.event_name = 'signup_completed'
+                    AND sc.anonymous_session_id = ss.anonymous_session_id
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        completed_from_started = completed_from_started_row["c"] if completed_from_started_row else 0
+        signup_completion_rate = _safe_rate(completed_from_started, started_sessions)
+
+        # signup_to_chat_rate:
+        # Users who completed signup during the period AND sent at least one chat_message_sent
+        # AFTER their signup_completed timestamp. Excludes pre-existing users.
+        new_signup_users_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT user_id) AS c
+            FROM product_events
+            WHERE event_name = 'signup_completed'
+              AND user_id IS NOT NULL
+              AND created_at >= ?
+            """,
+            (cutoff,)
+        ).fetchone()
+        new_signup_users = new_signup_users_row["c"] if new_signup_users_row else 0
+
+        activated_signup_users_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT sc.user_id) AS c
+            FROM product_events sc
+            WHERE sc.event_name = 'signup_completed'
+              AND sc.user_id IS NOT NULL
+              AND sc.created_at >= ?
+              AND EXISTS (
+                  SELECT 1 FROM product_events cm
+                  WHERE cm.event_name = 'chat_message_sent'
+                    AND cm.user_id = sc.user_id
+                    AND cm.created_at >= sc.created_at
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        activated_signup_users = activated_signup_users_row["c"] if activated_signup_users_row else 0
+        signup_to_chat_rate = _safe_rate(activated_signup_users, new_signup_users)
+
         total_fb = fb_pos + fb_neg
         positive_feedback_rate = _safe_rate(fb_pos, total_fb)
         adaptation_usage_rate  = _safe_rate(adaptation_used_responses, messages_sent)
 
         return {
             "period_days": period_days,
+            # Activity counts
             "landing_views": landing_views,
             "signup_started": signup_started,
             "signup_completed": signup_completed,
@@ -1273,11 +1378,19 @@ def get_beta_metrics(period_days: int = 7) -> dict:
             "positive_feedback": fb_pos,
             "negative_feedback": fb_neg,
             "chat_errors": chat_errors,
+            # Cohort-correlated conversion rates — all in [0.0, 1.0]
+            # landing_to_signup_rate: landing sessions → signup completion
             "landing_to_signup_rate": landing_to_signup_rate,
+            # signup_completion_rate: signup-start sessions → signup completion
             "signup_completion_rate": signup_completion_rate,
+            # signup_to_chat_rate: new users who sent ≥1 message after signup
             "signup_to_chat_rate": signup_to_chat_rate,
             "positive_feedback_rate": positive_feedback_rate,
-            "adaptation_usage_rate": adaptation_usage_rate
+            "adaptation_usage_rate": adaptation_usage_rate,
+            # Denominator context for verifying rate validity
+            "_landing_sessions": landing_sessions,
+            "_started_sessions": started_sessions,
+            "_new_signup_users": new_signup_users,
         }
 
 
