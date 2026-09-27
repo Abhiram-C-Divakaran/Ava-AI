@@ -7,7 +7,7 @@ import hmac
 import os
 import secrets
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextlib import contextmanager
 
 from cache import prefs_cache  # assuming cache.py exists
@@ -340,6 +340,42 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
             record_migration(5, "Adapted response count tracking")
+
+        # Migration 6: Privacy-safe product analytics and beta tester feedback
+        if not is_applied(6):
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS product_events (
+                    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_name           TEXT NOT NULL,
+                    anonymous_session_id TEXT NOT NULL,
+                    user_id              TEXT,
+                    page                 TEXT NOT NULL,
+                    metadata_json        TEXT NOT NULL DEFAULT '{}',
+                    created_at           TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_product_events_name    ON product_events(event_name);
+                CREATE INDEX IF NOT EXISTS idx_product_events_created ON product_events(created_at);
+                CREATE INDEX IF NOT EXISTS idx_product_events_user    ON product_events(user_id);
+                CREATE INDEX IF NOT EXISTS idx_product_events_anon    ON product_events(anonymous_session_id);
+
+                CREATE TABLE IF NOT EXISTS beta_feedback (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         TEXT,
+                    category        TEXT NOT NULL,
+                    message         TEXT NOT NULL,
+                    allow_follow_up INTEGER NOT NULL DEFAULT 0,
+                    status          TEXT NOT NULL DEFAULT 'new',
+                    created_at      TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_beta_feedback_status   ON beta_feedback(status);
+                CREATE INDEX IF NOT EXISTS idx_beta_feedback_category ON beta_feedback(category);
+                CREATE INDEX IF NOT EXISTS idx_beta_feedback_created  ON beta_feedback(created_at);
+                """
+            )
+            record_migration(6, "Privacy-safe product analytics and beta feedback")
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 def _hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
@@ -853,6 +889,9 @@ def delete_user_data(user_id: str) -> None:
         conn.execute("DELETE FROM user_memory WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM adaptation_profiles WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM adaptation_strategy_stats WHERE user_id = ?", (user_id,))
+        # Clear analytics and beta feedback attributed to this user
+        conn.execute("DELETE FROM product_events WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM beta_feedback WHERE user_id = ?", (user_id,))
 
 # ─── Cross-session user memory (Claude-style persistent memory) ───────────────
 def get_user_memory(user_id: str) -> dict:
@@ -1106,4 +1145,364 @@ def get_user_feedback_stats(user_id: str) -> dict:
             "positive_feedback": positive,
             "negative_feedback": total - positive,
             "positive_rate": round(positive / total, 3) if total > 0 else 0.0,
-        }
+        }
+
+
+# ─── Privacy-Safe Product Analytics ──────────────────────────────────────────
+# Privacy Model:
+# 1. Anonymous visitors are tracked solely by a transient client-generated session ID.
+# 2. No IP addresses, device/hardware fingerprints, or browser fingerprints are collected or derived.
+# 3. No raw chat messages, prompts, assistant responses, or factual memory contents are stored in analytics.
+# 4. No passwords, emails, session cookies, API keys, or OAuth tokens are accepted into event metadata.
+# 5. Metadata is strictly allowlisted, bounded in size, and stripped of sensitive keys.
+# 6. Aggregated beta metrics never expose user-level records publicly.
+
+def record_product_event(
+    event_name: str,
+    anonymous_session_id: str,
+    page: str,
+    user_id: str | None = None,
+    metadata: dict | None = None,
+    created_at: str | None = None
+) -> int:
+    """
+    Store a privacy-safe product event in product_events.
+    Ensures metadata is JSON-serialized and free of sensitive payload fields.
+    """
+    now = created_at or _now()
+    clean_meta = {}
+    if metadata and isinstance(metadata, dict):
+        forbidden_substrings = ("password", "email", "secret", "token", "prompt", "cookie", "api_key")
+        for k, v in metadata.items():
+            k_lower = str(k).lower()
+            if any(sub in k_lower for sub in forbidden_substrings):
+                continue
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                clean_meta[k] = v
+            else:
+                clean_meta[k] = str(v)[:128]
+    meta_json = json.dumps(clean_meta)
+
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO product_events (event_name, anonymous_session_id, user_id, page, metadata_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (event_name, anonymous_session_id, user_id, page, meta_json, now)
+        )
+        return cursor.lastrowid
+
+
+def get_beta_metrics(period_days: int = 7) -> dict:
+    """
+    Calculate aggregate product funnel metrics and conversion rates over period_days.
+    Returns strictly aggregate KPIs without user-level event records.
+
+    Metric semantics (see BETA_TEST_PLAN.md for full definitions):
+    - landing_to_signup_rate:
+        distinct anonymous sessions with landing_view that also have signup_completed / total landing sessions
+    - signup_completion_rate:
+        distinct anonymous sessions with signup_started that also complete signup / total started sessions
+    - signup_to_chat_rate:
+        new users (signup_completed in period) who also send a chat message after signup / total new users
+    - positive_feedback_rate:
+        positive feedback events / total feedback events (product_events only, no double-count)
+    - adaptation_usage_rate:
+        adaptation_used events / chat_message_sent events
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
+    with get_conn() as conn:
+        def count_events(name: str) -> int:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM product_events WHERE event_name = ? AND created_at >= ?",
+                (name, cutoff)
+            ).fetchone()
+            return row["c"] if row else 0
+
+        # ── Raw activity counts ────────────────────────────────────────────
+        landing_views = count_events("landing_view")
+        signup_started = count_events("signup_started")
+        signup_completed = count_events("signup_completed")
+
+        # Distinct chat users in the period (authenticated)
+        chat_users_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT user_id) AS c FROM product_events
+            WHERE event_name IN ('chat_message_sent', 'chat_opened')
+              AND user_id IS NOT NULL
+              AND created_at >= ?
+            """,
+            (cutoff,)
+        ).fetchone()
+        chat_users = chat_users_row["c"] if chat_users_row else 0
+
+        # Messages sent
+        messages_sent = count_events("chat_message_sent")
+
+        # Adaptation used responses: count ONLY dedicated 'adaptation_used' events.
+        # Do NOT count chat_response_completed with adaptation_used=True to avoid double-counting.
+        adaptation_used_responses = count_events("adaptation_used")
+
+        # Positive & negative feedback — product_events is the single canonical source.
+        # Do NOT augment with the feedback table to prevent double-counting.
+        fb_pos = count_events("feedback_positive")
+        fb_neg = count_events("feedback_negative")
+
+        # Chat errors
+        chat_err_row = conn.execute(
+            """
+            SELECT COUNT(*) AS c FROM product_events
+            WHERE event_name IN ('chat_error', 'stream_error') AND created_at >= ?
+            """,
+            (cutoff,)
+        ).fetchone()
+        chat_errors = chat_err_row["c"] if chat_err_row else 0
+
+        def _safe_rate(numerator: int, denominator: int) -> float:
+            """Bounded conversion rate in [0.0, 1.0]. Returns 0.0 when denominator=0."""
+            if denominator <= 0:
+                return 0.0
+            return round(min(1.0, numerator / denominator), 4)
+
+        # ── Cohort-correlated conversion rates ─────────────────────────────
+
+        # landing_to_signup_rate:
+        # Distinct anonymous sessions that had a landing_view AND a signup_completed.
+        # Denominator: all distinct anonymous sessions with landing_view in the period.
+        landing_sessions_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT anonymous_session_id) AS c
+            FROM product_events
+            WHERE event_name = 'landing_view' AND created_at >= ?
+              AND anonymous_session_id IS NOT NULL
+            """,
+            (cutoff,)
+        ).fetchone()
+        landing_sessions = landing_sessions_row["c"] if landing_sessions_row else 0
+
+        landed_and_converted_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT lv.anonymous_session_id) AS c
+            FROM product_events lv
+            WHERE lv.event_name = 'landing_view' AND lv.created_at >= ?
+              AND lv.anonymous_session_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM product_events sc
+                  WHERE sc.event_name = 'signup_completed'
+                    AND sc.anonymous_session_id = lv.anonymous_session_id
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        landed_and_converted = landed_and_converted_row["c"] if landed_and_converted_row else 0
+        landing_to_signup_rate = _safe_rate(landed_and_converted, landing_sessions)
+
+        # signup_completion_rate:
+        # Distinct anonymous sessions with signup_started that also have signup_completed.
+        started_sessions_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT anonymous_session_id) AS c
+            FROM product_events
+            WHERE event_name = 'signup_started' AND created_at >= ?
+              AND anonymous_session_id IS NOT NULL
+            """,
+            (cutoff,)
+        ).fetchone()
+        started_sessions = started_sessions_row["c"] if started_sessions_row else 0
+
+        completed_from_started_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT ss.anonymous_session_id) AS c
+            FROM product_events ss
+            WHERE ss.event_name = 'signup_started' AND ss.created_at >= ?
+              AND ss.anonymous_session_id IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM product_events sc
+                  WHERE sc.event_name = 'signup_completed'
+                    AND sc.anonymous_session_id = ss.anonymous_session_id
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        completed_from_started = completed_from_started_row["c"] if completed_from_started_row else 0
+        signup_completion_rate = _safe_rate(completed_from_started, started_sessions)
+
+        # signup_to_chat_rate:
+        # Users who completed signup during the period AND sent at least one chat_message_sent
+        # AFTER their signup_completed timestamp. Excludes pre-existing users.
+        new_signup_users_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT user_id) AS c
+            FROM product_events
+            WHERE event_name = 'signup_completed'
+              AND user_id IS NOT NULL
+              AND created_at >= ?
+            """,
+            (cutoff,)
+        ).fetchone()
+        new_signup_users = new_signup_users_row["c"] if new_signup_users_row else 0
+
+        activated_signup_users_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT sc.user_id) AS c
+            FROM product_events sc
+            WHERE sc.event_name = 'signup_completed'
+              AND sc.user_id IS NOT NULL
+              AND sc.created_at >= ?
+              AND EXISTS (
+                  SELECT 1 FROM product_events cm
+                  WHERE cm.event_name = 'chat_message_sent'
+                    AND cm.user_id = sc.user_id
+                    AND cm.created_at >= sc.created_at
+              )
+            """,
+            (cutoff,)
+        ).fetchone()
+        activated_signup_users = activated_signup_users_row["c"] if activated_signup_users_row else 0
+        signup_to_chat_rate = _safe_rate(activated_signup_users, new_signup_users)
+
+        total_fb = fb_pos + fb_neg
+        positive_feedback_rate = _safe_rate(fb_pos, total_fb)
+        adaptation_usage_rate  = _safe_rate(adaptation_used_responses, messages_sent)
+
+        return {
+            "period_days": period_days,
+            # Activity counts
+            "landing_views": landing_views,
+            "signup_started": signup_started,
+            "signup_completed": signup_completed,
+            "chat_users": chat_users,
+            "messages_sent": messages_sent,
+            "adaptation_used_responses": adaptation_used_responses,
+            "positive_feedback": fb_pos,
+            "negative_feedback": fb_neg,
+            "chat_errors": chat_errors,
+            # Cohort-correlated conversion rates — all in [0.0, 1.0]
+            # landing_to_signup_rate: landing sessions → signup completion
+            "landing_to_signup_rate": landing_to_signup_rate,
+            # signup_completion_rate: signup-start sessions → signup completion
+            "signup_completion_rate": signup_completion_rate,
+            # signup_to_chat_rate: new users who sent ≥1 message after signup
+            "signup_to_chat_rate": signup_to_chat_rate,
+            "positive_feedback_rate": positive_feedback_rate,
+            "adaptation_usage_rate": adaptation_usage_rate,
+            # Denominator context for verifying rate validity
+            "_landing_sessions": landing_sessions,
+            "_started_sessions": started_sessions,
+            "_new_signup_users": new_signup_users,
+        }
+
+
+def delete_product_events_older_than(days: int) -> int:
+    """
+    Data retention cleanup: delete product events older than the specified retention window.
+    """
+    if days < 1:
+        raise ValueError("Retention period must be at least 1 day")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "DELETE FROM product_events WHERE created_at < ?",
+            (cutoff,)
+        )
+        return cursor.rowcount
+
+
+# ─── Beta Tester Feedback ───────────────────────────────────────────────────
+
+ALLOWED_FEEDBACK_CATEGORIES = {
+    "Bug",
+    "Confusing",
+    "Memory issue",
+    "Response quality",
+    "Feature request",
+    "Other"
+}
+
+ALLOWED_FEEDBACK_STATUSES = {"new", "reviewing", "resolved"}
+
+def record_beta_feedback(
+    category: str,
+    message: str,
+    user_id: str | None = None,
+    allow_follow_up: bool = False,
+    created_at: str | None = None
+) -> int:
+    """
+    Record user feedback submitted via the beta feedback form.
+    Validates category enum and bounds message length to 2000 characters.
+    """
+    if category not in ALLOWED_FEEDBACK_CATEGORIES:
+        raise ValueError(f"Invalid category '{category}'. Must be one of {sorted(ALLOWED_FEEDBACK_CATEGORIES)}")
+    clean_msg = message.strip()
+    if not clean_msg:
+        raise ValueError("Feedback message cannot be empty")
+    if len(clean_msg) > 2000:
+        raise ValueError("Feedback message exceeds maximum length of 2000 characters")
+
+    now = created_at or _now()
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO beta_feedback (user_id, category, message, allow_follow_up, status, created_at)
+            VALUES (?, ?, ?, ?, 'new', ?)
+            """,
+            (user_id, category, clean_msg, 1 if allow_follow_up else 0, now)
+        )
+        return cursor.lastrowid
+
+
+def get_beta_feedback_list(
+    status: str | None = None,
+    category: str | None = None,
+    limit: int = 50,
+    offset: int = 0
+) -> list[dict]:
+    """
+    Admin query for tester feedback entries with optional filtering by status/category and pagination.
+    """
+    query = "SELECT id, user_id, category, message, allow_follow_up, status, created_at FROM beta_feedback WHERE 1=1"
+    params = []
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([max(1, min(limit, 100)), max(0, offset)])
+
+    with get_conn() as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "category": r["category"],
+                "message": r["message"],
+                "allow_follow_up": bool(r["allow_follow_up"]),
+                "status": r["status"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+
+
+def update_beta_feedback_status(feedback_id: int, status: str) -> bool:
+    """Update status of a beta feedback item (e.g. new -> reviewing -> resolved)."""
+    if status not in ALLOWED_FEEDBACK_STATUSES:
+        raise ValueError(f"Invalid status '{status}'. Must be one of {sorted(ALLOWED_FEEDBACK_STATUSES)}")
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE beta_feedback SET status = ? WHERE id = ?",
+            (status, feedback_id)
+        )
+        return cursor.rowcount > 0
+
+
+def delete_beta_feedback(feedback_id: int) -> bool:
+    """Admin hard-delete of a beta feedback entry by ID. Returns True if deleted."""
+    with get_conn() as conn:
+        cursor = conn.execute("DELETE FROM beta_feedback WHERE id = ?", (feedback_id,))
+        return cursor.rowcount > 0

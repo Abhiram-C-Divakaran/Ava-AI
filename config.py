@@ -82,6 +82,17 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
 
+# ─── Analytics Retention ────────────────────────────────────────────────────
+# Canonical retention window for product_events.
+# Range: 30–90 days. Default: 60 days.
+# Override via PRODUCT_EVENT_RETENTION_DAYS environment variable.
+_raw_retention = int(os.getenv("PRODUCT_EVENT_RETENTION_DAYS", "60"))
+if not (30 <= _raw_retention <= 90):
+    raise ValueError(
+        f"PRODUCT_EVENT_RETENTION_DAYS must be between 30 and 90 (got {_raw_retention})"
+    )
+PRODUCT_EVENT_RETENTION_DAYS: int = _raw_retention
+
 
 def ensure_directories() -> None:
     """Create persistent storage directories if they do not exist."""

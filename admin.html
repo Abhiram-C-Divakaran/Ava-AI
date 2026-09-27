@@ -1297,6 +1297,54 @@
                 </div>
             </div>
 
+            <!-- ─── Beta Metrics (Validation & Product Funnel) ─── -->
+            <div style="margin-top: 28px; margin-bottom: 24px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h3 style="font-family:'Sora',sans-serif; font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:0;">🧪 Beta Metrics</h3>
+                        <span style="font-size:0.7rem; font-weight:600; background:rgba(84,230,242,0.15); color:var(--cyan); padding:2px 8px; border-radius:999px;">Product Validation</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);" id="beta-metrics-period">Last 7 Days (Aggregate)</div>
+                </div>
+                <div class="stats-grid" id="beta-metrics-grid">
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">👀</span></div>
+                        <div class="stat-number zero" id="beta-landing-views">0</div>
+                        <div class="stat-label">Landing Views</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">✍️</span></div>
+                        <div class="stat-number zero" id="beta-signups">0</div>
+                        <div class="stat-label">Signups</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">💬</span></div>
+                        <div class="stat-number zero" id="beta-chat-users">0</div>
+                        <div class="stat-label">Active Chat Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">📨</span></div>
+                        <div class="stat-number zero" id="beta-messages">0</div>
+                        <div class="stat-label">Messages</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">👍</span></div>
+                        <div class="stat-number zero" id="beta-positive-rate">0%</div>
+                        <div class="stat-label">Positive Feedback Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">🧠</span></div>
+                        <div class="stat-number zero" id="beta-adaptation-rate">0%</div>
+                        <div class="stat-label">Adaptation Usage Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-top"><span class="stat-icon">⚠️</span></div>
+                        <div class="stat-number zero" id="beta-chat-errors">0</div>
+                        <div class="stat-label">Chat Errors</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Recently Added -->
             <div class="section-header">
                 <h2>Recent Activity</h2>
@@ -2008,10 +2056,42 @@
             renderReviews();
             renderUsers();
             renderAnalytics();
+            await loadBetaMetrics();
 
         } catch (err) {
             console.error('Error loading data:', err);
             showToast('⚠️ Error loading data: ' + err.message, 'error');
+        }
+    }
+
+    // ─── Beta Metrics Loader ─────────────────────────────────────────
+    async function loadBetaMetrics() {
+        try {
+            const res = await fetch('/api/admin/beta-metrics?period_days=7');
+            if (!res.ok) return;
+            const d = await res.json();
+
+            updateStat('beta-landing-views', d.landing_views || 0);
+            updateStat('beta-signups', d.signup_completed || 0);
+            updateStat('beta-chat-users', d.chat_users || 0);
+            updateStat('beta-messages', d.messages_sent || 0);
+            updateStat('beta-chat-errors', d.chat_errors || 0);
+
+            const posEl = document.getElementById('beta-positive-rate');
+            if (posEl) {
+                const posRate = Math.round((d.positive_feedback_rate || 0) * 100);
+                posEl.textContent = `${posRate}%`;
+                posEl.className = posRate === 0 ? 'stat-number zero' : 'stat-number';
+            }
+
+            const adaptEl = document.getElementById('beta-adaptation-rate');
+            if (adaptEl) {
+                const adaptRate = Math.round((d.adaptation_usage_rate || 0) * 100);
+                adaptEl.textContent = `${adaptRate}%`;
+                adaptEl.className = adaptRate === 0 ? 'stat-number zero' : 'stat-number';
+            }
+        } catch (e) {
+            console.warn('Could not load beta metrics:', e);
         }
     }
 
