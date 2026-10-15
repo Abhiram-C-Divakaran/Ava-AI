@@ -13,7 +13,7 @@ Features:
 - Configurable base URL (--base-url) and DB path (--db-path)
 - Two modes: --mode offline (zero external LLM calls) and --mode live (real streaming LLM check)
 - Remote execution safety guard (--allow-remote required for non-localhost)
-- Preflight HTTP server <-> DB matching check via transient canary
+- Non-mutating preflight DB alignment check via GET /api/system/db-fingerprint (zero product events written; server and verifier DB fingerprints must match, mismatch aborts before verification fixtures are created)
 - Comprehensive fixture tracking (users, sessions, anon sessions, feedback)
 - Guaranteed cleanup in finally block even upon errors or interruption
 - Zero-leak cleanup verification (asserts 0 test fixtures remain in DB)

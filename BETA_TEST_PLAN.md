@@ -163,7 +163,7 @@ Before onboarding real external beta testers, the automated pre-beta verificatio
 
 ### Safety & Isolation Guarantees:
 - **Localhost Guard**: Non-loopback URLs are rejected by default. Running against a non-localhost host requires explicit `--allow-remote` with a warning banner.
-- **Preflight DB Alignment**: Uses a transient HTTP canary event to verify the running server and local DB connection point to the exact same SQLite file before executing tests.
+- **Preflight DB Alignment**: Before creating any verification fixtures, the harness queries the protected `/api/system/db-fingerprint` diagnostic and compares its opaque fingerprint with the verifier's direct database fingerprint. A mismatch aborts the run before any synthetic analytics events are written. The endpoint exposes no DB path or filesystem secrets, production access requires authorization, and a failed preflight is completely non-mutating and zero-pollution.
 - **Guaranteed Fixture Cleanup**: All test users, anonymous sessions, feedback submissions, and chat records are tracked and purged in a `finally` block even if tests fail or are interrupted.
 - **Zero-Leak Verification**: Directly queries all database tables post-cleanup to assert 0 test fixtures remain. Fails the run if any artifact leaked.
 - **Disposable Environment**: Always execute against a dedicated local or disposable test database to prevent polluting production analytics.
