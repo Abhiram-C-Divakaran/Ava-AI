@@ -8,6 +8,7 @@ import zipfile
 import io
 import re
 import secrets
+import hmac
 import aiohttp
 import logging
 import asyncio
@@ -233,6 +234,26 @@ def ready_check():
 def get_operational_metrics(request: Request):
     require_admin(request)
     return metrics.get_snapshot()
+
+@app.get("/api/system/db-fingerprint")
+def get_system_db_fingerprint(request: Request):
+    """
+    Opaque diagnostic endpoint returning a non-sensitive database identity fingerprint.
+    Security:
+    - In non-production environments (development, staging, test), accessible for harness preflight.
+    - In production environments, strictly requires admin session or valid X-Admin-Password header.
+    - Exposes zero filesystem paths, credentials, or table contents.
+    """
+    is_admin = request.session.get("is_admin")
+    if config.ENVIRONMENT == "production" and not is_admin:
+        admin_header = request.headers.get("X-Admin-Password")
+        if not (config.ADMIN_PASSWORD and admin_header and hmac.compare_digest(admin_header, config.ADMIN_PASSWORD)):
+            raise HTTPException(status_code=403, detail="Diagnostic endpoint unavailable in production without admin authentication")
+
+    return {
+        "status": "ok",
+        "db_fingerprint": db.get_db_fingerprint()
+    }
 
 ADMIN_PASSWORD = config.ADMIN_PASSWORD
 

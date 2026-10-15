@@ -52,36 +52,49 @@ def generate_run_id() -> str:
     return f"beta_verify_{uuid.uuid4().hex[:12]}"
 
 
-def preflight_db_match(base_url: str, run_id: str) -> tuple[bool, str]:
+def preflight_db_match(
+    base_url: str,
+    run_id: str,
+    db_path: str | None = None,
+    admin_password: str | None = None
+) -> tuple[bool, str]:
     """
     Ensure the HTTP server and direct database.py connection target the exact same database.
-    Posts a transient canary event through HTTP and verifies visibility via direct SQL.
-    Immediately cleans up the canary event.
+    Queries the server's opaque /api/system/db-fingerprint diagnostic endpoint and compares
+    it with the verifier's direct SQLite database fingerprint.
+
+    Zero-Pollution Guarantee:
+    - Completely non-mutating: writes zero HTTP product events or DB rows.
+    - If alignment fails or server is unreachable, zero synthetic rows are created.
     """
-    canary_anon = f"canary_{run_id}"
     try:
         health_resp = requests.get(f"{base_url}/health", timeout=5)
         if health_resp.status_code != 200:
             return False, f"Server /health returned HTTP {health_resp.status_code}"
 
-        event_resp = requests.post(
-            f"{base_url}/api/events",
-            json={"event": "landing_view", "anonymous_session_id": canary_anon, "page": "/"},
-            timeout=5
-        )
-        if event_resp.status_code != 200:
-            return False, f"Server /api/events rejected canary with HTTP {event_resp.status_code}"
+        headers = {}
+        if admin_password:
+            headers["X-Admin-Password"] = admin_password
 
-        with db.get_conn() as conn:
-            row = conn.execute(
-                "SELECT id FROM product_events WHERE anonymous_session_id = ?",
-                (canary_anon,)
-            ).fetchone()
-            if not row:
-                return False, "Canary event recorded via HTTP was not found in local DB. Server and verifier DB paths do not match!"
-            conn.execute("DELETE FROM product_events WHERE anonymous_session_id = ?", (canary_anon,))
+        fp_resp = requests.get(f"{base_url}/api/system/db-fingerprint", headers=headers, timeout=5)
+        if fp_resp.status_code == 403:
+            return False, "Server rejected DB diagnostic request (HTTP 403 Forbidden). Diagnostic requires admin authentication in production."
+        if fp_resp.status_code != 200:
+            return False, f"Server /api/system/db-fingerprint returned HTTP {fp_resp.status_code}: {fp_resp.text}"
 
-        return True, "Preflight check passed: HTTP server and local DB are aligned."
+        server_fp = fp_resp.json().get("db_fingerprint")
+        if not server_fp:
+            return False, "Server response missing 'db_fingerprint' field"
+
+        local_fp = db.get_db_fingerprint(db_path)
+        if server_fp != local_fp:
+            return False, (
+                f"Database alignment mismatch: Server DB fingerprint ({server_fp}) "
+                f"does not match verifier direct DB fingerprint ({local_fp}). "
+                f"Verification aborted with ZERO events written."
+            )
+
+        return True, f"Preflight check passed: HTTP server and verifier DB fingerprints match ({local_fp})."
     except Exception as e:
         return False, f"Preflight connection exception: {e}"
 
@@ -92,12 +105,16 @@ class BetaVerificationHarness:
         base_url: str = "http://127.0.0.1:8000",
         mode: str = "offline",
         allow_remote: bool = False,
-        run_id: str | None = None
+        run_id: str | None = None,
+        db_path: str | None = None,
+        admin_password: str | None = None
     ):
         self.base_url = base_url.rstrip("/")
         self.mode = mode.lower()
         self.allow_remote = allow_remote
         self.run_id = run_id or generate_run_id()
+        self.db_path = db_path or config.DB_PATH
+        self.admin_password = admin_password
 
         self.passed_steps: list[str] = []
         self.failed_steps: list[tuple[str, str]] = []
@@ -579,7 +596,12 @@ class BetaVerificationHarness:
                 print(f"\n[WARNING] Executing against remote host: {self.base_url}")
                 print("This suite creates temporary users, events, and feedback entries.\n")
 
-        ok, msg = preflight_db_match(self.base_url, self.run_id)
+        ok, msg = preflight_db_match(
+            self.base_url,
+            self.run_id,
+            db_path=self.db_path,
+            admin_password=self.admin_password
+        )
         if not ok:
             print(f"\n[ABORT] Preflight DB alignment check failed: {msg}\n")
             return False
@@ -648,6 +670,11 @@ def parse_args(args=None):
         action="store_true",
         help="Explicitly permit verification against a remote/non-localhost host"
     )
+    parser.add_argument(
+        "--admin-password",
+        default=None,
+        help="Optional admin password header for production diagnostics"
+    )
     return parser.parse_args(args)
 
 
@@ -660,7 +687,9 @@ def main():
     harness = BetaVerificationHarness(
         base_url=args.base_url,
         mode=args.mode,
-        allow_remote=args.allow_remote
+        allow_remote=args.allow_remote,
+        db_path=args.db_path,
+        admin_password=args.admin_password
     )
     success = harness.run()
     sys.exit(0 if success else 1)
