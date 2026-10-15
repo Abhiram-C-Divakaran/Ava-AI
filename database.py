@@ -46,6 +46,45 @@ def check_database_integrity(target_path: str | None = None) -> str:
         row = cursor.fetchone()
         return row[0] if row else "unknown"
 
+def get_db_instance_id(target_path: str | None = None) -> str:
+    """
+    Retrieve or initialize an opaque database instance identifier stored inside the SQLite database.
+    This identifier uniquely distinguishes this SQLite database instance across processes and environments.
+    """
+    path = target_path or DB_PATH
+    try:
+        conn = sqlite3.connect(path, timeout=5.0)
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS system_metadata (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                """
+            )
+            row = conn.execute("SELECT value FROM system_metadata WHERE key = 'db_instance_id'").fetchone()
+            if row and row[0]:
+                return str(row[0])
+            instance_id = secrets.token_hex(16)
+            conn.execute("INSERT OR IGNORE INTO system_metadata (key, value) VALUES ('db_instance_id', ?)", (instance_id,))
+            conn.commit()
+            row = conn.execute("SELECT value FROM system_metadata WHERE key = 'db_instance_id'").fetchone()
+            return str(row[0]) if row else instance_id
+        finally:
+            conn.close()
+    except Exception:
+        norm = os.path.normcase(os.path.realpath(os.path.abspath(path)))
+        return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:32]
+
+def get_db_fingerprint(target_path: str | None = None) -> str:
+    """
+    Return a 16-character hexadecimal opaque fingerprint of the target SQLite database.
+    Safe for diagnostic exposure (zero paths, zero secrets, zero schema/content leakage).
+    """
+    raw_id = get_db_instance_id(target_path)
+    return hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:16]
+
 def backup_database(destination_path: str) -> str:
     """Safely create an online SQLite backup of DB_PATH using SQLite's native backup API."""
     dest_dir = os.path.dirname(os.path.abspath(destination_path)) or "."
@@ -137,6 +176,19 @@ def init_db():
             );
             """
         )
+
+        # Ensure system_metadata table exists for opaque instance identification
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_metadata (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            """
+        )
+        row = conn.execute("SELECT value FROM system_metadata WHERE key = 'db_instance_id'").fetchone()
+        if not row:
+            conn.execute("INSERT OR IGNORE INTO system_metadata (key, value) VALUES ('db_instance_id', ?)", (secrets.token_hex(16),))
 
         def is_applied(v: int) -> bool:
             row = conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (v,)).fetchone()

@@ -1100,6 +1100,157 @@ class TestBetaAnalytics(unittest.TestCase):
                 f"Expected 'server_session' for bad input {bad!r}, got {result!r}"
             )
 
+    # 52. Verification harness: safe host checks and run ID uniqueness
+    def test_52_verifier_helpers_safe_host_and_run_id(self):
+        """Verifier helper functions enforce safe host constraints and unique IDs."""
+        from scripts.verify_beta_protocol import is_safe_host, generate_run_id
+
+        # Safe hosts
+        self.assertTrue(is_safe_host("http://127.0.0.1:8000"))
+        self.assertTrue(is_safe_host("http://localhost:8000"))
+        self.assertTrue(is_safe_host("http://0.0.0.0:8000"))
+        self.assertTrue(is_safe_host("http://[::1]:8000"))
+
+        # Remote / unsafe hosts
+        self.assertFalse(is_safe_host("https://production.ava.ai"))
+        self.assertFalse(is_safe_host("https://example.com"))
+        self.assertFalse(is_safe_host("http://192.168.1.100:8000"))
+        self.assertFalse(is_safe_host("invalid-url"))
+
+        # Run ID uniqueness & formatting
+        id1 = generate_run_id()
+        id2 = generate_run_id()
+        self.assertNotEqual(id1, id2)
+        self.assertTrue(id1.startswith("beta_verify_"))
+        self.assertTrue(len(id1) >= 20)
+
+    # 53. Verification harness: CLI argument parser defaults and flags
+    def test_53_verifier_parse_args(self):
+        """Verifier parse_args supports defaults, modes, db-path, and allow-remote."""
+        from scripts.verify_beta_protocol import parse_args
+
+        # Defaults
+        args_default = parse_args([])
+        self.assertEqual(args_default.base_url, "http://127.0.0.1:8000")
+        self.assertEqual(args_default.mode, "offline")
+        self.assertIsNone(args_default.db_path)
+        self.assertFalse(args_default.allow_remote)
+        self.assertIsNone(args_default.admin_password)
+
+        # Custom arguments
+        args_custom = parse_args([
+            "--base-url", "http://localhost:9000",
+            "--mode", "live",
+            "--db-path", "/custom/path.db",
+            "--allow-remote",
+            "--admin-password", "my_pwd"
+        ])
+        self.assertEqual(args_custom.base_url, "http://localhost:9000")
+        self.assertEqual(args_custom.mode, "live")
+        self.assertEqual(args_custom.db_path, "/custom/path.db")
+        self.assertTrue(args_custom.allow_remote)
+        self.assertEqual(args_custom.admin_password, "my_pwd")
+
+    # 54. Verification harness: matching DB fingerprint succeeds non-mutating
+    def test_54_verifier_preflight_db_match_success(self):
+        """Preflight succeeds when server and direct DB fingerprints match, without writing events."""
+        from scripts.verify_beta_protocol import preflight_db_match
+        from unittest.mock import MagicMock
+
+        current_fp = db.get_db_fingerprint()
+        self.assertTrue(len(current_fp) == 16)
+
+        mock_health = MagicMock(status_code=200)
+        mock_fp = MagicMock(status_code=200)
+        mock_fp.json.return_value = {"status": "ok", "db_fingerprint": current_fp}
+
+        def mock_get(url, *args, **kwargs):
+            if "/health" in url:
+                return mock_health
+            if "/api/system/db-fingerprint" in url:
+                return mock_fp
+            return MagicMock(status_code=404)
+
+        with patch("scripts.verify_beta_protocol.requests.get", side_effect=mock_get):
+            ok, msg = preflight_db_match("http://127.0.0.1:8000", "test_run_123")
+            self.assertTrue(ok)
+            self.assertIn("match", msg)
+
+    # 55. Verification harness: mismatched DB fingerprint fails and leaves zero pollution
+    def test_55_verifier_preflight_db_mismatch_fails_zero_pollution(self):
+        """Preflight fails on fingerprint mismatch and creates 0 product_events."""
+        from scripts.verify_beta_protocol import preflight_db_match
+        from unittest.mock import MagicMock
+
+        # Count events before
+        with db.get_conn() as conn:
+            before_count = conn.execute("SELECT COUNT(*) as c FROM product_events").fetchone()["c"]
+
+        mock_health = MagicMock(status_code=200)
+        mock_fp = MagicMock(status_code=200)
+        mock_fp.json.return_value = {"status": "ok", "db_fingerprint": "different_fingerprint_1234"}
+
+        def mock_get(url, *args, **kwargs):
+            if "/health" in url:
+                return mock_health
+            if "/api/system/db-fingerprint" in url:
+                return mock_fp
+            return MagicMock(status_code=404)
+
+        with patch("scripts.verify_beta_protocol.requests.get", side_effect=mock_get):
+            ok, msg = preflight_db_match("http://127.0.0.1:8000", "test_run_mismatch")
+            self.assertFalse(ok)
+            self.assertIn("mismatch", msg.lower())
+
+        # Count events after — must be exactly identical (zero mutation)
+        with db.get_conn() as conn:
+            after_count = conn.execute("SELECT COUNT(*) as c FROM product_events").fetchone()["c"]
+        self.assertEqual(before_count, after_count)
+
+    # 56. Endpoint security: /api/system/db-fingerprint
+    def test_56_system_db_fingerprint_endpoint_security(self):
+        """Diagnostic endpoint is safe, non-leaking, and guarded in production."""
+        client = TestClient(app)
+
+        # In development / non-production
+        with patch("config.ENVIRONMENT", "development"):
+            resp = client.get("/api/system/db-fingerprint")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertIn("db_fingerprint", data)
+            self.assertEqual(len(data["db_fingerprint"]), 16)
+            # Ensure zero path leakage or secrets
+            raw_text = resp.text
+            self.assertNotIn(".db", raw_text)
+            self.assertNotIn("neurosupport", raw_text)
+            self.assertNotIn("C:\\", raw_text)
+            self.assertNotIn("/app", raw_text)
+
+        # In production without admin session or header -> 403
+        with patch("config.ENVIRONMENT", "production"), patch("config.ADMIN_PASSWORD", "secret_pass_123"):
+            resp_prod = client.get("/api/system/db-fingerprint")
+            self.assertEqual(resp_prod.status_code, 403)
+
+            # In production with valid X-Admin-Password -> 200
+            resp_auth = client.get("/api/system/db-fingerprint", headers={"X-Admin-Password": "secret_pass_123"})
+            self.assertEqual(resp_auth.status_code, 200)
+            self.assertEqual(len(resp_auth.json()["db_fingerprint"]), 16)
+
+    # 57. Verification harness: aborts on preflight failure without creating fixtures
+    def test_57_verifier_failed_preflight_aborts_without_creating_fixtures(self):
+        """Harness.run() returns False on failed preflight with zero user or session creation."""
+        from scripts.verify_beta_protocol import BetaVerificationHarness
+
+        harness = BetaVerificationHarness(base_url="http://127.0.0.1:8000")
+
+        with patch("scripts.verify_beta_protocol.preflight_db_match", return_value=(False, "Simulated preflight failure")):
+            success = harness.run()
+            self.assertFalse(success)
+            self.assertEqual(len(harness.tracked_users), 0)
+            self.assertEqual(len(harness.tracked_anon_sessions), 0)
+            self.assertEqual(len(harness.tracked_sessions), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+

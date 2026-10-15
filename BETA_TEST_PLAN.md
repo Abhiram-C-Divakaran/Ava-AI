@@ -1,6 +1,12 @@
 # Ava AI — Beta Test Plan & Product Validation Protocol
 
-This document establishes the real-user beta validation protocol for **Ava AI (v1.0.1)**. The objective is to validate product-market fit, user comprehension, memory utility, and behavioral adaptation with an initial cohort of **5 to 20 real users** under strict privacy safeguards.
+This document establishes the real-user beta validation protocol for **Ava AI**. The objective is to validate product-market fit, user comprehension, memory utility, and behavioral adaptation with an initial cohort of **5 to 20 real users** under strict privacy safeguards.
+
+### Beta Build Identity:
+- **Canonical Version (`version.py`)**: `1.0.1`
+- **Baseline Verified Main Commit**: [`ed03e70d59235eeade89c58a157f5ed59ec61a43`](file:///c:/Users/Abhiram/Videos/AVA)
+- **Production Inference Model**: `openai/gpt-oss-120b` (via Groq Cloud API)
+
 
 ---
 
@@ -116,7 +122,7 @@ curl -s -b cookies.txt http://127.0.0.1:8000/api/admin/beta-metrics?period_days=
 
 | Data Category | Storage Location | Retention Period | Deletion Mechanism |
 | :--- | :--- | :--- | :--- |
-| **Raw Product Events** | `product_events` table | **30–90 days** (Default: 60 days) | `scripts/cleanup_events.py --days 60` |
+| **Raw Product Events** | `product_events` table | **30–90 days** (Default: 60 days, configured via `PRODUCT_EVENT_RETENTION_DAYS`) | Automatic rolling cleanup loop every ~24h on startup; manual CLI available via `scripts/cleanup_events.py --days 60` |
 | **Aggregate Beta Metrics** | In-memory calculation from database | Indefinite (Non-personal KPIs) | Computed dynamically on request |
 | **Beta Tester Feedback** | `beta_feedback` table | Retained until resolved/reviewed | Admin status update or user account purge |
 | **Chat Sessions & Messages** | `sessions`, `messages` tables | User-controlled | Manual deletion in chat UI or account purge |
@@ -134,3 +140,31 @@ curl -s -b cookies.txt http://127.0.0.1:8000/api/admin/beta-metrics?period_days=
 5. **Personalization**: Adaptation usage rate in generated responses (`adaptation_usage_rate >= 30%`).
 6. **Memory**: Successful cross-session recall in controlled memory scenarios (`>= 90%`).
 7. **Reliability**: Chat error rate (`chat_errors / messages_sent < 1%`).
+
+---
+
+## 9. Pre-Beta Automated Verification Harness
+
+Before onboarding real external beta testers, the automated pre-beta verification harness must be executed to validate funnel telemetry, cohort correlation, admin controls, and account purging.
+
+### Verification Execution Commands:
+
+1. **Offline Mode (Safe for any test environment, zero external LLM calls)**:
+   ```bash
+   python scripts/verify_beta_protocol.py --mode offline --base-url http://127.0.0.1:8000
+   ```
+   *Validates landing events, signup with terms acceptance, authenticated sessions, feedback endpoints, admin metrics, account purge, and guaranteed cleanup without consuming LLM inference.*
+
+2. **Live Mode (Full end-to-end with real Groq streaming)**:
+   ```bash
+   python scripts/verify_beta_protocol.py --mode live --base-url http://127.0.0.1:8000
+   ```
+   *Validates the complete protocol including live SSE token streaming from `openai/gpt-oss-120b`, message ID attribution, and real-time positive feedback.*
+
+### Safety & Isolation Guarantees:
+- **Localhost Guard**: Non-loopback URLs are rejected by default. Running against a non-localhost host requires explicit `--allow-remote` with a warning banner.
+- **Preflight DB Alignment**: Uses a transient HTTP canary event to verify the running server and local DB connection point to the exact same SQLite file before executing tests.
+- **Guaranteed Fixture Cleanup**: All test users, anonymous sessions, feedback submissions, and chat records are tracked and purged in a `finally` block even if tests fail or are interrupted.
+- **Zero-Leak Verification**: Directly queries all database tables post-cleanup to assert 0 test fixtures remain. Fails the run if any artifact leaked.
+- **Disposable Environment**: Always execute against a dedicated local or disposable test database to prevent polluting production analytics.
+
