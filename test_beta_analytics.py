@@ -1100,6 +1100,55 @@ class TestBetaAnalytics(unittest.TestCase):
                 f"Expected 'server_session' for bad input {bad!r}, got {result!r}"
             )
 
+    # 52. Verification harness: safe host checks and run ID uniqueness
+    def test_52_verifier_helpers_safe_host_and_run_id(self):
+        """Verifier helper functions enforce safe host constraints and unique IDs."""
+        from scripts.verify_beta_protocol import is_safe_host, generate_run_id
+
+        # Safe hosts
+        self.assertTrue(is_safe_host("http://127.0.0.1:8000"))
+        self.assertTrue(is_safe_host("http://localhost:8000"))
+        self.assertTrue(is_safe_host("http://0.0.0.0:8000"))
+        self.assertTrue(is_safe_host("http://[::1]:8000"))
+
+        # Remote / unsafe hosts
+        self.assertFalse(is_safe_host("https://production.ava.ai"))
+        self.assertFalse(is_safe_host("https://example.com"))
+        self.assertFalse(is_safe_host("http://192.168.1.100:8000"))
+        self.assertFalse(is_safe_host("invalid-url"))
+
+        # Run ID uniqueness & formatting
+        id1 = generate_run_id()
+        id2 = generate_run_id()
+        self.assertNotEqual(id1, id2)
+        self.assertTrue(id1.startswith("beta_verify_"))
+        self.assertTrue(len(id1) >= 20)
+
+    # 53. Verification harness: CLI argument parser defaults and flags
+    def test_53_verifier_parse_args(self):
+        """Verifier parse_args supports defaults, modes, db-path, and allow-remote."""
+        from scripts.verify_beta_protocol import parse_args
+
+        # Defaults
+        args_default = parse_args([])
+        self.assertEqual(args_default.base_url, "http://127.0.0.1:8000")
+        self.assertEqual(args_default.mode, "offline")
+        self.assertIsNone(args_default.db_path)
+        self.assertFalse(args_default.allow_remote)
+
+        # Custom arguments
+        args_custom = parse_args([
+            "--base-url", "http://localhost:9000",
+            "--mode", "live",
+            "--db-path", "/custom/path.db",
+            "--allow-remote"
+        ])
+        self.assertEqual(args_custom.base_url, "http://localhost:9000")
+        self.assertEqual(args_custom.mode, "live")
+        self.assertEqual(args_custom.db_path, "/custom/path.db")
+        self.assertTrue(args_custom.allow_remote)
+
 
 if __name__ == "__main__":
     unittest.main()
+
