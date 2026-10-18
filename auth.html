@@ -1,659 +1,478 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ava AI — Sign in</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --navy-deep: #11142b;
-            --navy: #161a36;
-            --field: #20264e;
-            --blue: #4a8df0;
-            --blue-light: #6fb1ff;
-            --text: #eef0fb;
-            --muted: #8a90b8;
-            --border: #2b3160;
-        }
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#080f22"><title>Ava AI — Create your account</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;
+  --bg:#080f22;
+  --panel:#0b1226;
+  --field:#131d37;
+  --text:#f5f6ff;
+  --muted:#b7c5eb;
+  --border:#344779;
+  --blue:#35b9ff;
+  --error:#ffaaaa;
+  --ring:rgba(61,144,255,.18)}
 
-        /* ─── Light Mode ────────────────────────────────────────────── */
-        body.light-mode {
-            --navy-deep: #F8F6FF;
-            --navy: #F0ECFA;
-            --field: #ffffff;
-            --blue: #4a8df0;
-            --blue-light: #6fb1ff;
-            --text: #1D1230;
-            --muted: #6B5D82;
-            --border: rgba(27, 22, 100, 0.12);
-            --nav-bg: rgba(248, 246, 255, 0.88);
-            --nav-shadow: 0 4px 20px rgba(27, 22, 100, 0.06);
-            --shell-shadow: 0 40px 80px -40px rgba(27, 22, 100, 0.08);
-            --illustration-bg: radial-gradient(circle at 50% 40%, #F0ECFA 0%, #F8F6FF 70%);
-            --logo-mark-bg: #ffffff;
-            --logo-mark-border: rgba(27, 22, 100, 0.06);
-            --logo-mark-shadow: 0 0 80px rgba(74, 141, 240, 0.08);
-            --error-bg: rgba(248, 113, 113, 0.12);
-            --error-border: rgba(248, 113, 113, 0.25);
-            --error-text: #dc2626;
-            --success-bg: rgba(74, 222, 128, 0.12);
-            --success-border: rgba(74, 222, 128, 0.25);
-            --success-text: #16a34a;
-            --social-btn-bg: #ffffff;
-            --social-btn-border: rgba(27, 22, 100, 0.06);
-            --social-btn-text: #3D2E5A;
-            --social-btn-hover-bg: #F8F6FF;
-            --social-btn-hover-border: var(--blue);
-            --divider-color: rgba(27, 22, 100, 0.06);
-            --switch-link-color: var(--blue);
-        }
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;padding:64px 40px 32px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 43% 0%,#2854aa 0,#182750 26%,transparent 57%),var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif}
+button,input{font:inherit}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+button{cursor:pointer;color:inherit}
+button:disabled{cursor:wait;opacity:.7}
+button:focus-visible,a:focus-visible,input[type=checkbox]:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
+[hidden]{display:none!important}
+h1,h2,p{margin:0}
+svg{width:24px;height:24px;flex-shrink:0;vertical-align:middle}
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.shell{width:1500px;max-width:100%;min-height:830px;display:grid;grid-template-columns:62% 38%;border:1px solid rgba(92,124,205,.45);border-radius:28px;overflow:hidden;background:var(--panel)}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--navy-deep);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            transition: background 0.4s ease, color 0.4s ease;
-        }
-        .shell {
-            width: 100%;
-            max-width: 1000px;
-            display: grid;
-            grid-template-columns: 1.1fr 1fr;
-            background: var(--navy);
-            border-radius: 28px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            box-shadow: var(--shell-shadow, 0 40px 80px -40px rgba(0,0,0,0.6));
-            transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
-        }
-        .illustration {
-            position: relative;
-            background: var(--illustration-bg, radial-gradient(circle at 50% 40%, #1c2358 0%, var(--navy-deep) 70%));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            overflow: hidden;
-            transition: background 0.4s ease;
-        }
-        .logo-display {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 28px;
-        }
-        .logo-mark {
-            width: 180px;
-            height: 180px;
-            border-radius: 36px;
-            background: var(--logo-mark-bg, #1c2358);
-            border: 1px solid var(--logo-mark-border, var(--border));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: var(--logo-mark-shadow, 0 0 80px rgba(74,141,240,0.25));
-            transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
-        }
-        .logo-mark svg { width: 100px; height: 100px; }
-        .logo-wordmark {
-            font-family: 'Sora', sans-serif;
-            font-weight: 800;
-            font-size: 2rem;
-            color: var(--text);
-            letter-spacing: -0.01em;
-            transition: color 0.4s ease;
-        }
-        .logo-wordmark span { color: var(--blue-light); }
-        .logo-tagline {
-            color: var(--muted);
-            font-size: 0.95rem;
-            text-align: center;
-            max-width: 260px;
-            line-height: 1.6;
-            transition: color 0.4s ease;
-        }
-        .panel { padding: 48px 44px; }
-        .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-        .logo-icon { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-        .logo-icon svg { width: 38px; height: 38px; }
-        .logo-text { font-weight: 700; font-size: 1.1rem; font-family: 'Sora', sans-serif; color: var(--text); transition: color 0.4s ease; }
-        h1 { font-size: 1.6rem; margin-bottom: 6px; font-family: 'Sora', sans-serif; color: var(--text); transition: color 0.4s ease; }
-        h1 .accent { color: var(--blue-light); }
-        .subtitle { color: var(--muted); margin-bottom: 28px; transition: color 0.4s ease; }
-        form { display: flex; flex-direction: column; gap: 14px; }
-        .field input {
-            width: 100%;
-            background: var(--field);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 13px 16px;
-            font-size: 0.92rem;
-            color: var(--text);
-            font-family: inherit;
-            transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
-        }
-        .field input::placeholder { color: var(--muted); }
-        .field input:focus { outline: none; border-color: var(--blue); }
-        .toggle-pw { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; }
-        .field { position: relative; }
-        .terms { 
-            display: flex; 
-            align-items: flex-start; 
-            gap: 10px; 
-            font-size: 0.82rem; 
-            margin: 4px 0; 
-            color: var(--muted);
-            padding: 8px 4px;
-            border-radius: 8px;
-            transition: background 0.3s ease;
-        }
-        .terms:hover {
-            background: rgba(255,255,255,0.03);
-        }
-        body.light-mode .terms:hover {
-            background: rgba(27, 22, 100, 0.03);
-        }
-        .terms a { 
-            color: var(--blue-light); 
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-        .terms a:hover {
-            text-decoration: underline;
-        }
-        .terms input[type="checkbox"] {
-            appearance: none;
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            min-width: 18px;
-            border: 2px solid var(--border);
-            border-radius: 4px;
-            background: var(--field);
-            cursor: pointer;
-            position: relative;
-            margin-top: 2px;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-        }
-        .terms input[type="checkbox"]:checked {
-            background: var(--blue);
-            border-color: var(--blue);
-        }
-        .terms input[type="checkbox"]:checked::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff;
-            font-size: 0.7rem;
-            font-weight: 700;
-        }
-        .terms input[type="checkbox"]:focus {
-            outline: 2px solid var(--blue);
-            outline-offset: 2px;
-        }
-        .terms .error-highlight {
-            outline: 2px solid #ff6b6b;
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-        .submit {
-            background: linear-gradient(135deg, var(--blue), #3a6fd6);
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            padding: 13px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: filter 0.15s, transform 0.15s;
-        }
-        .submit:hover { filter: brightness(1.08); transform: translateY(-2px); }
-        .submit:disabled { opacity: 0.6; cursor: wait; transform: none; filter: none; }
-        .switch-mode { text-align: center; margin-top: 12px; color: var(--muted); }
-        .switch-mode a { color: var(--switch-link-color, var(--blue-light)); text-decoration: none; }
-        .divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--muted); font-size: 0.8rem; }
-        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--divider-color, var(--border)); }
-        .social-row { display: flex; justify-content: center; }
-        .social-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            background: var(--social-btn-bg, var(--field));
-            border: 1px solid var(--social-btn-border, var(--border));
-            border-radius: 12px;
-            padding: 11px 28px;
-            color: var(--social-btn-text, var(--text));
-            text-decoration: none;
-            font-size: 0.88rem;
-            font-weight: 500;
-            transition: border-color 0.15s, background 0.15s, transform 0.15s;
-        }
-        .social-btn:hover {
-            border-color: var(--social-btn-hover-border, var(--blue));
-            background: var(--social-btn-hover-bg, rgba(74,141,240,0.1));
-            transform: translateY(-2px);
-        }
-        .error-msg, .success-msg { font-size: 0.85rem; padding: 10px 14px; border-radius: 10px; display: none; }
-        .error-msg { 
-            background: var(--error-bg, rgba(240,90,90,0.12)); 
-            color: var(--error-text, #ff9c9c); 
-            border: 1px solid var(--error-border, rgba(240,90,90,0.25));
-        }
-        .success-msg { 
-            background: var(--success-bg, rgba(90,220,160,0.1)); 
-            color: var(--success-text, #8af0c4); 
-            border: 1px solid var(--success-border, rgba(90,220,160,0.25));
-        }
+.theme-toggle-auth{position:absolute;right:28px;top:19px;border:1px solid #5268a65c;border-radius:100px;display:flex;align-items:center;background:#101a35;padding:3px;width:96px;height:34px;gap:2px}
+.theme-toggle-auth span{display:grid;place-items:center;width:43px;height:28px;border-radius:100px}
+.theme-toggle-auth svg{width:18px;height:18px}
+.theme-sun{color:#f6c573}
+.theme-moon{color:#f4f4ff;background:#26355b}
+.brand{display:inline-flex;align-items:center;gap:15px;font:700 34px/1 Sora,system-ui,sans-serif;color:var(--text);text-decoration:none}
+.brand:hover{text-decoration:none}
+.brand>svg{width:58px;height:58px}
+.brand em{font-style:normal;background:linear-gradient(100deg,#44bef6,#6381fc);color:transparent;background-clip:text}
+.illustration{position:relative;isolation:isolate;padding:42px 38px 32px 52px;background:radial-gradient(ellipse at 98% 9%,#4232828a,transparent 44%),radial-gradient(ellipse at 70% 63%,#233c8055,transparent 57%),linear-gradient(130deg,#080e20,#10162e);overflow:hidden}
+.marketing-copy{position:relative;z-index:2;width:455px;max-width:56%;margin-top:34px}
+.marketing-copy h2{font:800 61px/.99 Sora,system-ui,sans-serif;letter-spacing:-2.8px}
+.gradient-word{background:linear-gradient(90deg,#36c1ed 0%,#6b9cfb 47%,#a16cf3 100%);background-clip:text;color:transparent}
+.intro{font-size:19px;line-height:1.5;color:var(--muted);margin-top:24px;max-width:440px}
+.features{display:grid;gap:16px;margin-top:26px;max-width:450px;position:relative;z-index:2}
+.feature{display:flex;gap:20px;align-items:center}
+.feature-icon{display:grid;place-items:center;flex-shrink:0;width:54px;height:54px;border:1px solid currentColor;border-radius:14px;color:#48beff;background:#1b477d40}
+.feature-icon svg{width:29px;height:29px}
+.feature:nth-child(2) .feature-icon{color:#ad75fb;background:#7140a32b}
+.feature:nth-child(3) .feature-icon{color:#5be3ba;background:#288e7130}
+.feature:nth-child(4) .feature-icon{color:#ffb94f;background:#9c651c33}
+.feature h3{margin:0 0 2px;font-size:16px;font-weight:600;line-height:1.4}
+.feature p{color:var(--muted);font-size:14px;line-height:1.45}
+.value-strip{position:absolute;left:52px;right:32px;bottom:31px;display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:23px;z-index:2}
+.value{display:flex;gap:20px;align-items:center;font-size:13px;line-height:1.6;color:var(--muted)}
+.value:not(:last-child){border-right:1px solid #7182b649;padding-right:20px}
+.value strong{font-weight:400;color:#dce4ff}
+.value svg{width:32px;height:32px;color:#58c57e}
+.value:nth-child(2) svg{color:#ff6d72}
+.value:nth-child(3) svg{color:#9461ff}
 
-        /* ─── Theme Toggle ──────────────────────────────────────────── */
-        .theme-toggle-auth {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 6px 12px;
-            color: var(--muted);
-            font-size: 0.9rem;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            line-height: 1;
-        }
-        .theme-toggle-auth:hover {
-            background: rgba(255,255,255,0.15);
-            border-color: var(--blue);
-            color: var(--text);
-        }
-        .theme-toggle-auth .icon { font-size: 0.9rem; }
+/* Decorative vector composition: no live chat controls or API requests. */
+.chat-art{position:absolute;width:365px;height:500px;right:18px;top:170px;pointer-events:none;z-index:1}
+.ribbons{position:absolute;width:600px;height:690px;max-width:none;left:-132px;top:-110px;z-index:-1}
+.chat-back{position:absolute;left:-28px;top:-3px;width:315px;height:453px;border-radius:24px;border:1px solid #45bcff;background:linear-gradient(140deg,#102b52,#171d42 80%);transform:rotate(7deg);box-shadow:inset 0 0 18px #4184ec22}
+.mock-sidebar{display:flex;flex-direction:column;gap:27px;padding:62px 14px;color:#8597d8}
+.mock-sidebar svg{width:20px;height:20px}
+.mock-sidebar svg:first-child{color:#5bb2ff}
+.chat-front{position:absolute;left:21px;top:10px;width:324px;height:445px;border:1px solid #8277df;border-top-color:#689ee2;border-radius:25px;background:linear-gradient(120deg,#0b142b,#10162c 65%,#26204b);transform:rotate(4deg);padding:22px 20px;box-shadow:0 7px 22px #02081644,inset 0 0 10px #6c8dff17}
+.mock-header{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600}
+.mock-brand{display:flex;align-items:center;gap:7px}
+.mock-brand svg{width:22px;height:22px}
+.mock-brand em{color:#5ca8fc;font-style:normal}
+.status-dots{display:flex;gap:10px}
+.status-dots i{display:block;width:5px;height:5px;background:#7b7bce;border-radius:50%}
+.status-dots i:first-child{background:#a8c875}
+.mock-user{margin:25px 0 20px 35px;background:#252f51;border:1px solid #7983b01c;border-radius:16px;padding:16px 13px;color:#edf1ff;font-size:13px;line-height:1.5}
+.mock-reply{display:flex;align-items:flex-start;gap:10px;border:1px solid #617fee;border-radius:16px;padding:15px 11px;background:linear-gradient(120deg,#1a2a64,#393084);font-size:13px;line-height:1.6;color:#eff1ff;margin-right:17px}
+.mock-reply svg{width:28px;height:28px}
+.typing-dots{display:flex;gap:10px;background:#192040;width:max-content;padding:14px 17px;border-radius:22px;margin-top:19px}
+.typing-dots i{width:6px;height:6px;background:#6d77cb;border-radius:50%}
+.typing-dots i:first-child{background:#668dff}
+.mock-input{position:absolute;bottom:18px;left:15px;right:15px;height:64px;border:1px solid #657fea;background:linear-gradient(120deg,#151e38,#25253e);border-radius:22px;display:flex;align-items:center;justify-content:space-between;padding:10px 10px 10px 20px;color:#8796d1;font-size:15px}
+.mock-input>span{width:39px;height:39px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#509fff,#3863ed);color:white;box-shadow:0 0 13px #4a82fa77}
+.mock-input svg{width:22px}
+.annotation{position:absolute;font:italic 22px/1.05 'Segoe Print','Bradley Hand',cursive;color:#c2b9f6;letter-spacing:.2px;transform:rotate(-9deg);opacity:.88}
+.annotation svg{position:absolute;fill:none;stroke:currentColor;stroke-width:1.4;width:50px;height:50px}
+.note-top{right:6px;top:-75px}
+.note-top svg{left:-31px;top:27px}
+.note-middle{left:-85px;top:278px}
+.note-middle svg{left:14px;top:-42px;transform:rotate(20deg)}
+.note-bottom{right:15px;bottom:-18px}
+.note-bottom svg{left:-49px;top:-24px;transform:rotate(-70deg)}
 
-        /* ─── Light mode overrides for auth page ────────────────────── */
-        body.light-mode .theme-toggle-auth {
-            background: rgba(27, 22, 100, 0.04);
-            border-color: rgba(27, 22, 100, 0.06);
-            color: #6B5D82;
-        }
-        body.light-mode .theme-toggle-auth:hover {
-            background: rgba(27, 22, 100, 0.08);
-            border-color: var(--blue);
-            color: #1D1230;
-        }
-        body.light-mode .submit {
-            background: linear-gradient(135deg, #4a8df0, #3a6fd6);
-            color: #fff;
-        }
-        body.light-mode .submit:hover {
-            filter: brightness(1.08);
-        }
-        body.light-mode .field input {
-            background: #ffffff;
-            border-color: rgba(27, 22, 100, 0.12);
-            color: #1D1230;
-        }
-        body.light-mode .field input::placeholder {
-            color: #6B5D82;
-        }
-        body.light-mode .field input:focus {
-            border-color: #4a8df0;
-        }
+.panel{padding:36px 54px 28px;background:radial-gradient(ellipse at 100% 0%,#16315b80,transparent 50%),linear-gradient(150deg,#0c132a,#080e20);min-width:0}
+.panel .brand{font-size:27px;gap:13px}
+.panel .brand>svg{width:46px;height:46px}
+.panel h1{font:700 34px/1.23 Sora,system-ui,sans-serif;letter-spacing:-1.25px;margin-top:23px;white-space:nowrap}
+.subtitle{font-size:18px;line-height:1.45;color:var(--muted);margin-top:7px}
+.mobile-proposition{display:none}
+form{margin-top:21px}
+.field{position:relative;margin-bottom:12px}
+.input-wrap{position:relative}
+.field-icon{position:absolute;left:17px;top:16px;width:22px;height:22px;color:#a4b3dd;pointer-events:none}
+.field input{height:54px;width:100%;border:1px solid var(--border);border-radius:12px;background:linear-gradient(120deg,#161f38bb,#17244088);color:var(--text);padding:13px 49px 13px 57px;outline:none;font-size:14px;transition:border-color .18s,box-shadow .18s}
+.field input::placeholder{color:#aab7da;opacity:1}
+.field input:focus{border-color:#469cf8;box-shadow:0 0 0 3px var(--ring)}
+.field input[aria-invalid=true]{border-color:var(--error)}
+.field input:-webkit-autofill{-webkit-text-fill-color:var(--text);box-shadow:0 0 0 40px var(--field) inset}
+.toggle-pw{position:absolute;right:12px;top:9px;width:36px;height:36px;display:grid;place-items:center;border:0;background:none;color:#c5cff2;border-radius:8px}
+.toggle-pw svg{width:21px;height:21px}
+.field-error{font-size:12px;color:var(--error);margin-top:5px}
+.password-guidance{list-style:none;padding:0;margin:9px 0 15px;display:grid;gap:2px;color:var(--muted);font-size:13px;line-height:1.5}
+.password-guidance li{display:flex;gap:9px;align-items:center}
+.guidance-dot{width:16px;height:16px;border:1.3px solid #8391b8;border-radius:50%;flex-shrink:0;display:grid;place-items:center;transition:background .2s,border-color .2s}
+.password-guidance .met .guidance-dot{border-color:#69d5b3;background:#25574b;color:#baf6e2}
+.password-guidance .met .guidance-dot:after{content:'✓';font-size:10px}
+.terms{display:flex;align-items:flex-start;gap:11px;color:#c2cdef;font-size:13px;line-height:1.65}
+.terms input{appearance:none;width:22px;height:22px;border:1px solid #5e72ae;border-radius:5px;background:#10182d;flex-shrink:0;margin:0;cursor:pointer;display:grid;place-items:center}
+.terms input:checked{background:#4089ee;border-color:#61b7ff}
+.terms input:checked:after{content:'✓';font-size:15px;color:white}
+.terms input[aria-invalid=true]{border-color:var(--error)}
+.submit{border:1px solid #7095ff66;width:100%;height:54px;border-radius:12px;background:linear-gradient(100deg,#2fa9f8,#3e82fa 55%,#745dff);color:white;display:flex;align-items:center;justify-content:center;gap:14px;font-weight:600;font-size:16px;margin-top:17px;transition:filter .2s,transform .2s}
+.submit:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.submit:active{transform:translateY(0)}
+.submit svg{width:22px}
+.divider{display:flex;align-items:center;gap:17px;margin:17px 0 15px;color:var(--muted);font-size:13px}
+.divider:before,.divider:after{content:'';height:1px;background:#4b5b8c;flex:1}
+.social-btn{display:flex;align-items:center;justify-content:center;gap:17px;width:100%;height:53px;border:1px solid #4d6095;border-radius:12px;color:var(--text);font-size:15px;font-weight:600;background:linear-gradient(120deg,#18213a,#19223b);transition:border-color .2s,background .2s}
+.social-btn:hover{border-color:#7c9ddd;background:#243351;text-decoration:none}
+.social-btn svg{width:23px;height:23px}
+.switch-mode{text-align:center;color:var(--muted);font-size:14px;margin-top:15px}
+.switch-mode button{background:none;border:0;padding:0;color:var(--blue);font:inherit}
+.switch-mode button:hover{text-decoration:underline}
+.privacy-card{display:flex;align-items:center;gap:17px;background:#1a243b99;border:1px solid #53699b50;border-radius:14px;padding:11px 17px;margin-top:17px;min-height:61px;color:var(--muted);font-size:12px;line-height:1.55}
+.privacy-card svg{width:25px;height:25px;color:#5ed9b0}
+.error-msg,.success-msg{border:1px solid #d16b7955;border-radius:10px;background:#b53c4b18;padding:10px 13px;margin-top:14px;font-size:13px;color:var(--error)}
+.success-msg{color:#9fe5bc;border-color:#4b9e6d55;background:#3d9e641a}
+.panel[data-mode=login] form{margin-top:29px}
+.panel[data-mode=login] .privacy-card{margin-top:24px}
 
-        @media (max-width: 760px) {
-            .illustration { display: none; }
-            .shell { grid-template-columns: 1fr; }
-            .panel { padding: 40px 28px; }
-            .theme-toggle-auth { top: 12px; right: 12px; padding: 4px 10px; font-size: 0.8rem; }
-        }
-    </style>
-</head>
-<body>
+body.light-mode{color-scheme:light;
+  --bg:#eaf0fb;
+  --panel:#f9fbff;
+  --field:#f1f5fc;
+  --text:#172341;
+  --muted:#4c5f84;
+  --border:#a5b7d8;
+  --blue:#0874bf;
+  --error:#b72e47;background:radial-gradient(ellipse at 43% 0%,#aecafa,transparent 60%),var(--bg)}
+.light-mode .panel{background:radial-gradient(ellipse at 100% 0%,#d8e6ff,transparent 60%),#fbfcff}
+.light-mode .illustration{--text:#f5f6ff;
+  --muted:#b7c5eb}
+.light-mode .field input{background:#f1f5fc}
+.light-mode .field input::placeholder{color:#627598}
+.light-mode .field-icon,.light-mode .toggle-pw{color:#60749b}
+.light-mode .terms{color:#4c5f84}
+.light-mode .terms input{background:#f1f5fc}
+.light-mode .terms input:checked{background:#4089ee}
+.light-mode .social-btn{background:#f1f5fc}
+.light-mode .social-btn:hover{background:#e5edfb}
+.light-mode .privacy-card{background:#eaf1fb}
+.light-mode .privacy-card svg{color:#22876c}
+.light-mode .success-msg{color:#217346}
+.light-mode .theme-toggle-auth{background:#e7eefb;border-color:#b6c6e3}
+.light-mode .theme-sun{background:#fff;color:#ba790a}
+.light-mode .theme-moon{background:none;color:#687794}
 
-<!-- ─── SVG Defs ─────────────────────────────────────────────────────── -->
-<svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
-    <defs>
-        <linearGradient id="cyanGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#54E6F2"/>
-            <stop offset="100%" stop-color="#7C6CF6"/>
-        </linearGradient>
-    </defs>
-</svg>
+@media(min-width:1200px) and (max-width:1550px){body{padding-inline:28px}
+.illustration{padding-left:36px}
+.marketing-copy{max-width:58%}
+.marketing-copy h2{font-size:clamp(45px,3.75vw,58px)}
+.intro{font-size:17px;max-width:390px}
+.feature{gap:15px}
+.features{max-width:390px}
+.feature h3{font-size:15px}
+.feature p{font-size:13px}
+.chat-art{right:-12px;transform:scale(.85);transform-origin:right center}
+.value-strip{left:36px;gap:14px}
+.value{font-size:11px;gap:12px}
+.panel{padding:39px 35px 28px}
+.panel h1{font-size:30px}
+.subtitle{font-size:16px}
+}
 
-<!-- ─── Theme Toggle ─────────────────────────────────────────────────── -->
-<button class="theme-toggle-auth" id="themeToggle" aria-label="Toggle theme">
-    <span class="icon" id="themeIcon">🌙</span>
-</button>
+@media(min-width:768px) and (max-width:1199px){body{padding:64px 24px 24px}
+.shell{grid-template-columns:55% 45%;min-height:820px}
+.illustration{padding:35px 28px}
+.illustration .brand{font-size:28px}
+.illustration .brand>svg{width:46px;height:46px}
+.marketing-copy{max-width:100%;width:100%;margin-top:26px}
+.marketing-copy h2{font-size:clamp(34px,4.25vw,48px);line-height:1.05;letter-spacing:-1.8px}
+.intro{font-size:15px;max-width:330px;margin-top:18px}
+.features{gap:16px;margin-top:23px;max-width:330px}
+.feature{gap:13px}
+.feature-icon{width:42px;height:42px;border-radius:11px}
+.feature-icon svg{width:24px}
+.feature h3{font-size:13px}
+.feature p{font-size:12px}
+.chat-art{top:auto;bottom:24px;right:17px;transform:scale(.37);transform-origin:right bottom}
+.annotation{display:none}
+.value-strip{left:28px;right:auto;bottom:30px;display:flex;flex-direction:column;gap:11px;max-width:180px}
+.value{font-size:10px;gap:12px}
+.value:not(:last-child){border:0;padding:0}
+.value svg{width:22px;height:22px}
+.panel{padding:35px 25px}
+.panel .brand{font-size:24px}
+.panel h1{font-size:clamp(24px,2.7vw,31px);white-space:normal;letter-spacing:-1px}
+.subtitle{font-size:15px}
+.field input{font-size:13px;padding-left:46px}
+.field-icon{left:14px;width:20px}
+.terms{font-size:12px}
+.password-guidance{font-size:12px}
+.privacy-card{font-size:11px;padding:11px;gap:10px}
+.social-btn{font-size:13px}
+.switch-mode{font-size:12px}
+}
 
-<!-- ─── Auth Shell ───────────────────────────────────────────────────── -->
-<div class="shell">
-    <div class="illustration">
-        <div class="logo-display">
-            <div class="logo-mark">
-                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ava AI chat bot logo">
-                    <circle cx="14" cy="58" r="9" fill="#fff"/>
-                    <circle cx="106" cy="58" r="9" fill="#fff"/>
-                    <line x1="60" y1="8" x2="60" y2="22" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
-                    <circle cx="60" cy="8" r="6" fill="#fff"/>
-                    <path d="M32 24 h56 a18 18 0 0 1 18 18 v34 a18 18 0 0 1 -18 18 h-24 l-18 16 v-16 h-14 a18 18 0 0 1 -18 -18 v-34 a18 18 0 0 1 18 -18 z" fill="#fff"/>
-                    <circle cx="54" cy="58" r="5" fill="#10173f"/>
-                    <circle cx="68" cy="58" r="5" fill="#10173f"/>
-                </svg>
-            </div>
-            <div class="logo-wordmark">Ava<span>AI</span></div>
-            <p class="logo-tagline">Your AI assistant with sentiment analysis, frustration detection, and persistent memory.</p>
-        </div>
-    </div>
+@media(max-width:767px){body{padding:64px 20px 24px;align-items:flex-start;background:radial-gradient(ellipse at 50% 0%,#24437f80,transparent 50%),var(--bg)}
+.shell{display:flex;flex-direction:column;min-height:0;max-width:500px;border-radius:23px}
+.panel{order:0;padding:29px 24px 26px}
+.panel .brand{font-size:26px}
+.panel .brand>svg{width:43px;height:43px}
+.panel h1{font-size:clamp(24px,6.2vw,31px);white-space:normal;letter-spacing:-1px;margin-top:23px}
+.subtitle{font-size:15px;line-height:1.5}
+.mobile-proposition{display:block;color:var(--muted);font-size:12px;margin-top:8px}
+.illustration{display:none}
+.theme-toggle-auth{top:17px;right:20px}
+.field input{font-size:14px;padding-left:48px}
+.field-icon{left:15px}
+.terms{font-size:12px}
+.password-guidance{font-size:12px}
+.submit{font-size:15px}
+.social-btn{font-size:14px}
+.privacy-card{font-size:11px;gap:12px;padding:12px}
+.switch-mode{font-size:13px}
+.panel[data-mode=login]{padding-block:32px 36px}
+}
 
-    <div class="panel">
-        <div class="logo">
-            <div class="logo-icon">
-                <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="30" cy="15" r="14" fill="url(#cyanGrad)"/>
-                    <circle cx="45" cy="40" r="14" fill="#54E6F2" opacity="0.85"/>
-                    <circle cx="15" cy="40" r="14" fill="#7C6CF6" opacity="0.85"/>
-                </svg>
-            </div>
-            <span class="logo-text">Ava AI</span>
-        </div>
-        <h1 id="form-title">Welcome back to <span class="accent">Ava!</span></h1>
-        <p class="subtitle" id="form-subtitle">Sign in to pick up your conversation where you left off.</p>
+@media(max-width:380px){.panel{padding-inline:20px}
+.terms{gap:9px;font-size:11px}
+.panel h1{font-size:24px}
+.field input{font-size:12px}
+.privacy-card{padding-inline:11px}
+}
 
-        <div class="error-msg" id="error-msg"></div>
-        <div class="success-msg" id="success-msg"></div>
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}
+}
 
-        <form id="auth-form">
-            <div class="field" id="name-field" style="display: none;">
-                <input type="text" id="name" placeholder="Enter your name" autocomplete="name">
-            </div>
-            <div class="field">
-                <input type="email" id="email" placeholder="Enter your email" autocomplete="email" required>
-            </div>
-            <div class="field">
-                <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required minlength="6">
-                <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">👁️</button>
-            </div>
+/* Fit the complete signup composition at the 1698 × 926 reference size. */
+@media(min-width:1200px){.panel>.brand{display:flex;width:max-content}
+.panel{padding-bottom:25px}
+.panel form{margin-top:16px}
+.panel .field{margin-bottom:10px}
+.panel .divider{margin-top:14px}
+.panel .privacy-card{margin-top:14px}
+}
 
-            <label class="terms" id="terms-row" style="display: none;">
-                <input type="checkbox" id="agree" required>
-                <span>I agree to the <a href="terms.html" target="_blank">Terms of Service</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></span>
-            </label>
+@media(min-width:1200px) and (max-width:1350px){.chat-art{transform:scale(.73);right:-10px}
+.features{max-width:350px}
+}
 
-            <button type="submit" class="submit" id="submit-btn">Sign In</button>
-        </form>
-
-        <p class="switch-mode" id="switch-mode">
-            New here? <a href="#" id="switch-link">Create an account</a>
-        </p>
-
-        <div class="divider">Or continue with</div>
-        <div class="social-row">
-            <a href="/api/auth/google" class="social-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 10.8v3.6h5.04c-.2 1.2-1.5 3.6-5.04 3.6-3.04 0-5.52-2.52-5.52-5.6s2.48-5.6 5.52-5.6c1.73 0 2.9.74 3.56 1.37l2.43-2.34C16.3 4.32 14.36 3.4 12 3.4 6.93 3.4 2.8 7.53 2.8 12.6s4.13 9.2 9.2 9.2c5.3 0 8.83-3.73 8.83-8.98 0-.6-.07-1.07-.15-1.52H12z"/></svg>
-                Sign in with Google
-            </a>
-        </div>
-    </div>
+</style></head><body>
+<svg class="defs" aria-hidden="true"><defs>
+<linearGradient id="brand-blue" x2=".8" y2="1"><stop stop-color="#4ee2f2"/><stop offset="1" stop-color="#3684ee"/></linearGradient><symbol id="brand-mark" viewBox="0 0 60 60"><circle cx="30" cy="15" r="14" fill="url(#brand-blue)"/><circle cx="15" cy="40" r="14" fill="#7762ff"/><circle cx="45" cy="40" r="14" fill="#2dc9df"/></symbol>
+<symbol id="user-icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 6 0 0 1 16 0v3Z"/></symbol><symbol id="mail-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m3 6 9 7 9-7"/></symbol><symbol id="lock-icon" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 5v3"/></symbol><symbol id="eye-icon" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="shield-icon" viewBox="0 0 24 24"><path d="m12 2 9 4v6c0 6-9 10-9 10S3 18 3 12V6Z"/><path d="m8 12 3 3 5-6"/></symbol><symbol id="arrow-icon" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+<symbol id="brain-icon" viewBox="0 0 24 24"><path d="M10 20V5a3 3 0 0 0-5-2 3 3 0 0 0-3 5 4 4 0 0 0 0 7 4 4 0 0 0 4 6c2 2 4 1 4-1Zm4 0V5a3 3 0 0 1 5-2 3 3 0 0 1 3 5 4 4 0 0 1 0 7 4 4 0 0 1-4 6c-2 2-4 1-4-1ZM5 7l5 3m-5 5 5-1m9-7-5 3m5 5-5-1"/></symbol><symbol id="sliders-icon" viewBox="0 0 24 24"><path d="M2 6h11m6 0h3M2 18h4m6 0h10"/><circle cx="16" cy="6" r="3"/><circle cx="9" cy="18" r="3"/></symbol><symbol id="bolt-icon" viewBox="0 0 24 24"><path d="m14 1-11 13h8l-1 9L21 9h-8Z"/></symbol><symbol id="leaf-icon" viewBox="0 0 24 24"><path d="M21 2C8 1 2 7 5 15s18 5 16-13ZM2 23C5 14 13 10 17 6"/></symbol><symbol id="heart-icon" viewBox="0 0 24 24"><path d="M12 21C-7 8 4-4 12 5 20-4 31 8 12 21Z"/></symbol><symbol id="spark-icon" viewBox="0 0 24 24"><path d="m11 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Zm9-1v6m-3-3h6"/></symbol><symbol id="home-icon" viewBox="0 0 24 24"><path d="m2 11 10-9 10 9M5 9v13h5v-8h4v8h5V9"/></symbol><symbol id="chat-icon" viewBox="0 0 24 24"><path d="M21 11a9 9 0 0 1-9 9H3v-5a9 9 0 1 1 18-4Z"/></symbol>
+</defs></svg>
+<button type="button" class="theme-toggle-auth" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false"><span class="theme-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg></span><span class="theme-moon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 16A9 9 0 0 1 9 3a9 9 0 1 0 11 13Z"/></svg></span></button>
+<main class="shell">
+<section class="illustration" aria-labelledby="value-title">
+<a class="brand" href="/" aria-label="Ava AI home"><svg aria-hidden="true"><use href="#brand-mark"/></svg><span>Ava <em>AI</em></span></a>
+<div class="marketing-copy"><h2 id="value-title">A more<br><span class="gradient-word">understanding</span><br>AI assistant</h2><p class="intro">Chat, reflect, and make progress with an AI assistant that adapts to you, remembers what matters, and always stays on your side.</p></div>
+<div class="features">
+<article class="feature"><span class="feature-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#brain-icon"/></svg></span><div><h3>Remembers what matters</h3><p>Keeps helpful context across conversations.</p></div></article>
+<article class="feature"><span class="feature-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><use href="#sliders-icon"/></svg></span><div><h3>Adapts to your preferences</h3><p>Learns your style and gives more personalized responses over time.</p></div></article>
+<article class="feature"><span class="feature-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><use href="#shield-icon"/></svg></span><div><h3>A safe, private space</h3><p>View, export, or delete your saved memory from your account settings.</p></div></article>
+<article class="feature"><span class="feature-icon"><svg fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><use href="#bolt-icon"/></svg></span><div><h3>Here to help you think</h3><p>Get clear, supportive, and actionable responses.</p></div></article>
 </div>
-
+<div class="chat-art" aria-hidden="true">
+<svg class="ribbons" viewBox="0 0 600 690" fill="none"><defs><linearGradient id="ribbon-blue" x1="100" y1="40" x2="490" y2="620" gradientUnits="userSpaceOnUse"><stop stop-color="#257cd7" stop-opacity="0"/><stop offset=".4" stop-color="#1252b8" stop-opacity=".65"/><stop offset="1" stop-color="#5369ff"/></linearGradient><linearGradient id="ribbon-teal" x1="550" y1="100" x2="300" y2="550" gradientUnits="userSpaceOnUse"><stop stop-color="#65d9d0" stop-opacity=".65"/><stop offset=".5" stop-color="#354496" stop-opacity=".3"/><stop offset="1" stop-color="#7a43d9" stop-opacity=".6"/></linearGradient></defs><path d="M5 25C150 5 277 97 361 220S472 480 269 604C133 690 100 570 168 483S347 253 218 172 88 87 5 25Z" fill="url(#ribbon-blue)"/><path d="M212 190C310 113 448 25 508 139S372 315 452 414 612 488 524 593 316 713 252 609 407 517 327 404 142 291 212 190Z" fill="url(#ribbon-teal)"/><path d="M157 50C325-43 306 186 435 169S585 288 478 345 545 487 362 535 91 578 120 449" stroke="#6d54ed" stroke-opacity=".65" stroke-width="2"/></svg>
+<div class="chat-back"><div class="mock-sidebar"><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#home-icon"/></svg><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#chat-icon"/></svg><svg fill="none" stroke="currentColor" stroke-width="1.7"><use href="#user-icon"/></svg></div></div>
+<div class="chat-front"><div class="mock-header"><span class="mock-brand"><svg><use href="#brand-mark"/></svg><span>Ava <em>AI</em></span></span><span class="status-dots"><i></i><i></i><i></i></span></div><div class="mock-user">I've been feeling overwhelmed lately. Can you help me think this through?</div><div class="mock-reply"><svg><use href="#brand-mark"/></svg><p>Of course. You're not alone in feeling this way. Let's break this down together...</p></div><div class="typing-dots"><i></i><i></i><i></i></div><div class="mock-input">Type a message...<span><svg fill="none" stroke="currentColor" stroke-width="1.8"><use href="#arrow-icon"/></svg></span></div></div>
+<p class="annotation note-top">Thoughtful<br>conversations<svg viewBox="0 0 50 50"><path d="M44 4C18 8 12 23 10 43m-7-9 7 10 8-9"/></svg></p><p class="annotation note-middle">Learns<br>and adapts<svg viewBox="0 0 50 50"><path d="M8 46C5 24 17 12 38 6m-10-1 11 1-4 10"/></svg></p><p class="annotation note-bottom">Always here<br>for you<svg viewBox="0 0 50 50"><path d="M44 4C18 8 12 23 10 43m-7-9 7 10 8-9"/></svg></p>
+</div>
+<div class="value-strip"><div class="value"><svg fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#leaf-icon"/></svg><p><strong>More clarity</strong><br>in everyday decisions</p></div><div class="value"><svg fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#heart-icon"/></svg><p><strong>A supportive</strong><br>and judgment-free space</p></div><div class="value"><svg fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#spark-icon"/></svg><p><strong>A personalized</strong><br>AI that grows with you</p></div></div>
+</section>
+<section class="panel" aria-labelledby="form-title" data-mode="signup">
+<a class="brand" href="/" aria-label="Ava AI home"><svg aria-hidden="true"><use href="#brand-mark"/></svg><span>Ava <em>AI</em></span></a>
+<h1 id="form-title">Create your account</h1><p class="subtitle" id="form-subtitle">Join Ava AI and start a more personalized conversation experience.</p><p class="mobile-proposition">An AI assistant that remembers what matters.</p>
+<div class="error-msg" id="error-msg" role="alert" tabindex="-1" hidden></div><div class="success-msg" id="success-msg" role="status" hidden></div>
+<form id="auth-form" novalidate>
+<div class="field" id="name-field"><label class="sr-only" for="name">Your name</label><div class="input-wrap"><svg class="field-icon" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><use href="#user-icon"/></svg><input type="text" id="name" placeholder="Your name" autocomplete="name" maxlength="100" required aria-describedby="name-error"></div><p class="field-error" id="name-error" hidden></p></div>
+<div class="field"><label class="sr-only" for="email">Your email address</label><div class="input-wrap"><svg class="field-icon" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><use href="#mail-icon"/></svg><input type="email" id="email" placeholder="Your email address" autocomplete="email" required aria-describedby="email-error"></div><p class="field-error" id="email-error" hidden></p></div>
+<div class="field"><label class="sr-only" for="password">Password</label><div class="input-wrap"><svg class="field-icon" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><use href="#lock-icon"/></svg><input type="password" id="password" placeholder="Create a password" autocomplete="new-password" minlength="8" maxlength="128" required aria-describedby="password-error password-guidance"><button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password" aria-pressed="false"><svg fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><use href="#eye-icon"/></svg></button></div><p class="field-error" id="password-error" hidden></p></div>
+<ul class="password-guidance" id="password-guidance"><li id="guidance-length"><span class="guidance-dot" aria-hidden="true"></span>At least 8 characters</li><li id="guidance-mix"><span class="guidance-dot" aria-hidden="true"></span>Includes a letter and a number</li><li><span class="guidance-dot" aria-hidden="true"></span>Use a strong, unique password</li></ul>
+<div id="terms-row"><label class="terms"><input type="checkbox" id="agree" required aria-describedby="agree-error"><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span></label><p class="field-error" id="agree-error" hidden></p></div>
+<button type="submit" class="submit" id="submit-btn"><span id="submit-label">Create Account</span><svg fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#arrow-icon"/></svg></button>
+</form>
+<div class="divider">or continue with</div>
+<a href="/api/auth/google" class="social-btn" id="google-link"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.4a4.6 4.6 0 0 1-2 3v2.6h3.3c1.9-1.8 2.9-4.3 2.9-7.5Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.3-2.6c-.9.6-2 .9-3.4.9-2.6 0-4.9-1.8-5.7-4.2H2.9v2.7A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.3 13.7a6 6 0 0 1 0-3.4V7.6H2.9a10 10 0 0 0 0 8.8Z"/><path fill="#EA4335" d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9A9.6 9.6 0 0 0 12 2a10 10 0 0 0-9.1 5.6l3.4 2.7A6 6 0 0 1 12 6.1Z"/></svg><span id="google-label">Sign up with Google</span></a>
+<p class="switch-mode"><span id="switch-copy">Already have an account?</span> <button type="button" id="switch-link">Sign in</button></p>
+<div class="privacy-card"><svg fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#shield-icon"/></svg><p>Your conversations and account data are protected by Ava's privacy controls.</p></div>
+</section></main>
 <script>
-    // ─── Theme Toggle ────────────────────────────────────────────
-    (function() {
-        const body = document.body;
-        const themeToggle = document.getElementById('themeToggle');
-        const themeIcon = document.getElementById('themeIcon');
+'use strict';
+const $ = id => document.getElementById(id);
+// Shared theme key and cross-tab behavior are unchanged.
+function setTheme(theme) {
+    const light = theme === 'light';
+    document.body.classList.toggle('light-mode', light);
+    $('themeToggle').setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+    $('themeToggle').setAttribute('aria-pressed', String(light));
+    try { localStorage.setItem('ava-theme', light ? 'light' : 'dark'); } catch (_) {}
+}
+let savedTheme = 'dark';
+try { savedTheme = localStorage.getItem('ava-theme') || 'dark'; } catch (_) {}
+setTheme(savedTheme);
+$('themeToggle').addEventListener('click', () => setTheme(document.body.classList.contains('light-mode') ? 'dark' : 'light'));
+window.addEventListener('storage', e => { if (e.key === 'ava-theme') setTheme(e.newValue || 'dark'); });
 
-        const savedTheme = localStorage.getItem('ava-theme') || 'dark';
-
-        function setTheme(theme) {
-            const isDark = theme === 'dark';
-            
-            if (isDark) {
-                body.classList.remove('light-mode');
-                if (themeIcon) themeIcon.textContent = '🌙';
-            } else {
-                body.classList.add('light-mode');
-                if (themeIcon) themeIcon.textContent = '☀️';
-            }
-            
-            localStorage.setItem('ava-theme', theme);
+// Same landing → signup funnel identifier. Never use fingerprints or device data.
+let anonymousSessionFallback;
+function getAnonymousSessionId() {
+    const KEY = 'ava_anon_session_id';
+    let id;
+    try { id = sessionStorage.getItem(KEY); } catch (_) { id = anonymousSessionFallback; }
+    if (!id || !/^[a-zA-Z0-9_\-]{1,64}$/.test(id)) {
+        try { id = 'anon-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24); }
+        catch (_) {
+            const arr = new Uint8Array(12);
+            crypto.getRandomValues(arr);
+            id = 'anon-' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
         }
-
-        setTheme(savedTheme);
-
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'ava-theme') {
-                setTheme(e.newValue || 'dark');
-            }
-        });
-
-        if (themeToggle) {
-            themeToggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const isDark = !body.classList.contains('light-mode');
-                setTheme(isDark ? 'light' : 'dark');
-            });
-        }
-    })();
-
-    // ─── Anonymous Session ID ─────────────────────────────────────────
-    // Reuses the same key as the landing page so that landing_view →
-    // signup_started → signup_completed can be correlated without
-    // identifying the user. No IP, fingerprint, or device data used.
-    function getAnonymousSessionId() {
-        const KEY = 'ava_anon_session_id';
-        let id = sessionStorage.getItem(KEY);
-        if (!id || !/^[a-zA-Z0-9_\-]{1,64}$/.test(id)) {
-            try {
-                id = 'anon-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
-            } catch (_) {
-                // Fallback for environments without crypto.randomUUID
-                const arr = new Uint8Array(12);
-                crypto.getRandomValues(arr);
-                id = 'anon-' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-            }
-            sessionStorage.setItem(KEY, id);
-        }
-        return id;
+        anonymousSessionFallback = id;
+        try { sessionStorage.setItem(KEY, id); } catch (_) {}
     }
-
-    const form = document.getElementById('auth-form');
-    const title = document.getElementById('form-title');
-    const subtitle = document.getElementById('form-subtitle');
-    const nameField = document.getElementById('name-field');
-    const termsRow = document.getElementById('terms-row');
-    const agreeCheckbox = document.getElementById('agree');
-    const submitBtn = document.getElementById('submit-btn');
-    const switchMode = document.getElementById('switch-mode');
-    const switchLink = document.getElementById('switch-link');
-    const errorMsg = document.getElementById('error-msg');
-    const successMsg = document.getElementById('success-msg');
-    const togglePw = document.getElementById('toggle-pw');
-    const pwInput = document.getElementById('password');
-
-    let mode = new URLSearchParams(window.location.search).get('mode') === 'login' ? 'login' : 'signup';
-
-    function render() {
-        errorMsg.style.display = 'none';
-        successMsg.style.display = 'none';
-
-        if (mode === 'signup') {
-            title.innerHTML = 'Welcome to Sign Up <span class="accent">Ava!</span>';
-            subtitle.textContent = 'Create an account to start chatting with your AI assistant.';
-            nameField.style.display = '';
-            document.getElementById('name').required = true;
-            termsRow.style.display = 'flex';
-            agreeCheckbox.required = true;
-            submitBtn.textContent = 'Sign Up';
-            pwInput.setAttribute('autocomplete', 'new-password');
-            switchMode.innerHTML = 'Already have an account? <a href="#" id="switch-link">Sign in</a>';
-        } else {
-            title.innerHTML = 'Welcome back to <span class="accent">Ava!</span>';
-            subtitle.textContent = 'Sign in to pick up your conversation where you left off.';
-            nameField.style.display = 'none';
-            document.getElementById('name').required = false;
-            termsRow.style.display = 'none';
-            agreeCheckbox.required = false;
-            submitBtn.textContent = 'Sign In';
-            pwInput.setAttribute('autocomplete', 'current-password');
-            switchMode.innerHTML = 'New here? <a href="#" id="switch-link">Create an account</a>';
-        }
-
-        const newLink = document.getElementById('switch-link');
-        if (newLink) {
-            newLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                mode = mode === 'signup' ? 'login' : 'signup';
-                const url = new URL(window.location);
-                url.searchParams.set('mode', mode);
-                window.history.replaceState({}, '', url);
-                render();
-            });
-        }
-    }
-
+    return id;
+}
+const form = $('auth-form'), pwInput = $('password'), submitBtn = $('submit-btn');
+let mode = new URLSearchParams(window.location.search).get('mode') === 'login' ? 'login' : 'signup';
+let submitting = false;
+function clearFieldError(id) { $(id).removeAttribute('aria-invalid'); $(id + '-error').hidden = true; }
+function fieldError(id, message) {
+    $(id).setAttribute('aria-invalid', 'true');
+    $(id + '-error').textContent = message;
+    $(id + '-error').hidden = false;
+}
+function updateGuidance() {
+    $('guidance-length').classList.toggle('met', pwInput.value.length >= 8);
+    // Advisory only: the backend does not require a letter/number combination.
+    $('guidance-mix').classList.toggle('met', /[a-z]/i.test(pwInput.value) && /\d/.test(pwInput.value));
+}
+function render() {
+    const signup = mode === 'signup';
+    document.querySelector('.panel').dataset.mode = mode;
+    document.title = signup ? 'Ava AI — Create your account' : 'Ava AI — Sign in';
+    $('form-title').textContent = signup ? 'Create your account' : 'Welcome back';
+    $('form-subtitle').textContent = signup ? 'Join Ava AI and start a more personalized conversation experience.' : 'Sign in to continue your conversations with Ava.';
+    $('name-field').hidden = !signup;
+    $('name').required = signup;
+    $('name').disabled = !signup;
+    $('terms-row').hidden = !signup;
+    $('agree').required = signup;
+    $('agree').disabled = !signup;
+    $('password-guidance').hidden = !signup;
+    pwInput.minLength = signup ? 8 : 1;
+    pwInput.autocomplete = signup ? 'new-password' : 'current-password';
+    pwInput.placeholder = signup ? 'Create a password' : 'Your password';
+    pwInput.setAttribute('aria-describedby', signup ? 'password-error password-guidance' : 'password-error');
+    pwInput.type = 'password';
+    $('toggle-pw').setAttribute('aria-label', 'Show password');
+    $('toggle-pw').setAttribute('aria-pressed', 'false');
+    $('submit-label').textContent = signup ? 'Create Account' : 'Sign In';
+    $('google-label').textContent = signup ? 'Sign up with Google' : 'Sign in with Google';
+    $('switch-copy').textContent = signup ? 'Already have an account?' : 'New here?';
+    $('switch-link').textContent = signup ? 'Sign in' : 'Create an account';
+    $('error-msg').hidden = true;
+    $('success-msg').hidden = true;
+    ['name', 'email', 'password', 'agree'].forEach(clearFieldError);
+    updateGuidance();
+}
+$('switch-link').addEventListener('click', () => {
+    if (submitting) return;
+    mode = mode === 'signup' ? 'login' : 'signup';
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', mode);
+    window.history.replaceState({}, '', url);
     render();
-
-    togglePw.addEventListener('click', () => {
-        const showing = pwInput.type === 'text';
-        pwInput.type = showing ? 'password' : 'text';
-        togglePw.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
-    });
-
-    // ─── Handle Signup with Terms Acceptance ──────────────────────────
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        errorMsg.style.display = 'none';
-        successMsg.style.display = 'none';
-
-        const email = document.getElementById('email').value.trim();
-        const password = pwInput.value;
-        const name = document.getElementById('name').value.trim();
-        const anonId = getAnonymousSessionId();
-
-        // ─── For Signup: Validate Terms Acceptance ────────────────────
-        if (mode === 'signup') {
-            if (!agreeCheckbox.checked) {
-                errorMsg.textContent = '⚠️ You must agree to the Terms of Service and Privacy Policy to create an account.';
-                errorMsg.style.display = 'block';
-                // Highlight the checkbox
-                agreeCheckbox.classList.add('error-highlight');
-                setTimeout(() => {
-                    agreeCheckbox.classList.remove('error-highlight');
-                }, 3000);
-                return;
-            }
-            // ─── Fire signup_started once after client-side validation ─
-            // Do NOT emit on every keystroke; emit exactly once per attempt.
-            try {
-                fetch('/api/events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        event: 'signup_started',
-                        page: '/auth.html',
-                        anonymous_session_id: anonId,
-                        metadata: { source: 'auth_form' }
-                    })
-                }).catch(() => {}); // Analytics failure must not block signup
-            } catch (_) {}
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = mode === 'signup' ? 'Creating account…' : 'Signing in…';
-
+});
+window.addEventListener('popstate', () => {
+    if (submitting) return;
+    mode = new URLSearchParams(window.location.search).get('mode') === 'login' ? 'login' : 'signup';
+    render();
+});
+$('toggle-pw').addEventListener('click', () => {
+    const showing = pwInput.type === 'text';
+    pwInput.type = showing ? 'password' : 'text';
+    $('toggle-pw').setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    $('toggle-pw').setAttribute('aria-pressed', String(!showing));
+});
+['name', 'email', 'password', 'agree'].forEach(id => $(id).addEventListener('input', () => { clearFieldError(id); if (id === 'password') updateGuidance(); }));
+function validate() {
+    ['name', 'email', 'password', 'agree'].forEach(clearFieldError);
+    const errors = [];
+    if (mode === 'signup' && (!$('name').value.trim() || $('name').value.trim().length > 100)) errors.push(['name', 'Enter your name (up to 100 characters).']);
+    $('email').value = $('email').value.trim();
+    if (!$('email').value || !$('email').validity.valid) errors.push(['email', 'Enter a valid email address.']);
+    const minimum = mode === 'signup' ? 8 : 1;
+    if (pwInput.value.length < minimum || pwInput.value.length > 128) errors.push(['password', mode === 'signup' ? 'Use a password between 8 and 128 characters.' : 'Enter your password (up to 128 characters).']);
+    if (mode === 'signup' && !$('agree').checked) errors.push(['agree', 'Please accept the Terms of Service and Privacy Policy to create an account.']);
+    errors.forEach(([id, text]) => fieldError(id, text));
+    if (errors.length) $(errors[0][0]).focus();
+    return errors.length === 0;
+}
+form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (submitting) return;
+    $('error-msg').hidden = true;
+    $('success-msg').hidden = true;
+    if (!validate()) return;
+    const attemptMode = mode;
+    const email = $('email').value.trim(), password = pwInput.value, name = $('name').value.trim();
+    // Lock before analytics/network activity so duplicate submissions cannot race.
+    submitting = true;
+    submitBtn.disabled = true;
+    $('switch-link').disabled = true;
+    form.setAttribute('aria-busy', 'true');
+    $('submit-label').textContent = attemptMode === 'signup' ? 'Creating account…' : 'Signing in…';
+    let anonId;
+    try { anonId = getAnonymousSessionId(); } catch (_) { /* Analytics must not block authentication. */ }
+    if (attemptMode === 'signup' && anonId) {
         try {
-            const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
-
-            // ─── For Signup: Include terms acceptance in the request ──
-            const body = mode === 'signup'
-                ? {
-                    name,
-                    email,
-                    password,
-                    terms_accepted: true,
-                    terms_accepted_date: new Date().toISOString()
-                  }
-                : { email, password };
-
-            // ─── Include anonymous session for funnel attribution ─────
-            // This lets the backend correlate landing_view → signup_started
-            // → signup_completed without identifying the visitor.
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Anonymous-Session': anonId
-                },
-                body: JSON.stringify(body),
-            });
-
-            const contentType = res.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const textResponse = await res.text();
-                console.error('Non-JSON response:', textResponse);
-                throw new Error(`Server returned ${res.status} with non-JSON. ${textResponse.substring(0, 200)}`);
-            }
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.detail || 'Invalid email or password');
-            }
-
-            // ─── Store user data ──────────────────────────────────────
-            const userData = {
-                user_id: data.user_id,
-                name: data.name,
-                email: data.email,
-                is_admin: data.is_admin || false
-            };
-
-            // ─── If signup, store that terms were accepted ────────────
-            if (mode === 'signup') {
-                userData.terms_accepted = true;
-                userData.terms_accepted_date = new Date().toISOString();
-                // Also store in localStorage so we can track across sessions
-                localStorage.setItem('ava-terms-accepted', 'true');
-                localStorage.setItem('ava-terms-accepted-date', new Date().toISOString());
-            }
-
-            localStorage.setItem('neurosupport_user', JSON.stringify(userData));
-
-            successMsg.textContent = mode === 'signup'
-                ? '✅ Account created! You have accepted the Terms & Privacy Policy. Redirecting…'
-                : '✅ Signed in — redirecting…';
-            successMsg.style.display = 'block';
-
-            // ─── Redirect based on admin flag ─────────────────────────
-            setTimeout(() => {
-                if (data.is_admin) {
-                    window.location.href = 'admin.html';
-                } else {
-                    window.location.href = 'chat.html';
-                }
-            }, 800);
-        } catch (err) {
-            console.error('Auth error:', err);
-            errorMsg.textContent = err.message || 'Network error. Please check if the backend server is running.';
-            errorMsg.style.display = 'block';
-            submitBtn.disabled = false;
-            submitBtn.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+            fetch('/api/events', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: 'signup_started', page: '/auth.html', anonymous_session_id: anonId, metadata: { source: 'auth_form' } })
+            }).catch(() => {});
+        } catch (_) {}
+    }
+    try {
+        const endpoint = attemptMode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+        const body = attemptMode === 'signup' ? { name, email, password, terms_accepted: true, terms_accepted_date: new Date().toISOString() } : { email, password };
+        const headers = { 'Content-Type': 'application/json' };
+        if (anonId) headers['X-Anonymous-Session'] = anonId;
+        const res = await fetch(endpoint, { method: 'POST', credentials: 'same-origin', headers, body: JSON.stringify(body) });
+        if (!(res.headers.get('content-type') || '').includes('application/json')) throw new Error('The server could not complete your request. Please try again.');
+        const data = await res.json();
+        if (!res.ok) {
+            const detail = typeof data.detail === 'string' ? data.detail : Array.isArray(data.detail) ? data.detail.map(item => item.msg).filter(Boolean).join(' ') : '';
+            throw new Error(detail || (res.status === 429 ? 'Too many attempts. Please wait a minute and try again.' : 'Unable to sign in. Check your details and try again.'));
         }
-    });
-</script>
-</body>
-</html>
+        const userData = { user_id: data.user_id, name: data.name, email: data.email, is_admin: data.is_admin || false };
+        if (attemptMode === 'signup') {
+            userData.terms_accepted = true;
+            userData.terms_accepted_date = new Date().toISOString();
+            localStorage.setItem('ava-terms-accepted', 'true');
+            localStorage.setItem('ava-terms-accepted-date', userData.terms_accepted_date);
+        }
+        localStorage.setItem('neurosupport_user', JSON.stringify(userData));
+        $('success-msg').textContent = attemptMode === 'signup' ? 'Account created! Redirecting to your conversations…' : 'Signed in — redirecting…';
+        $('success-msg').hidden = false;
+        form.setAttribute('aria-busy', 'false');
+        // signup_completed remains server-owned; do not double-count the funnel.
+        setTimeout(() => { window.location.href = data.is_admin ? 'admin.html' : 'chat.html'; }, 800);
+    } catch (err) {
+        $('error-msg').textContent = err instanceof TypeError ? 'Unable to connect. Check your connection and try again.' : err.message || 'Unable to complete your request. Please try again.';
+        $('error-msg').hidden = false;
+        $('error-msg').focus();
+        submitting = false;
+        submitBtn.disabled = false;
+        $('switch-link').disabled = false;
+        form.setAttribute('aria-busy', 'false');
+        $('submit-label').textContent = mode === 'signup' ? 'Create Account' : 'Sign In';
+    }
+});
+render();
+</script></body></html>
