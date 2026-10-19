@@ -1,0 +1,25 @@
+# ==============================================================================
+# Ava AI — Caddyfile Configuration for Production Reverse Proxy
+# Automates zero-cost HTTPS TLS termination via Let's Encrypt / ZeroSSL
+# ==============================================================================
+
+{$DOMAIN:localhost} {
+    # Forward all traffic to Ava listening internally on 127.0.0.1:8000
+    reverse_proxy 127.0.0.1:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto https
+    }
+
+    # Enable compression
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
